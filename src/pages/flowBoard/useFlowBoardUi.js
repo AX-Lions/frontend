@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export function useFlowchartUi(initialIndex) {
+export function useFlowBoardUi(initialIndex) {
   const [isMeetingMenuOpen, setIsMeetingMenuOpen] = useState(false)
   const [isBriefScrolled, setIsBriefScrolled] = useState(false)
   const [isBriefSearchActive, setIsBriefSearchActive] = useState(false)
