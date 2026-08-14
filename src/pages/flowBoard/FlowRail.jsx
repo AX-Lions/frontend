@@ -17,14 +17,14 @@ export function FlowRail({ activeRail, icons, onRailSelect }) {
       >
         <img src={icons.bookCheck} alt="" />
       </a>
-      <button
+      <a
         className={activeRail === 'chat' ? 'rail-link active' : 'rail-link'}
-        type="button"
+        href="/chat"
         aria-label="채팅"
         onClick={() => onRailSelect('chat')}
       >
         <img src={icons.chat} alt="" />
-      </button>
+      </a>
       <span className="rail-user" />
     </aside>
   )
