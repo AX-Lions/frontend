@@ -67,22 +67,31 @@ jobs:
         run: |
           set -euo pipefail
 
-          # 이전 판을 남겨 둡니다. 새 판이 잘못돼도 되돌릴 수 있어야 합니다.
-          if [ -d "$TARGET/dist" ]; then
-            rm -rf "$TARGET/dist.prev"
-            cp -a "$TARGET/dist" "$TARGET/dist.prev"
-          fi
+          # ⚠ dist 디렉터리 자체를 갈아치우면 안 됩니다.
+          # 서빙하는 컨테이너가 이 디렉터리를 바인드 마운트로 물고 있는데,
+          # 마운트는 이름이 아니라 inode 를 붙잡습니다. rm 후 같은 이름으로 다시
+          # 만들면 실체가 달라져, 컨테이너는 사라진 옛 디렉터리를 계속 봅니다.
+          # 결과는 빈 폴더 → index 없음 → 403 이고, 빌드는 멀쩡한데 화면만 안 뜹니다.
+          #
+          # 그래서 디렉터리는 그대로 두고 안의 내용만 바꿉니다.
+          mkdir -p "$TARGET/dist" "$TARGET/dist.prev"
 
-          # 통째로 바꿉니다. 덮어쓰면 지워진 파일이 남아 낡은 자산이 섞입니다.
-          rm -rf "$TARGET/dist.new"
-          cp -a dist-new "$TARGET/dist.new"
-          rm -rf "$TARGET/dist"
-          mv "$TARGET/dist.new" "$TARGET/dist"
+          # 이전 판 보관 — 새 판이 잘못돼도 되돌릴 수 있어야 합니다.
+          find "$TARGET/dist.prev" -mindepth 1 -delete
+          cp -a "$TARGET/dist/." "$TARGET/dist.prev/" 2>/dev/null || true
 
-          # nginx 는 볼륨을 읽기 전용으로 물고 있어 재시작이 필요 없습니다.
-          # 설정이 바뀐 경우를 위해 리로드만 겁니다.
-          docker exec bordo-web nginx -s reload 2>/dev/null || \
-            docker compose -f "$TARGET/repo/deploy/docker-compose.web.yml" up -d
+          # 내용만 비우고 채웁니다. 비우는 이유는 지워진 파일이 남으면
+          # 낡은 자산이 섞이기 때문입니다.
+          find "$TARGET/dist" -mindepth 1 -delete
+          cp -a dist-new/. "$TARGET/dist/"
+
+          test -f "$TARGET/dist/index.html" || { echo "::error::index.html 이 반영되지 않았습니다"; exit 1; }
+
+          # 정적 파일은 리로드 없이 즉시 반영됩니다. 컨테이너가 내려가 있는
+          # 경우에만 띄웁니다.
+          docker inspect -f '{{.State.Running}}' bordo-web 2>/dev/null | grep -q true || \
+            docker compose -f "$TARGET/repo/deploy/docker-compose.web.yml" \
+                           --env-file "$TARGET/repo/deploy/.env" up -d
 
       - name: 응답 확인
         run: |
@@ -92,10 +101,10 @@ jobs:
             sleep 2
           done
           echo "::error::프론트가 응답하지 않습니다 (마지막 $CODE)"
-          # 되돌립니다.
-          if [ -d "$TARGET/dist.prev" ]; then
-            rm -rf "$TARGET/dist"
-            mv "$TARGET/dist.prev" "$TARGET/dist"
+          # 되돌릴 때도 디렉터리를 갈아치우지 않습니다. 같은 이유입니다.
+          if [ -n "$(ls -A "$TARGET/dist.prev" 2>/dev/null)" ]; then
+            find "$TARGET/dist" -mindepth 1 -delete
+            cp -a "$TARGET/dist.prev/." "$TARGET/dist/"
             echo "::error::이전 판으로 되돌렸습니다"
           fi
           exit 1
