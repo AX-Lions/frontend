@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react'
 const MIN_ZOOM = 1
 const MAX_ZOOM = 1.2
 const ZOOM_STEP = 0.1
+const BOARD_VIEW_PADDING_X = 48
+const BOARD_VIEW_PADDING_Y = 40
 
 function clampZoom(value) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(value.toFixed(2))))
@@ -143,11 +145,11 @@ export function useFlowchartBoard(contentBounds) {
       const availableWidth = board.clientWidth
       const availableHeight = board.clientHeight - (boardHeader?.offsetHeight ?? 64)
       const nextFitScale = Math.min(
-        availableWidth / contentBounds.width,
-        availableHeight / contentBounds.height,
+        (availableWidth - BOARD_VIEW_PADDING_X) / contentBounds.width,
+        (availableHeight - BOARD_VIEW_PADDING_Y) / contentBounds.height,
       )
 
-      setFitScale(Number(nextFitScale.toFixed(4)))
+      setFitScale(Number(Math.max(0.1, Math.min(1, nextFitScale)).toFixed(4)))
     }
 
     updateFitScale()

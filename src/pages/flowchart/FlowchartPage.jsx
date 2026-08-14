@@ -73,28 +73,43 @@ export function FlowchartPage() {
     zoomPercent,
   } = useFlowchartBoard(BOARD_CONTENT_BOUNDS)
   const {
+    activeBriefTag,
     activeCategory,
     activeIndex,
     activeMetricId,
     activeRail,
     activeReplyId,
+    clearReply,
     collapsedFilters,
+    isBriefChatActive,
+    isBriefSearchActive,
+    isFlowSidebarCollapsed,
     isBriefScrolled,
     isMeetingMenuOpen,
     isSidebarScrolled,
     setActiveCategory,
     setActiveIndex,
     setActiveRail,
+    setIsBriefChatActive,
+    setIsBriefSearchActive,
     setIsBriefScrolled,
     setIsSidebarScrolled,
+    toggleBriefTag,
+    toggleFlowSidebar,
     toggleFilterCollapse,
     toggleMeetingMenu,
     toggleMetric,
     toggleReply,
   } = useFlowchartUi(indexes[0])
 
+  const clearReplyFocus = (event) => {
+    if (activeReplyId && !event.target.closest('.reply-card')) {
+      clearReply()
+    }
+  }
+
   return (
-    <div className="flowchart-page">
+    <div className="flowchart-page" onPointerDownCapture={clearReplyFocus}>
       <aside className="flow-rail" aria-label="주요 메뉴">
         <a
           className={activeRail === 'home' ? 'rail-link active' : 'rail-link'}
@@ -123,7 +138,7 @@ export function FlowchartPage() {
         <span className="rail-user" />
       </aside>
 
-      <aside className="flow-sidebar" aria-label="회의 탐색">
+      <aside className={isFlowSidebarCollapsed ? 'flow-sidebar is-collapsed' : 'flow-sidebar'} aria-label="회의 탐색">
         <header className={isSidebarScrolled ? 'team-header is-scrolled' : 'team-header'}>
           <a className="team-name" href="/">
             AX Lions
@@ -131,8 +146,14 @@ export function FlowchartPage() {
           <button className="team-refresh" type="button" aria-label="새로고침">
             <img src={icons.refresh} alt="" />
           </button>
-          <button className="sidebar-toggle" type="button" aria-label="사이드바 접기">
-            <img src={icons.expandLeftDouble} alt="" />
+          <button
+            className="sidebar-toggle"
+            type="button"
+            aria-label={isFlowSidebarCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+            aria-expanded={!isFlowSidebarCollapsed}
+            onClick={toggleFlowSidebar}
+          >
+            <img className={isFlowSidebarCollapsed ? 'is-collapsed' : ''} src={icons.expandLeftDouble} alt="" />
           </button>
         </header>
 
@@ -246,85 +267,87 @@ export function FlowchartPage() {
             </button>
           </header>
 
-          <div
-            className="board-zoom-surface"
-            style={{
-              width: BOARD_CONTENT_BOUNDS.width * renderedZoom,
-              height: BOARD_CONTENT_BOUNDS.height * renderedZoom,
-            }}
-          >
+          <div className="board-center-frame">
             <div
-              className="board-stage"
+              className="board-zoom-surface"
               style={{
-                transform: `scale(${renderedZoom})`,
-                left: -BOARD_CONTENT_BOUNDS.left * renderedZoom,
-                top: -BOARD_CONTENT_BOUNDS.top * renderedZoom,
+                width: BOARD_CONTENT_BOUNDS.width * renderedZoom,
+                height: BOARD_CONTENT_BOUNDS.height * renderedZoom,
               }}
             >
-              <svg className="connector-layer" viewBox="0 0 776 931" preserveAspectRatio="none" aria-hidden="true">
-                <defs>
-                  <marker id="flow-arrow" markerHeight="8" markerWidth="8" orient="auto" refX="7" refY="4">
-                    <path d="M0,0 L8,4 L0,8" />
-                  </marker>
-                </defs>
-                <path d="M198 146 H578" />
-                <path d="M630 198 V642" />
-                <path d="M630 198 V302 H146 V642" />
-                <path d="M198 694 H578" />
-              </svg>
+              <div
+                className="board-stage"
+                style={{
+                  transform: `scale(${renderedZoom})`,
+                  left: -BOARD_CONTENT_BOUNDS.left * renderedZoom,
+                  top: -BOARD_CONTENT_BOUNDS.top * renderedZoom,
+                }}
+              >
+                <svg className="connector-layer" viewBox="0 0 776 931" preserveAspectRatio="none" aria-hidden="true">
+                  <defs>
+                    <marker id="flow-arrow" markerHeight="8" markerWidth="8" orient="auto" refX="7" refY="4">
+                      <path d="M0,0 L8,4 L0,8" />
+                    </marker>
+                  </defs>
+                  <path d="M198 146 H578" />
+                  <path d="M630 198 V642" />
+                  <path d="M630 198 V302 H146 V642" />
+                  <path d="M198 694 H578" />
+                </svg>
 
-              <ProfileNode className="top-left" image="/flowchart/profile-2.jpeg" name="유수인" />
-              <ProfileNode className="top-right" image="/flowchart/profile-3.jpeg" name="서재민" />
-              <ProfileNode className="bottom-right" image="/flowchart/profile-1.jpeg" name="강다은" />
+                <ProfileNode className="top-left" image="/flowchart/profile-2.jpeg" name="유수인" />
+                <ProfileNode className="top-right" image="/flowchart/profile-3.jpeg" name="서재민" />
+                <ProfileNode className="bottom-right" image="/flowchart/profile-1.jpeg" name="강다은" />
 
-              <MetricGroup
-                activeMetricId={activeMetricId}
-                className="top-flow"
-                items={boardMetrics.top}
-                onMetricToggle={toggleMetric}
-              />
-              <MetricGroup
-                activeMetricId={activeMetricId}
-                className="left-flow"
-                items={boardMetrics.left}
-                onMetricToggle={toggleMetric}
-              />
-              <MetricGroup
-                activeMetricId={activeMetricId}
-                className="right-flow"
-                items={boardMetrics.right}
-                onMetricToggle={toggleMetric}
-              />
+                <MetricGroup
+                  activeMetricId={activeMetricId}
+                  className="top-flow"
+                  items={boardMetrics.top}
+                  onMetricToggle={toggleMetric}
+                />
+                <MetricGroup
+                  activeMetricId={activeMetricId}
+                  className="left-flow"
+                  items={boardMetrics.left}
+                  onMetricToggle={toggleMetric}
+                />
+                <MetricGroup
+                  activeMetricId={activeMetricId}
+                  className="right-flow"
+                  items={boardMetrics.right}
+                  onMetricToggle={toggleMetric}
+                />
 
-              <article className="summary-board">
-                {summaryColumns.map((column) => (
-                  <section className="summary-column" key={column.title}>
-                    <h2>{column.title}</h2>
-                    <div>
-                      {column.items.map((item) => (
-                        <button type="button" key={item}>
-                          {item}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </article>
+                <article className="summary-board">
+                  {summaryColumns.map((column) => (
+                    <section className="summary-column" key={column.title}>
+                      <h2>{column.title}</h2>
+                      <div>
+                        {column.items.map((item) => (
+                          <button type="button" key={item}>
+                            {item}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </article>
 
-              <div className="ai-profile">
-                <button className="ai-avatar" type="button" aria-label="임수연의 Bordo 활동내역">
-                  <span className="ai-spark">✦</span>
-                  <strong>
-                    임수연의
+                <div className="ai-profile">
+                  <button className="ai-avatar" type="button" aria-label="임수연의 Bordo 활동내역">
+                    <span className="ai-spark">✦</span>
+                    <strong>
+                      임수연의
+                      <br />
+                      Bordo
+                    </strong>
+                  </button>
+                  <p>
+                    Bordo의 활동내역을 보려면
                     <br />
-                    Bordo
-                  </strong>
-                </button>
-                <p>
-                  Bordo의 활동내역을 보려면
-                  <br />
-                  위 버튼을 눌러주세요!
-                </p>
+                    위 버튼을 눌러주세요!
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -345,9 +368,14 @@ export function FlowchartPage() {
         <aside className={activeReplyId ? 'briefing-panel has-active-reply' : 'briefing-panel'} aria-label="Zero 브리핑">
           <header className={isBriefScrolled ? 'briefing-header is-scrolled' : 'briefing-header'}>
             <h2>Zero 브리핑</h2>
-            <label className="brief-search">
+            <label className={isBriefSearchActive ? 'brief-search is-active' : 'brief-search'}>
               <img src={icons.search} alt="" />
-              <input type="search" aria-label="브리핑 검색" />
+              <input
+                type="search"
+                aria-label="브리핑 검색"
+                onFocus={() => setIsBriefSearchActive(true)}
+                onBlur={(event) => setIsBriefSearchActive(event.currentTarget.value.trim().length > 0)}
+              />
             </label>
           </header>
 
@@ -360,10 +388,15 @@ export function FlowchartPage() {
               </p>
               <div className="brief-tags">
                 {briefTags.map((tag) => (
-                  <span key={tag.label}>
+                  <button
+                    className={activeBriefTag === tag.label ? 'is-active' : ''}
+                    type="button"
+                    key={tag.label}
+                    onClick={() => toggleBriefTag(tag.label)}
+                  >
                     {tag.label}
                     <b>{tag.count}</b>
-                  </span>
+                  </button>
                 ))}
               </div>
             </section>
@@ -372,13 +405,13 @@ export function FlowchartPage() {
               <h3>확인이 필요해요</h3>
               <div className="brief-card-list">
                 {checkItems.map((item) => (
-                  <article className="brief-card" key={item.title}>
+                  <button className="brief-card" type="button" key={item.title}>
                     <div>
                       <h4>{item.title}</h4>
                       <p>{item.body}</p>
                     </div>
                     <img src={icons.expandRight} alt="" />
-                  </article>
+                  </button>
                 ))}
               </div>
             </section>
@@ -387,12 +420,12 @@ export function FlowchartPage() {
               <h3>나에게 요청한 내용</h3>
               <div className="brief-card-list">
                 {requestItems.map((item) => (
-                  <article className="brief-card muted" key={item.title}>
+                  <button className="brief-card muted" type="button" key={item.title}>
                     <div>
                       <h4>{item.title}</h4>
                       <p>{item.body}</p>
                     </div>
-                  </article>
+                  </button>
                 ))}
               </div>
             </section>
@@ -422,8 +455,13 @@ export function FlowchartPage() {
             </section>
           </div>
 
-          <form className="brief-chat">
-            <textarea aria-label="Zero에게 질문" placeholder="Zero에게 물어보세요..." />
+          <form className={isBriefChatActive ? 'brief-chat is-active' : 'brief-chat'}>
+            <textarea
+              aria-label="Zero에게 질문"
+              placeholder="Zero에게 물어보세요..."
+              onFocus={() => setIsBriefChatActive(true)}
+              onBlur={(event) => setIsBriefChatActive(event.currentTarget.value.trim().length > 0)}
+            />
             <div>
               <button type="button" aria-label="내용 추가">
                 <img src={icons.add} alt="" />

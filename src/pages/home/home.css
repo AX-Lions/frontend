@@ -530,7 +530,7 @@ h1 {
 }
 
 .project-card .meeting-company {
-  margin-bottom: 12px;
+  margin-bottom: 18px;
   color: #333333;
   font-size: 13px;
   line-height: 1;
@@ -549,7 +549,7 @@ h1 {
 
 .favorite-mark {
   position: absolute;
-  top: 16px;
+  top: 10px;
   right: 16px;
   width: 24px;
   height: 24px;
@@ -605,40 +605,39 @@ h1 {
 
 .schedule-content {
   display: grid;
-  gap: 16px;
+  align-content: center;
+  gap: 10px;
   min-height: 243px;
   flex: 1;
-  padding: 16px 9px;
-  place-items: center;
+  padding: 18px 24px;
 }
 
 .schedule-item {
-  display: flex;
+  display: grid;
   width: 100%;
-  gap: 48px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
   align-items: center;
-  justify-content: space-between;
-  padding-right: 16px;
+  padding: 8px 0;
+  border-radius: 10px;
+  transition: background 160ms ease;
+}
+
+.schedule-item:hover {
+  background: #fafafb;
+}
+
+.schedule-item:active {
+  background: #f3f4f6;
 }
 
 .schedule-info {
   display: grid;
-  width: 274px;
-  grid-template-columns: 90px minmax(0, 1fr);
-  gap: 32px;
+  min-width: 0;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 20px;
   align-items: center;
   overflow: hidden;
-  border-radius: 8px;
-  padding: 8px 16px;
-  transition: background 160ms ease;
-}
-
-.schedule-info:hover {
-  background: #f3f4f6;
-}
-
-.schedule-info:active {
-  background: #e5e7eb;
 }
 
 .schedule-info time,
@@ -647,19 +646,19 @@ h1 {
 .summary-content time {
   color: #111111;
   font-size: 12px;
-  line-height: 1;
+  line-height: 1.35;
 }
 
 .schedule-info strong {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   font-size: 16px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .schedule-item button {
-  min-width: 116px;
+  min-width: 126px;
   height: 36px;
   border-radius: 999px;
   background: #f3f4f6;
@@ -840,19 +839,16 @@ h1 {
   }
 
   .schedule-item {
-    gap: 20px;
-    padding-right: 10px;
+    gap: 14px;
   }
 
   .schedule-info {
-    width: min(100%, 274px);
-    grid-template-columns: 72px minmax(0, 1fr);
-    gap: 20px;
-    padding-inline: 10px;
+    grid-template-columns: 84px minmax(0, 1fr);
+    gap: 14px;
   }
 
   .schedule-item button {
-    min-width: 108px;
+    min-width: 112px;
     padding-inline: 14px;
   }
 }

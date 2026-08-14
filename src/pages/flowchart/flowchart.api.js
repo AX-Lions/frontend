@@ -131,8 +131,8 @@ export const replyItems = [
 ]
 
 export const BOARD_CONTENT_BOUNDS = {
-  left: 28,
-  top: 86,
-  width: 720,
-  height: 714,
+  left: 38,
+  top: 56,
+  width: 700,
+  height: 820,
 }
