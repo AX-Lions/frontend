@@ -1,0 +1,117 @@
+# main 에 머지되면 서버에 반영합니다.
+#
+# 빌드와 배포를 나눴습니다. 빌드는 GitHub 호스팅 러너가, 배포만 서버의
+# self-hosted 러너가 받습니다.
+#
+#   빌드를 서버에서 하지 않는 이유
+#   - 라즈베리파이에 Node 를 설치하지 않아도 됩니다
+#   - Vite 빌드가 훨씬 빠릅니다
+#   - node_modules 가 서버 디스크를 먹지 않습니다
+#   저장소가 public 이라 호스팅 러너는 무료입니다.
+name: 배포
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      # package-lock.json 을 그대로 따릅니다. npm install 은 잠금 파일을
+      # 고쳐 버려서 "내 컴퓨터에서는 되는데" 가 생깁니다.
+      - name: 의존성
+        run: npm ci
+
+      - name: 빌드
+        run: npm run build
+
+      # 빌드 산출물이 비어 있는데 배포가 성공하는 상황을 막습니다.
+      - name: 산출물 확인
+        run: |
+          test -f dist/index.html || { echo "::error::dist/index.html 이 없습니다"; exit 1; }
+          echo "파일 $(find dist -type f | wc -l)개 · $(du -sh dist | cut -f1)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 3
+
+  deploy:
+    needs: build
+    runs-on: [self-hosted, Linux, ARM64, bordo-frontend]
+    timeout-minutes: 10
+    env:
+      TARGET: /home/zanviq/bordo/frontend
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist-new
+
+      - name: 배포
+        run: |
+          set -euo pipefail
+
+          # 이전 판을 남겨 둡니다. 새 판이 잘못돼도 되돌릴 수 있어야 합니다.
+          if [ -d "$TARGET/dist" ]; then
+            rm -rf "$TARGET/dist.prev"
+            cp -a "$TARGET/dist" "$TARGET/dist.prev"
+          fi
+
+          # 통째로 바꿉니다. 덮어쓰면 지워진 파일이 남아 낡은 자산이 섞입니다.
+          rm -rf "$TARGET/dist.new"
+          cp -a dist-new "$TARGET/dist.new"
+          rm -rf "$TARGET/dist"
+          mv "$TARGET/dist.new" "$TARGET/dist"
+
+          # nginx 는 볼륨을 읽기 전용으로 물고 있어 재시작이 필요 없습니다.
+          # 설정이 바뀐 경우를 위해 리로드만 겁니다.
+          docker exec bordo-web nginx -s reload 2>/dev/null || \
+            docker compose -f "$TARGET/repo/deploy/docker-compose.web.yml" up -d
+
+      - name: 응답 확인
+        run: |
+          for i in $(seq 1 10); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8020/ || true)
+            [ "$CODE" = "200" ] && { echo "정상 (200)"; exit 0; }
+            sleep 2
+          done
+          echo "::error::프론트가 응답하지 않습니다 (마지막 $CODE)"
+          # 되돌립니다.
+          if [ -d "$TARGET/dist.prev" ]; then
+            rm -rf "$TARGET/dist"
+            mv "$TARGET/dist.prev" "$TARGET/dist"
+            echo "::error::이전 판으로 되돌렸습니다"
+          fi
+          exit 1
+
+      - name: SPA 폴백 확인
+        run: |
+          # /flow-board 로 직접 들어와도 index.html 이 나와야 합니다.
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8020/flow-board)
+          [ "$CODE" = "200" ] || { echo "::error::SPA 폴백이 동작하지 않습니다 ($CODE)"; exit 1; }
+          echo "폴백 정상"
+
+      - name: 백엔드 프록시 확인
+        run: |
+          # 인증 없이 부르므로 401 이 정상입니다. 502 면 백엔드가 죽은 것입니다.
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8020/api/v1/home)
+          case "$CODE" in
+            401|403|200) echo "프록시 정상 ($CODE)" ;;
+            *) echo "::error::백엔드 프록시 실패 ($CODE)"; exit 1 ;;
+          esac
