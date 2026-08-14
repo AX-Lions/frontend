@@ -1,37 +1,44 @@
 # AX Lions Frontend
 
-Central Hackathon MVP frontend built with React and Vite.
+중앙 해커톤 MVP 프론트엔드입니다. React와 Vite로 구성되어 있습니다.
 
-## Start
+## 시작하기
 
 ```bash
 npm install
 npm run dev
 ```
 
-On Windows PowerShell, use this if script execution is blocked:
+Windows PowerShell에서 스크립트 실행이 막히면 아래 명령어를 사용하세요.
 
 ```bash
 npm.cmd run dev
 ```
 
-## MVP Folder Structure
+## 폴더 구조
 
-```txt
+```text
 src/
-  app/                 # app router and global providers
-  pages/               # route-level page composition
-  features/            # feature-owned components and logic
-  shared/              # reusable components and constants
-  lib/                 # app-wide clients, formatters, utilities
-  assets/              # static assets imported by components
+  app/                 # 라우터와 전역 Provider
+  pages/               # 화면 단위 페이지 구성
+  features/            # 기능별 컴포넌트와 로직
+  shared/              # 재사용 컴포넌트와 상수
+  lib/                 # 공통 유틸, 포맷터, 클라이언트
+  assets/              # 컴포넌트에서 import하는 정적 에셋
 ```
 
-## Rule of Thumb
+## 작업 기준
 
-- Put a full screen in `pages`.
-- Put domain-specific parts in `features/{feature-name}`.
-- Put reusable buttons, inputs, layout helpers, and constants in `shared`.
-- Put API clients, storage helpers, and pure utility functions in `lib`.
-- Keep demo/mock data close to the feature until it becomes shared.
-- Create `api`, `hooks`, or `styles` folders inside a feature only when files actually need them.
+- 전체 화면은 `pages`에 둡니다.
+- 기능에 종속된 컴포넌트와 로직은 `features/{feature-name}`에 둡니다.
+- 재사용 가능한 버튼, 입력, 레이아웃 헬퍼, 상수는 `shared`에 둡니다.
+- 공통 API 클라이언트, 저장소 헬퍼, 순수 유틸 함수는 `lib`에 둡니다.
+- 데모/목 데이터는 공유가 필요해지기 전까지 해당 기능 가까이에 둡니다.
+- `api`, `hooks`, `styles` 폴더는 실제로 파일이 필요할 때만 만듭니다.
+
+## 현재 구현
+
+- API 연동 제거
+- Figma 시안 기준 목 데이터 적용
+- 홈 화면과 플로우 화면 UI 구성
+- Figma에서 추출한 아이콘 에셋 반영
