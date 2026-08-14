@@ -66,7 +66,7 @@ export function Sidebar({ recentProjects = [], favoriteProjects = [] }) {
             </button>
             {openSections.recent
               ? recentProjects.map((project) => (
-                  <a className="project-link" href="/flowchart" key={project.id}>
+                  <a className="project-link" href="/flow-board" key={project.id}>
                     <img className="doc-icon" src={icons.folder} alt="" aria-hidden="true" />
                     {project.name}
                   </a>
@@ -84,7 +84,7 @@ export function Sidebar({ recentProjects = [], favoriteProjects = [] }) {
             </button>
             {openSections.favorite
               ? favoriteProjects.map((project) => (
-                  <a className="project-link" href="/flowchart" key={project.id}>
+                  <a className="project-link" href="/flow-board" key={project.id}>
                     <img className="doc-icon" src={icons.folder} alt="" aria-hidden="true" />
                     {project.name}
                   </a>

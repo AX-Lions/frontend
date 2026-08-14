@@ -141,7 +141,7 @@ export function HomePage() {
               </h1>
               <a
                 className={homeData.briefing_pending.exists ? 'ai-brief-button' : 'ai-brief-button disabled'}
-                href={homeData.briefing_pending.exists ? `/flowchart?meeting=${homeData.briefing_pending.meeting_id}` : '/'}
+                href={homeData.briefing_pending.exists ? `/flow-board?meeting=${homeData.briefing_pending.meeting_id}` : '/'}
               >
                 Bordo 브리핑 보러가기
               </a>
@@ -173,7 +173,7 @@ export function HomePage() {
                     }
                   }}
                 >
-                  <a className="project-card-link" href={`/flowchart?meeting=${meeting.meeting_id}`}>
+                  <a className="project-card-link" href={`/flow-board?meeting=${meeting.meeting_id}`}>
                     <span className="meeting-company">{getProjectName(meeting.project_id, homeData)}</span>
                     <strong>{meeting.title}</strong>
                     <time>{meeting.displayed_at}</time>

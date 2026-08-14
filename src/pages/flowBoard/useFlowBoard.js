@@ -10,7 +10,7 @@ function clampZoom(value) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(value.toFixed(2))))
 }
 
-export function useFlowchartBoard(contentBounds) {
+export function useFlowBoard(contentBounds) {
   const [zoom, setZoom] = useState(1)
   const [fitScale, setFitScale] = useState(0)
   const [isPanning, setIsPanning] = useState(false)

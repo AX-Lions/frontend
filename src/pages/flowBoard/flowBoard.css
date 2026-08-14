@@ -1,9 +1,9 @@
-.flowchart-page,
-.flowchart-page * {
+.flow-board-page,
+.flow-board-page * {
   box-sizing: border-box;
 }
 
-.flowchart-page {
+.flow-board-page {
   --ink: #1f1f1f;
   --muted: #60646c;
   --soft: #fafafb;
@@ -22,20 +22,20 @@
   font-size: 12px;
 }
 
-.flowchart-page button,
-.flowchart-page input,
-.flowchart-page textarea {
+.flow-board-page button,
+.flow-board-page input,
+.flow-board-page textarea {
   font: inherit;
 }
 
-.flowchart-page button {
+.flow-board-page button {
   border: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
 }
 
-.flowchart-page a {
+.flow-board-page a {
   color: inherit;
   text-decoration: none;
 }
