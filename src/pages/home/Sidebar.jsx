@@ -35,7 +35,7 @@ export function Sidebar({ recentProjects = [], favoriteProjects = [] }) {
         >
           <img src={icons.menu} alt="" />
         </button>
-        <a className="logo" href="/">
+        <a className="logo" href="/" aria-label="Bordo 홈">
           <img src="/BordoLogo.svg" alt="Bordo" />
         </a>
       </div>

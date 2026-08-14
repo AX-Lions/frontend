@@ -20,6 +20,7 @@ const icons = {
   home: '/icons/HomeIcon.svg',
   refresh: '/icons/Refresh.svg',
   search: '/icons/Search.svg',
+  unchecked: '/icons/unchecked.svg',
 }
 
 const participants = [
@@ -383,6 +384,8 @@ export function FlowchartPage() {
           <label className="filter-toggle">
             <span>시간순</span>
             <input type="checkbox" />
+            <img className="checked-icon" src={icons.checked} alt="" />
+            <img className="unchecked-icon" src={icons.unchecked} alt="" />
           </label>
 
           <button className="filter-heading" type="button">
@@ -394,6 +397,7 @@ export function FlowchartPage() {
               <span>{participant.name}</span>
               <input type="checkbox" defaultChecked={participant.checked} />
               <img className="checked-icon" src={icons.checked} alt="" />
+              <img className="unchecked-icon" src={icons.unchecked} alt="" />
             </label>
           ))}
 
@@ -409,6 +413,7 @@ export function FlowchartPage() {
               </span>
               <input type="checkbox" defaultChecked={filter.checked} />
               <img className="checked-icon" src={icons.checked} alt="" />
+              <img className="unchecked-icon" src={icons.unchecked} alt="" />
             </label>
           ))}
         </section>
