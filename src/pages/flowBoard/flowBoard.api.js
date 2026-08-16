@@ -18,7 +18,8 @@ export const toneIcons = {
   request: '/flowchart/icons/request.svg',
   change: '/flowchart/icons/change.svg',
   schedule: '/flowchart/icons/schedule.svg',
-  decision: '/flowchart/icons/decision.svg',
+  conclusion: '/flowchart/icons/decision.svg',
+  etc: '/flowchart/icons/decision.svg',
 }
 
 export const toneLabels = {
@@ -26,7 +27,8 @@ export const toneLabels = {
   request: '요청사항',
   change: '변동사항',
   schedule: '일정',
-  decision: '결정',
+  conclusion: '결론',
+  etc: '기타',
 }
 
 export const participants = [
@@ -43,7 +45,8 @@ export const contentFilters = [
   { name: '요청사항', tone: 'request', checked: true },
   { name: '변동사항', tone: 'change', checked: true },
   { name: '일정', tone: 'schedule', checked: true },
-  { name: '결정', tone: 'decision', checked: false },
+  { name: '결론', tone: 'conclusion', checked: true },
+  { name: '기타', tone: 'etc', checked: true },
 ]
 
 export const indexes = [

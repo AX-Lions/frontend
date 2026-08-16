@@ -911,7 +911,7 @@
   --tone-glow: rgba(165, 243, 252, 0.25);
 }
 
-.metric-icon.decision {
+.metric-icon.conclusion {
   --tone-base: #f0fdf4;
   --tone-hover: #dcfce7;
   --tone-selected: #bbf7d0;
