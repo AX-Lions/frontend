@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import './flowBoard.css'
 import { FlowBriefingSidebar } from './FlowBriefingSidebar'
 import { FlowMetricBadge } from './FlowMetricBadge'
@@ -6,14 +8,11 @@ import { FlowRail } from './FlowRail'
 import {
   BOARD_CONTENT_BOUNDS,
   boardMetrics,
-  briefTags,
-  checkItems,
   contentFilters,
   icons,
   indexes,
+  meetingRecord,
   participants,
-  replyItems,
-  requestItems,
   summaryColumns,
 } from './flowBoard.api'
 import { useFlowBoard } from './useFlowBoard'
@@ -51,6 +50,11 @@ function ProfileNode({ className, image, name }) {
 }
 
 export function FlowBoardPage() {
+  const isBordoBriefingEntry = new URLSearchParams(window.location.search).get('source') === 'bordo-briefing'
+  const [recordPanelMode, setRecordPanelMode] = useState(isBordoBriefingEntry ? 'bordo' : null)
+  const [activeSummaryItem, setActiveSummaryItem] = useState(null)
+  const isRecordPanelOpen = recordPanelMode !== null
+  const isBordoPanelOpen = recordPanelMode === 'bordo'
   const {
     boardRef,
     handleBoardPointerDown,
@@ -72,8 +76,6 @@ export function FlowBoardPage() {
     activeIndex,
     activeMetricId,
     activeRail,
-    activeReplyId,
-    clearReply,
     collapsedFilters,
     isBriefChatActive,
     isBriefSearchActive,
@@ -93,17 +95,10 @@ export function FlowBoardPage() {
     toggleFilterCollapse,
     toggleMeetingMenu,
     toggleMetric,
-    toggleReply,
   } = useFlowBoardUi(indexes[0])
 
-  const clearReplyFocus = (event) => {
-    if (activeReplyId && !event.target.closest('.reply-card')) {
-      clearReply()
-    }
-  }
-
   return (
-    <div className="flow-board-page" onPointerDownCapture={clearReplyFocus}>
+    <div className="flow-board-page">
       <FlowRail activeRail={activeRail} icons={icons} onRailSelect={setActiveRail} />
 
       <FlowNavigationSidebar
@@ -123,10 +118,10 @@ export function FlowBoardPage() {
         participants={participants}
       />
 
-      <main className="flow-workspace">
+      <main className={isRecordPanelOpen ? 'flow-workspace has-record-panel' : 'flow-workspace'}>
         <section
           className={isPanning ? 'flow-board is-panning' : 'flow-board'}
-          aria-label="회의 플로우 보드"
+          aria-label="회의 플로우보드"
           ref={boardRef}
           onWheel={handleBoardWheel}
           onPointerDown={handleBoardPointerDown}
@@ -159,15 +154,37 @@ export function FlowBoardPage() {
               >
                 <svg className="connector-layer" viewBox="0 0 776 931" preserveAspectRatio="none" aria-hidden="true">
                   <defs>
-                    <marker id="flow-arrow" markerHeight="8" markerWidth="8" orient="auto" refX="7" refY="4">
+                    <marker id="flow-arrow-diagonal" markerHeight="8" markerWidth="8" orient="auto" refX="7" refY="4">
                       <path d="M0,0 L8,4 L0,8" />
                     </marker>
                   </defs>
-                  <path d="M198 146 H578" />
-                  <path d="M630 198 V642" />
-                  <path d="M630 198 V302 H146 V642" />
-                  <path d="M198 694 H578" />
+                  <path className="connector-top" d="M175 376 H589" />
+                  <path className="connector-left" d="M614 425 L131 688" />
+                  <path className="connector-right" d="M666 452 V681" />
                 </svg>
+
+                <article className="summary-board">
+                  {summaryColumns.map((column) => (
+                    <section className="summary-column" key={column.title}>
+                      <h2>{column.title}</h2>
+                      <div>
+                        {column.items.map((item) => (
+                          <button
+                            className={activeSummaryItem === `${column.title}-${item}` ? 'is-active' : ''}
+                            type="button"
+                            key={item}
+                            onClick={() => {
+                              setActiveSummaryItem(`${column.title}-${item}`)
+                              setRecordPanelMode('meeting')
+                            }}
+                          >
+                            {item}
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </article>
 
                 <ProfileNode className="top-left" image="/flowchart/profile-2.jpeg" name="유수인" />
                 <ProfileNode className="top-right" image="/flowchart/profile-3.jpeg" name="서재민" />
@@ -192,42 +209,30 @@ export function FlowBoardPage() {
                   onMetricToggle={toggleMetric}
                 />
 
-                <article className="summary-board">
-                  {summaryColumns.map((column) => (
-                    <section className="summary-column" key={column.title}>
-                      <h2>{column.title}</h2>
-                      <div>
-                        {column.items.map((item) => (
-                          <button type="button" key={item}>
-                            {item}
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                </article>
-
-                <div className="ai-profile">
+                <div
+                  className={isBordoPanelOpen ? 'ai-profile is-open' : 'ai-profile'}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClickCapture={(event) => {
+                    event.stopPropagation()
+                    setRecordPanelMode((mode) => (mode === 'bordo' ? null : 'bordo'))
+                  }}
+                >
                   <button className="ai-avatar" type="button" aria-label="임수연의 Bordo 활동내역">
-                    <span className="ai-spark">✦</span>
+                    <span className="ai-spark">B</span>
                     <strong>
                       임수연의
                       <br />
                       Bordo
                     </strong>
                   </button>
-                  <p>
-                    Bordo의 활동내역을 보려면
-                    <br />
-                    위 버튼을 눌러주세요!
-                  </p>
+                  <p>Bordo의 활동내역을 보려면 위 버튼을 눌러주세요!</p>
                 </div>
               </div>
             </div>
           </div>
 
           {zoom > minZoom ? (
-            <div className="zoom-controls" aria-label="플로우 보드 확대 축소">
+            <div className="zoom-controls" aria-label="플로우보드 확대 축소">
               <button type="button" aria-label="축소" onClick={zoomOut} disabled={zoom <= minZoom}>
                 -
               </button>
@@ -239,23 +244,21 @@ export function FlowBoardPage() {
           ) : null}
         </section>
 
-        <FlowBriefingSidebar
-          activeBriefTag={activeBriefTag}
-          activeReplyId={activeReplyId}
-          briefTags={briefTags}
-          checkItems={checkItems}
-          icons={icons}
-          isChatActive={isBriefChatActive}
-          isSearchActive={isBriefSearchActive}
-          isScrolled={isBriefScrolled}
-          onBriefTagToggle={toggleBriefTag}
-          onChatActiveChange={setIsBriefChatActive}
-          onReplyToggle={toggleReply}
-          onScroll={(event) => setIsBriefScrolled(event.currentTarget.scrollTop > 0)}
-          onSearchActiveChange={setIsBriefSearchActive}
-          replyItems={replyItems}
-          requestItems={requestItems}
-        />
+        {isRecordPanelOpen ? (
+          <FlowBriefingSidebar
+            activeBriefTag={activeBriefTag}
+            icons={icons}
+            isChatActive={isBriefChatActive}
+            isSearchActive={isBriefSearchActive}
+            isScrolled={isBriefScrolled}
+            meetingRecord={meetingRecord}
+            mode={recordPanelMode}
+            onBriefTagToggle={toggleBriefTag}
+            onChatActiveChange={setIsBriefChatActive}
+            onScroll={(event) => setIsBriefScrolled(event.currentTarget.scrollTop > 0)}
+            onSearchActiveChange={setIsBriefSearchActive}
+          />
+        ) : null}
       </main>
     </div>
   )

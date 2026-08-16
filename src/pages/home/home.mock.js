@@ -1,5 +1,5 @@
 export const mockHomeData = {
-  user_name: '유수인',
+  user_name: '유수인님',
   greeting_mode: 'BRIEFING_AVAILABLE',
   briefing_pending: {
     exists: true,
