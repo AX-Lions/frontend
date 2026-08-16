@@ -34,8 +34,8 @@ export const participants = [
   { name: '서재민', checked: true },
   { name: '강다은', checked: true },
   { name: '임수연의 Bordo', checked: true },
-  { name: '최비성', checked: false },
-  { name: '임수연', checked: false },
+  { name: '최보미', checked: false },
+  { name: '전수진', checked: false },
 ]
 
 export const contentFilters = [
@@ -43,14 +43,14 @@ export const contentFilters = [
   { name: '요청사항', tone: 'request', checked: true },
   { name: '변동사항', tone: 'change', checked: true },
   { name: '일정', tone: 'schedule', checked: true },
-  { name: '결론', tone: 'decision', checked: false },
+  { name: '결정', tone: 'decision', checked: false },
 ]
 
 export const indexes = [
   '진행 상황 공유',
   '백엔드 개발 논의',
-  '프론트엔드/디자인 싱크 맞추기',
-  '기획안 작성 방향 논의',
+  '프론트엔드 디자인 싱크 맞추기',
+  '기획서 작성 방향 논의',
   '작업 마감 기한 논의',
 ]
 
@@ -76,9 +76,9 @@ export const boardMetrics = {
     { tone: 'change', count: 2 },
   ],
   left: [
+    { tone: 'opinion', count: 3 },
     { tone: 'request', count: 2 },
-    { tone: 'change', count: 3 },
-    { tone: 'schedule', count: 1 },
+    { tone: 'change', count: 2 },
   ],
   right: [
     { tone: 'opinion', count: 1 },
@@ -88,51 +88,161 @@ export const boardMetrics = {
   ],
 }
 
-export const briefTags = [
-  { label: '중요', count: 3 },
-  { label: '결정', count: 3 },
-  { label: '요청사항', count: 2 },
-  { label: '수정사항', count: 4 },
-]
-
-export const checkItems = [
-  {
-    title: '백엔드 개발 일정 변경',
-    body: 'API 연동 완료일이 8/16 -> 8/19로 변경됐어요.',
-  },
-  {
-    title: '디자인 수정 요청',
-    body: '임수연님이 회의 화면의 우측 패널 너비 조정을 요청했어요.',
-  },
-]
-
-export const requestItems = [
-  {
-    title: '8/15까지 회의 화면 디자인 수정',
-    body: '서재민님이 요청했어요.',
-  },
-  {
-    title: '수정된 화면 개발팀에 공유',
-    body: '다음 회의 전까지 확인이 필요해요.',
-  },
-]
-
-export const replyItems = [
-  {
-    id: 'design-deadline',
-    question: '디자인 최종안은 언제까지 전달 가능할까요?',
-    meta: '임수연 · 14:32',
-  },
-  {
-    id: 'api-scope',
-    question: 'API 수정사항도 이번 스프린트에 포함일까요?',
-    meta: '최비성 · 14:32',
-  },
-]
+export const meetingRecord = {
+  title: '서재민의 회의록',
+  highlightTitle: '주요 발언',
+  highlight:
+    '로그인 오류는 인증 토큰 처리 과정에서 발생한 것 같아요. API 연동 일정은 이틀 정도 미뤄야 할 것 같습니다. 수정된 화면은 개발팀에 공유 부탁드려요.',
+  tags: [
+    { label: '의견', count: 3 },
+    { label: '요청사항', count: 5 },
+    { label: '변동사항', count: 4 },
+    { label: '일정', count: 1 },
+    { label: '결정', count: 1 },
+  ],
+  sections: [
+    {
+      title: '전달한 내용',
+      groups: [
+        {
+          tone: 'opinion',
+          label: '의견',
+          items: [
+            {
+              title: '로그인 오류 원인',
+              body: '“확인해보니까 토큰 만료 처리 쪽에서 문제가 발생하는 것 같아요.”',
+              meta: '→ 임수연의 Bordo · 14:18',
+            },
+            {
+              title: '에러 메시지 처리',
+              body: '“그러면 로그인 실패 원인을 구분해서 메시지를 보여주는 건 어떤가요.”',
+              meta: '→ 임수연의 Bordo · 14:24',
+            },
+            {
+              title: '로딩 처리',
+              body: '“API 응답이 늦어질 수 있어서 로딩 상태는 넣는 게 좋을 것 같습니다.”',
+              meta: '→ 임수연의 Bordo · 14:31',
+            },
+            {
+              title: '로그인 유지 방식',
+              body: '“사용자가 앱을 다시 실행했을 때 매번 로그인하지 않도록 로그인 상태를 일정 기간 유지하면 좋을 것 같아요.”',
+              meta: '→ 강다은 · 18:04',
+            },
+          ],
+        },
+        {
+          tone: 'request',
+          label: '요청사항',
+          items: [
+            {
+              title: '수정된 디자인 확인 요청',
+              body: '“로그인 화면 수정된 시안 나오면 공유 부탁드릴게요.”',
+              meta: '→ 임수연의 Bordo · 14:27',
+            },
+            {
+              title: '프론트엔드 확인 요청',
+              body: '“에러 코드 전달드리면 화면에서 어떻게 처리할지 한 번 확인해주세요.”',
+              meta: '→ 임수연의 Bordo · 18:48',
+            },
+            {
+              title: 'QA 테스트 요청',
+              body: '“로그인 수정 완료되면 QA 한 번 같이 진행해주시면 될 것 같아요.”',
+              meta: '→ 강다은 · 29:33',
+            },
+          ],
+        },
+        {
+          tone: 'change',
+          label: '변동사항',
+          items: [
+            {
+              title: '비밀번호 오류 처리 변경',
+              body: '“비밀번호 오류 발생 시 기존 공통 에러 메시지 대신 로그인 실패 사유를 구분해서 전달하도록 변경됐어요.”',
+              meta: '→ 강다은 · 24:48',
+            },
+            {
+              title: '로그인 처리 방식 변경',
+              body: '“토큰 만료 시에는 재로그인시키는 방식으로 변경할게요.”',
+              meta: '→ 임수연의 Bordo · 34:29',
+            },
+            {
+              title: '개발 범위 변경',
+              body: '“이번에는 소셜 로그인까지 말고 일반 로그인 수정까지만 진행하겠습니다.”',
+              meta: '→ 강다은 · 41:01',
+            },
+            {
+              title: '로그인 API 응답 구조 변경',
+              body: '“로그인 API 응답값에 사용자 프로필 정보가 함께 포함되도록 응답 구조 변경했습니다.”',
+              meta: '→ 강다은 · 41:01',
+            },
+          ],
+        },
+        {
+          tone: 'schedule',
+          label: '일정',
+          items: [
+            {
+              title: 'API 연동 일정',
+              body: '“API 연동 완료일은 8월 19일까지로 다시 잡겠습니다.”',
+              meta: '→ 강다은 · 37:10',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      title: '전달받은 내용',
+      groups: [
+        {
+          tone: 'opinion',
+          label: '의견',
+          items: [
+            {
+              title: '로그인 오류 원인',
+              body: '“확인해보니까 토큰 만료 처리 쪽에서 문제가 발생하는 것 같아요.”',
+              meta: '유수인 → · 14:18',
+            },
+            {
+              title: '에러 메시지 처리',
+              body: '“그러면 로그인 실패 원인을 구분해서 메시지를 보여주는 건 어떤가요.”',
+              meta: '유수인 → · 14:24',
+            },
+            {
+              title: '로딩 처리',
+              body: '“API 응답이 늦어질 수 있어서 로딩 상태는 넣는 게 좋을 것 같습니다.”',
+              meta: '유수인 → · 14:31',
+            },
+          ],
+        },
+        {
+          tone: 'request',
+          label: '요청사항',
+          items: [
+            {
+              title: '수정된 디자인 확인 요청',
+              body: '“로그인 화면 수정된 시안 나오면 공유 부탁드릴게요.”',
+              meta: '유수인 → · 14:27',
+            },
+            {
+              title: '프론트엔드 확인 요청',
+              body: '“에러 코드 전달드리면 화면에서 어떻게 처리할지 한 번 확인해주세요.”',
+              meta: '유수인 → · 18:48',
+            },
+            {
+              title: 'QA 테스트 요청',
+              body: '“로그인 수정 완료되면 QA 한 번 같이 진행해주시면 될 것 같아요.”',
+              meta: '유수인 → · 29:33',
+            },
+          ],
+        },
+      ],
+    },
+  ],
+}
 
 export const BOARD_CONTENT_BOUNDS = {
-  left: 38,
-  top: 56,
-  width: 700,
-  height: 820,
+  left: 0,
+  top: 0,
+  width: 776,
+  height: 931,
 }

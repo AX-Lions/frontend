@@ -75,7 +75,10 @@ export function useFlowBoard(contentBounds) {
   }
 
   const handleBoardPointerDown = (event) => {
-    if (event.button !== 0 || event.target.closest('.zoom-controls, .meeting-title button')) {
+    if (
+      event.button !== 0 ||
+      event.target.closest('.zoom-controls, .meeting-title button, .ai-profile, .summary-board button')
+    ) {
       return
     }
 
