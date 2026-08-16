@@ -7,6 +7,12 @@ const starIcons = {
   inactive: '/icons/Starunactive.svg',
 }
 
+const chatIcons = {
+  add: '/chat-icons/add-round.svg',
+  filter: '/chat-icons/filter-alt.svg',
+  send: '/chat-icons/send-hor.svg',
+}
+
 function formatScheduleTime(value) {
   if (!value) {
     return ''
@@ -47,6 +53,7 @@ export function HomePage() {
   const [recentMeetings, setRecentMeetings] = useState(() => getMockHomeData().recent_meetings)
   const [favoriteMessage, setFavoriteMessage] = useState('')
   const [selectedMeetingId, setSelectedMeetingId] = useState('mtg_88')
+  const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
 
   useEffect(() => {
     if (!favoriteMessage) {
@@ -135,13 +142,17 @@ export function HomePage() {
           <section className="welcome-section">
             <div className="welcome-row">
               <h1>
-                안녕하세요, {homeData.user_name}님
+                안녕하세요, {homeData.user_name}
                 <br />
                 Bordo에 오신 것을 환영합니다.
               </h1>
               <a
                 className={homeData.briefing_pending.exists ? 'ai-brief-button' : 'ai-brief-button disabled'}
-                href={homeData.briefing_pending.exists ? `/flow-board?meeting=${homeData.briefing_pending.meeting_id}` : '/'}
+                href={
+                  homeData.briefing_pending.exists
+                    ? `/flow-board?meeting=${homeData.briefing_pending.meeting_id}&source=bordo-briefing`
+                    : '/'
+                }
               >
                 Bordo 브리핑 보러가기
               </a>
@@ -157,7 +168,7 @@ export function HomePage() {
             </div>
 
             <div className="project-strip">
-              {recentMeetings.map((meeting) => (
+              {recentMeetings.slice(0, 5).map((meeting) => (
                 <article
                   className={
                     selectedMeetingId === meeting.meeting_id ? 'project-card selected' : 'project-card'
@@ -200,20 +211,28 @@ export function HomePage() {
                 </a>
               </div>
               <div className="schedule-content">
-                {homeData.today_schedule.map((schedule) => (
-                  <div className="schedule-item" key={`${schedule.at}-${schedule.project_id}`}>
-                    <div className="schedule-info">
-                      <time>{schedule.time_range ?? formatScheduleTime(schedule.at)}</time>
-                      <div>
-                        <strong>{schedule.title}</strong>
-                        <span>
-                          {schedule.project_name} · {schedule.location}
-                        </span>
-                      </div>
+                {homeData.today_schedule.map((schedule) => {
+                  const scheduleKey = `${schedule.at}-${schedule.project_id}`
+
+                  return (
+                    <div className="schedule-item" key={scheduleKey}>
+                      <button
+                        className={selectedScheduleKey === scheduleKey ? 'schedule-info selected' : 'schedule-info'}
+                        type="button"
+                        onClick={() => setSelectedScheduleKey(scheduleKey)}
+                      >
+                        <time>{schedule.time_range ?? formatScheduleTime(schedule.at)}</time>
+                        <div>
+                          <strong>{schedule.title}</strong>
+                          <span>
+                            {schedule.project_name} · {schedule.location}
+                          </span>
+                        </div>
+                      </button>
+                      <button type="button">회의 참여하기</button>
                     </div>
-                    <button type="button">회의 참여하기</button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </article>
 
@@ -225,31 +244,53 @@ export function HomePage() {
                 </a>
               </div>
               <div className="summary-content">
-                <div className="summary-meta">
-                  <span>{homeData.recent_meeting_summary.project_name}</span>
-                  <time>{homeData.recent_meeting_summary.displayed_at}</time>
+                <div className="summary-topline">
+                  <div className="summary-title-stack">
+                    <span>{homeData.recent_meeting_summary.project_name}</span>
+                    <h3>{homeData.recent_meeting_summary.title}</h3>
+                  </div>
+                  <div className="summary-state">
+                    <time>{homeData.recent_meeting_summary.displayed_at}</time>
+                    <span className="summary-badge">{homeData.recent_meeting_summary.status}</span>
+                  </div>
                 </div>
-                <h3>{homeData.recent_meeting_summary.title}</h3>
-                <span className="summary-badge">{homeData.recent_meeting_summary.status}</span>
+
                 <hr className="summary-divider" />
-                <p>
+
+                <div className="summary-block">
                   <strong>주요 결정</strong>
-                  {homeData.recent_meeting_summary.main_decisions.map((decision) => (
-                    <span key={decision}>{decision}</span>
-                  ))}
-                </p>
-                <p className="zero-summary">
+                  <ul>
+                    {homeData.recent_meeting_summary.main_decisions.map((decision) => (
+                      <li key={decision}>{decision}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="summary-block zero-summary">
                   <strong>Zero 요약</strong>
-                  <span>“{homeData.recent_meeting_summary.zero_summary}”</span>
-                </p>
+                  <p>“{homeData.recent_meeting_summary.zero_summary}”</p>
+                </div>
               </div>
             </article>
           </section>
         </div>
 
-        <button className="chat-button" type="button">
-          채팅창
-        </button>
+        <div className="chat-dock" role="group" aria-label="Bordo 채팅">
+          <div className="chat-tools">
+            <button type="button" aria-label="추가">
+              <img src={chatIcons.add} alt="" />
+            </button>
+            <button type="button" aria-label="필터">
+              <img src={chatIcons.filter} alt="" />
+            </button>
+          </div>
+          <button className="chat-input" type="button">
+            Bordo에게 물어보세요...
+          </button>
+          <button className="chat-send" type="button" aria-label="전송">
+            <img src={chatIcons.send} alt="" />
+          </button>
+        </div>
       </main>
     </div>
   )
