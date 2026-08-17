@@ -593,8 +593,20 @@
   scrollbar-width: none;
 }
 
+/*
+  말풍선 폭은 고정이 아니라 내용이 정한다.
+  ──────────────────────────────────────
+  고치기 전에는 `width: 214px` 이 박혀 있었다. 한 글자를 보내도 214px 짜리
+  상자가 나오고, 두 문장을 보내면 그 상자 안에서 다섯 줄로 접혔다. 게다가
+  `padding` 이 0 이라 **글자가 모서리에 붙었다.**
+
+  폭을 창 기준 비율로 두는 이유는, 채팅 영역이 목록 패널 유무·전체 화면에 따라
+  넓이가 크게 달라지기 때문이다. px 로 두면 넓은 화면에서는 한가운데 가느다란
+  띠가 되고 좁은 화면에서는 넘친다.
+*/
 .message-row {
   display: flex;
+  max-width: 76%;
   gap: 8px;
 }
 
@@ -604,8 +616,8 @@
 
 .message-row.bot > div {
   display: grid;
-  gap: 8px;
-  width: 320px;
+  min-width: 0;
+  gap: 4px;
 }
 
 .message-row.bot strong {
@@ -615,11 +627,13 @@
 
 .message-row.bot span {
   display: flex;
+  min-width: 0;
   align-items: flex-end;
   gap: 8px;
 }
 
 .message-row.me {
+  align-self: flex-end;
   align-items: flex-end;
   justify-content: flex-end;
 }
@@ -631,10 +645,17 @@
 
 .message-bubble {
   display: block;
-  width: 214px;
-  min-height: 63px;
+  width: fit-content;
+  max-width: 100%;
   margin: 0;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  line-height: 1.5;
+  /* 보낸 사람이 넣은 줄바꿈을 지우지 않는다. 서버는 본문을 그대로 저장하는데
+     화면이 `pre-wrap` 을 안 주면 여러 줄이 한 줄로 뭉쳐 보인다. */
+  white-space: pre-wrap;
+  /* 띄어쓰기 없는 긴 URL 한 줄이 말풍선을 뚫고 나가는 것을 막는다. */
+  overflow-wrap: anywhere;
 }
 
 .message-bubble.gray {
