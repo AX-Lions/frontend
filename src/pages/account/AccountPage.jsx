@@ -105,7 +105,11 @@ export function AccountPage() {
     draftAgentName !== null && draftAgentName.trim() !== (agent.data?.agent_name ?? '')
 
   // 비워 두면 서버가 이 문자열을 만든다. 여기서는 **보여만 주고 저장하지 않는다** —
-  // 저장해 버리면 나중에 이름을 바꿔도 대리인은 옛 이름으로 남는다.
+  // 저장해 버리면 나중에 사람 이름을 바꿔도 대리인은 옛 이름으로 굳는다.
+  //
+  // 다만 조립 규칙이 서버와 여기 두 군데가 됐다. 서버가 기본 호칭 형식을 바꾸면
+  // 이 자리만 옛 형식으로 남는다. 설정 응답에 다 만들어진 이름을 하나
+  // 얹어 달라고 백엔드에 올려 뒀고, 오면 이 줄을 지우고 그것을 쓴다.
   const fallbackAgentName = me.data?.name ? `${me.data.name}의 Bordo` : '내 Bordo'
 
   const say = (type, message) => setNotice({ type, message })
