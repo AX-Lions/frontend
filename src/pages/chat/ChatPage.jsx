@@ -482,9 +482,9 @@ const settingItems = [
 ]
 
 
-function SettingSwitch({ enabled, onToggle }) {
+function SettingSwitch({ enabled, disabled = false, onToggle }) {
   return (
-    <button className={enabled ? 'settings-switch on' : 'settings-switch'} type="button" aria-pressed={enabled} onClick={onToggle}>
+    <button className={enabled ? "settings-switch on" : "settings-switch"} type="button" aria-pressed={enabled} disabled={disabled} onClick={onToggle}>
       <span className="settings-switch-knob" />
       <span className="settings-switch-label">{enabled ? 'ON' : 'OFF'}</span>
     </button>
@@ -527,6 +527,7 @@ function SettingsPanel() {
   const [openPromptMenuId, setOpenPromptMenuId] = useState(null)
   const [promptText, setPromptText] = useState('')
   const [notice, setNotice] = useState(null)
+  const [pendingKeys, setPendingKeys] = useState([])
 
   useEffect(() => {
     if (!notice) {
@@ -551,7 +552,18 @@ function SettingsPanel() {
 
   const toggleSetting = async (settingId) => {
     const key = SETTING_KEY[settingId]
+
+    // 보내는 중인 키는 다시 받지 않는다.
+    //
+    // 빠르게 두 번 누르면 PATCH 두 개가 순서 없이 오간다. 늦게 도착한 쪽이
+    // 서버의 마지막 값이 되는데 화면은 두 번째 클릭 기준으로 그려져 있어,
+    // **서버와 화면이 어긋난 채 새로고침 전까지 남는다.**
+    if (pendingKeys.includes(key)) {
+      return
+    }
+
     const next = !serverSettings?.[key]
+    setPendingKeys((c) => [...c, key])
 
     // 먼저 칠하고 보낸다. 스위치는 누른 즉시 움직여야 눌린 줄 안다.
     setServerSettings((current) => ({ ...(current ?? {}), [key]: next }))
@@ -568,6 +580,8 @@ function SettingsPanel() {
     } catch (err) {
       setServerSettings((current) => ({ ...(current ?? {}), [key]: !next }))
       showNotice('error', err?.message)
+    } finally {
+      setPendingKeys((c) => c.filter((k) => k !== key))
     }
   }
 
@@ -635,7 +649,11 @@ function SettingsPanel() {
                   <strong>{item.title}</strong>
                   <p>{item.description}</p>
                 </div>
-                <SettingSwitch enabled={item.enabled} onToggle={() => toggleSetting(item.id)} />
+                <SettingSwitch
+                  disabled={pendingKeys.includes(SETTING_KEY[item.id])}
+                  enabled={item.enabled}
+                  onToggle={() => toggleSetting(item.id)}
+                />
               </div>
             ))}
           </div>

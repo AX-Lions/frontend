@@ -20,6 +20,7 @@ export function HomePage() {
   const [favoriteMessage, setFavoriteMessage] = useState('')
   const [selectedMeetingId, setSelectedMeetingId] = useState(null)
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
+  const [pendingFavorites, setPendingFavorites] = useState([])
 
   useEffect(() => {
     if (!favoriteMessage) {
@@ -44,6 +45,15 @@ export function HomePage() {
     event.preventDefault()
     event.stopPropagation()
 
+    // 보내는 중인 것은 다시 받지 않는다.
+    //
+    // 빠르게 두 번 누르면 두 요청이 순서 없이 오간다. `PUT` 이 `DELETE` 보다
+    // 늦게 도착하면 **서버는 즐겨찾기인데 화면은 아니다.** 성공 경로에서는
+    // 서버 값과 다시 맞춰 보지 않으므로 그 어긋남이 새로고침 전까지 남는다.
+    if (pendingFavorites.includes(meetingId)) {
+      return
+    }
+
     const target = homeData?.recent_meetings?.find((m) => m.meeting_id === meetingId)
     if (!target) {
       return
@@ -58,12 +68,15 @@ export function HomePage() {
 
     paint(next)
     setFavoriteMessage(next ? '즐겨찾기에 추가했습니다' : '즐겨찾기에서 제거했습니다')
+    setPendingFavorites((c) => [...c, meetingId])
 
     try {
       await setMeetingFavorite(meetingId, next)
     } catch (err) {
       paint(!next)
       setFavoriteMessage(err?.message || '즐겨찾기를 바꾸지 못했습니다')
+    } finally {
+      setPendingFavorites((c) => c.filter((id) => id !== meetingId))
     }
   }
 
@@ -166,6 +179,7 @@ export function HomePage() {
                       className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
                       type="button"
                       aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
+                      disabled={pendingFavorites.includes(meeting.meeting_id)}
                       onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
                     >
                       <img src={meeting.is_favorite ? starIcons.active : starIcons.inactive} alt="" />
