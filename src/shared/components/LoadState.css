@@ -1,0 +1,57 @@
+.load-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.load-state p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.load-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--line);
+  border-top-color: var(--muted);
+  border-radius: 50%;
+  animation: load-spin 0.8s linear infinite;
+}
+
+@keyframes load-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 움직임을 줄여 달라고 설정한 사람에게는 돌리지 않는다. 회전은 어지럼증을
+   유발할 수 있고, 여기서는 점만 보여도 뜻이 전달된다. */
+@media (prefers-reduced-motion: reduce) {
+  .load-spinner {
+    animation: none;
+    border-top-color: var(--line);
+  }
+}
+
+.load-state-error .load-message {
+  color: var(--accent);
+}
+
+.load-state-error button {
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.load-state-error button:hover {
+  background: var(--sidebar);
+}
