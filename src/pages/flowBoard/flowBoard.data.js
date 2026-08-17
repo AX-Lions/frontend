@@ -93,6 +93,12 @@ export async function resolveMeetingId(signal) {
   if (fromUrl) {
     return fromUrl
   }
+
   const home = await api.get('/home', undefined, { signal })
-  return home?.recent_meeting_summary?.meeting_id ?? null
+  // `recent_meeting_summary` 는 **끝난 회의**만 채워진다. 예정된 회의밖에 없는
+  // 팀은 그것이 비어 있어서, 그 값만 보면 열 회의가 없다고 판단해 버린다.
+  // 최근 회의 목록으로 한 번 더 내려본다.
+  return home?.recent_meeting_summary?.meeting_id
+    ?? home?.recent_meetings?.[0]?.meeting_id
+    ?? null
 }

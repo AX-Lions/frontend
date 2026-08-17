@@ -16,7 +16,7 @@ import { toneOf } from './flowBoard.data'
 import { useFlowBoardMeeting, useMeetingFlow } from './useFlowBoardData'
 import { useFlowBoard } from './useFlowBoard'
 import { useFlowBoardUi } from './useFlowBoardUi'
-import { LoadError, Loading } from '../../shared/components/LoadState.jsx'
+import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
 /**
  * 요약표 3열.
@@ -176,6 +176,20 @@ export function FlowBoardPage() {
     return (
       <div className="flow-board-page">
         <LoadError error={meeting.error} onRetry={meeting.reload} />
+      </div>
+    )
+  }
+
+  // 회의가 하나도 없으면 **판이 아니라 안내를 그린다.**
+  //
+  // 여기서 막지 않으면 읽기는 성공했으므로 위 두 갈래를 지나쳐 보드가 그대로
+  // 그려진다. 제목은 빈 문자열, 요약표는 빈 칸, 화살표 개수는 0 — 사용자에게는
+  // **고장 난 화면으로 보인다.** "아직 회의가 없다" 와 "못 불러왔다" 는 다르다.
+  if (!meetingId) {
+    return (
+      <div className="flow-board-page">
+        <FlowRail activeRail={activeRail} icons={icons} onRailSelect={setActiveRail} />
+        <Empty>아직 열린 회의가 없습니다. 회의가 끝나면 여기에 흐름이 그려집니다.</Empty>
       </div>
     )
   }
