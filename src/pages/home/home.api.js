@@ -24,3 +24,16 @@ export function setMeetingFavorite(meetingId, on) {
   const path = `/meetings/${meetingId}/favorite`
   return on ? api.put(path) : api.delete(path)
 }
+
+/**
+ * 불참 등록 / 해제.
+ *
+ * 토글인데 POST 인 이유는 서버 쪽 사정이다 — 켜는 시점에 대리인 설정 스냅샷을
+ * 남기고 참석 상태까지 함께 바꾼다.
+ *
+ * `sources` 는 **이 회의에서 대리인이 근거로 쓸 자료 종류**다. 빈 배열은
+ * "아무것도 쓰지 않는다" 는 뜻이고 제한 없음이 아니다.
+ */
+export function setDelegation(meetingId, { enabled, sources }) {
+  return api.post(`/meetings/${meetingId}/delegate`, { enabled, sources })
+}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Sidebar } from './Sidebar.jsx'
+import { DelegateDialog } from './DelegateDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
@@ -21,6 +22,17 @@ export function HomePage() {
   const [selectedMeetingId, setSelectedMeetingId] = useState(null)
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
   const [pendingFavorites, setPendingFavorites] = useState([])
+  const [delegateFor, setDelegateFor] = useState(null)
+
+  /** 저장한 결과를 목록에 반영한다. 전체를 다시 읽으면 스크롤이 튄다. */
+  const applyDelegation = (meetingId, saved) => setData((current) => (current ? {
+    ...current,
+    today_schedule: current.today_schedule.map((s) => (
+      s.meeting_id === meetingId
+        ? { ...s, delegation: { delegated: saved.delegated, prompt: saved.prompt, sources: saved.sources } }
+        : s
+    )),
+  } : current))
 
   useEffect(() => {
     if (!favoriteMessage) {
@@ -223,21 +235,34 @@ export function HomePage() {
                         </div>
                       </button>
                       {/*
-                        문구와 주소를 서버가 준다. Discord 로 갈지 서비스 안에서
-                        열지는 회의마다 다르다.
+                        `참여하기` 가 아니라 **불참 등록** 버튼이다.
 
-                        `<a>` 가 더 맞지만 `<button>` 을 쓴다. 이 자리의 스타일이
-                        `.schedule-item > button:last-child` 로 걸려 있어서, 태그를
-                        바꾸면 **모양이 통째로 풀린다.** 선택자를 고치는 것은 화면
-                        담당 영역이라 연결 작업에서 건드리지 않는다.
+                        회의에 들어갈 사람은 Discord 를 이미 열어 두고 있다.
+                        이 화면에서 눌러야 하는 것은 오히려 그 반대 —
+                        "못 간다, 대리인이 대신 가라" 다. 이 서비스가 답하려는
+                        질문이 "내가 없는 동안 무슨 일이 있었지" 이므로,
+                        **없을 것을 미리 등록하는 자리**가 첫 화면에 있어야 한다.
+
+                        참석자가 아닌 회의는 `delegation` 이 `null` 이라 버튼을
+                        내리지 않고 회의로 가는 링크만 남긴다.
                       */}
-                      <button
-                        type="button"
-                        disabled={!schedule.action?.url}
-                        onClick={() => window.open(schedule.action.url, '_blank', 'noopener')}
-                      >
-                        {schedule.action?.label ?? '회의 참여하기'}
-                      </button>
+                      {schedule.delegation ? (
+                        <button
+                          className={schedule.delegation.delegated ? 'is-delegated' : ''}
+                          type="button"
+                          onClick={() => setDelegateFor(schedule)}
+                        >
+                          {schedule.delegation.delegated ? '대리 참석 중' : '회의에 참여하지 않아요'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!schedule.action?.url}
+                          onClick={() => window.open(schedule.action.url, '_blank', 'noopener')}
+                        >
+                          {schedule.action?.label ?? '회의 참여하기'}
+                        </button>
+                      )}
                     </div>
                   )
                 })}
@@ -312,6 +337,14 @@ export function HomePage() {
           </button>
         </div>
       </main>
+
+      {delegateFor ? (
+        <DelegateDialog
+          schedule={delegateFor}
+          onClose={() => setDelegateFor(null)}
+          onSaved={applyDelegation}
+        />
+      ) : null}
     </div>
   )
 }

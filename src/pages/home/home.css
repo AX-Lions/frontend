@@ -1205,3 +1205,14 @@ h1 {
   color: var(--muted);
   font-size: 13px;
 }
+
+/* 이미 맡긴 회의. 눌러서 범위를 다시 고르거나 취소할 수 있으므로 비활성으로
+   두지 않고, 상태만 다르게 보인다. */
+.schedule-item > button:last-child.is-delegated {
+  background: #1f1f1f;
+  color: #ffffff;
+}
+
+.schedule-item > button:last-child.is-delegated:hover {
+  background: #333333;
+}
