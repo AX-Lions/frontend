@@ -1198,3 +1198,10 @@ h1 {
     gap: 12px;
   }
 }
+
+/* 결정이 하나도 없는 회의도 있다. 목록 자리를 비워 두면 못 불러온 것처럼 보인다. */
+.summary-none {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
