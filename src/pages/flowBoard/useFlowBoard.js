@@ -6,6 +6,21 @@ const ZOOM_STEP = 0.1
 const BOARD_VIEW_PADDING_X = 48
 const BOARD_VIEW_PADDING_Y = 40
 
+/**
+ * 판을 끌면 안 되는 것들.
+ *
+ * 노드와 뱃지가 여기 없으면 **누르는 순간 드래그가 시작돼 클릭이 안 난다.**
+ * 이전 캔버스에서 대리인 프로필을 누르면 판이 따라 움직이던 자리다.
+ */
+const BOARD_INTERACTIVE = [
+  '.zoom-controls',
+  '.meeting-title button',
+  '.meeting-menu',
+  '.summary-board button',
+  '.flow-node',
+  '.flow-badge-group',
+].join(', ')
+
 function clampZoom(value) {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(value.toFixed(2))))
 }
@@ -15,7 +30,7 @@ export function useFlowBoard(contentBounds) {
   const [fitScale, setFitScale] = useState(0)
   const [isPanning, setIsPanning] = useState(false)
   const boardRef = useRef(null)
-  const hasCenteredBoard = useRef(false)
+  const centeredFor = useRef(null)
   const panState = useRef({
     pointerId: null,
     startX: 0,
@@ -77,7 +92,7 @@ export function useFlowBoard(contentBounds) {
   const handleBoardPointerDown = (event) => {
     if (
       event.button !== 0 ||
-      event.target.closest('.zoom-controls, .meeting-title button, .ai-profile, .summary-board button')
+      event.target.closest(BOARD_INTERACTIVE)
     ) {
       return
     }
@@ -123,16 +138,33 @@ export function useFlowBoard(contentBounds) {
   }
 
   useEffect(() => {
+    const board = boardRef.current
+
+    if (!board) {
+      return
+    }
+
+    /*
+      브라우저 확대 차단을 **보드 안으로 좁힌다.**
+
+      이전에는 `window` 에 걸려 있어서 사이드바·우측 패널 위에서도 ctrl+휠이
+      막혔다. 화면 전체가 12px 고정 폰트라 글자를 키워 읽으려던 사람이
+      **아무 데서도 확대할 수 없었다.** 판 위에서만 막으면 판은 자체 줌을 쓰고
+      나머지는 브라우저 확대가 그대로 산다.
+
+      React 의 `onWheel` 로는 못 막는다. React 는 루트에 passive 리스너로
+      위임해 붙여서 `preventDefault()` 가 무시된다.
+    */
     const preventBrowserZoom = (event) => {
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault()
       }
     }
 
-    window.addEventListener('wheel', preventBrowserZoom, { passive: false })
+    board.addEventListener('wheel', preventBrowserZoom, { passive: false })
 
     return () => {
-      window.removeEventListener('wheel', preventBrowserZoom)
+      board.removeEventListener('wheel', preventBrowserZoom)
     }
   }, [])
 
@@ -168,11 +200,21 @@ export function useFlowBoard(contentBounds) {
   useEffect(() => {
     const board = boardRef.current
 
-    if (!board || !fitScale || hasCenteredBoard.current) {
+    /*
+      판 크기가 바뀌면 다시 가운데로 보낸다.
+
+      한 번만 가운데를 잡던 코드였다. 무대가 776×931 고정일 때는 맞았지만,
+      이제 무대 크기가 **노드 수에 따라 달라진다.** 회의↔작업을 오가거나
+      필터로 사람이 줄면 판이 커지거나 작아지는데, 스크롤이 그대로면
+      아무것도 없는 여백을 보고 있게 된다.
+    */
+    const key = `${contentBounds.width}x${contentBounds.height}`
+
+    if (!board || !fitScale || centeredFor.current === key) {
       return
     }
 
-    hasCenteredBoard.current = true
+    centeredFor.current = key
     window.requestAnimationFrame(() => {
       const boardHeader = board.querySelector('.meeting-title')
       const headerHeight = boardHeader?.offsetHeight ?? 64
