@@ -1798,3 +1798,135 @@ button.team-shortcut:active {
 .chat-calendar-footer button {
   color: var(--chat-muted);
 }
+
+/* ─────────────────────────────── 새 채팅 */
+
+.new-chat {
+  position: relative;
+  display: grid;
+  width: 360px;
+  max-height: 80%;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--chat-line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 12%);
+}
+
+.new-chat header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.new-chat h2 {
+  margin: 0;
+  font-size: var(--chat-fs-title);
+}
+
+.new-chat header button {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--chat-muted);
+}
+
+.new-chat-types {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.new-chat-type {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--chat-line);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.new-chat-type strong {
+  font-size: var(--chat-fs-body);
+}
+
+.new-chat-type span {
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  line-height: 1.35;
+}
+
+.new-chat-type.selected {
+  border-color: var(--chat-point);
+  box-shadow: inset 0 0 0 1px var(--chat-point);
+}
+
+.new-chat > input {
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  outline: 0;
+  color: var(--chat-ink);
+}
+
+.new-chat > input:focus {
+  border-color: var(--chat-point);
+}
+
+.new-chat-error {
+  margin: 0;
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+.new-chat-list {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 120px;
+}
+
+.new-chat-list h3 {
+  margin: 8px 0 2px;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  font-weight: 400;
+}
+
+.new-chat-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.new-chat-member:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.new-chat-member img,
+.new-chat-initial {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--chat-white-hover);
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+  object-fit: cover;
+}
+
+.new-chat-member em {
+  margin-left: auto;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  font-style: normal;
+}

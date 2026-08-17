@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { icons } from './chat.icons.js'
+import { NewChatDialog } from './NewChatDialog.jsx'
 import { toDirectRows, toTeamRows } from './chat.data.js'
 import { formatTime } from './chat.format.js'
 import { AvatarStack, BordoAvatar, Icon, IconButton, RequestIcon, UnreadBadge } from './chat.ui.jsx'
@@ -156,6 +157,7 @@ export function ChatListPanel({
   importantRooms,
   selectedChatId,
   onConfirmImportant,
+  onCreatedRoom,
   onSelectChat,
   onOpenSettings,
 }) {
@@ -207,6 +209,8 @@ export function ChatListPanel({
           <IconButton label="채팅 생성" active={tool === 'create'} onClick={() => toggleTool('create')}>
             <Icon src={icons.add} />
           </IconButton>
+          {/* 톱니와 반짝이가 **같은 화면**을 열고 있었다. 톱니는 채팅 설정,
+              반짝이는 대리인 설정이다. 아래에서 둘을 가른다. */}
           <IconButton
             label="AI 대리인 설정"
             active={tool === 'ai'}
@@ -382,6 +386,16 @@ export function ChatListPanel({
           </section>
         ))}
       </div>
+
+      {tool === 'create' ? (
+        <NewChatDialog
+          onClose={() => setTool('')}
+          onCreated={(room) => {
+            setTool('')
+            onCreatedRoom(room)
+          }}
+        />
+      ) : null}
     </aside>
   )
 }

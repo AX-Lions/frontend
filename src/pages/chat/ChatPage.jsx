@@ -161,6 +161,12 @@ export function ChatPage() {
         selectedChatId={selectedChatId}
         sidebar={sidebar.data}
         onConfirmImportant={confirmImportant}
+        onCreatedRoom={(room) => {
+          // 만들자마자 연다. 목록에 새 줄이 생기기만 하면 사용자는 어느 것이
+          // 방금 만든 것인지 찾아야 한다.
+          setSelectedChatId(room.id)
+          sidebar.reload()
+        }}
         onSelectChat={setSelectedChatId}
         onOpenSettings={() => setView('settings')}
       />
