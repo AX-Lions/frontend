@@ -1,8 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 
 import './chat.css'
-import { icons, importantChats, messages, primaryChat, projectChats, teamRows } from './chat.mock.js'
+import { icons } from './chat.mock.js'
+import {
+  createPrompt,
+  deletePrompt,
+  fetchAgentSettings,
+  fetchImportant,
+  fetchMessages,
+  fetchPrompts,
+  fetchSidebar,
+  markRead,
+  patchAgentSettings,
+  sendMessage,
+  toPreview,
+  toTeamRows,
+} from './chat.data.js'
+import { formatTime, withDayDividers } from './chat.format.js'
+import { useResource } from '../../lib/useResource.js'
+import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
 function IconButton({ children, label, active = false, onClick }) {
   return (
@@ -57,7 +74,9 @@ function ChatPreview({ chat, selected, onSelect }) {
       <div className="chat-preview-left">
         {chat.bordo ? (
           <BordoAvatar />
-        ) : chat.stacked ? (
+        ) : chat.stacked || !chat.avatar ? (
+          // 아바타를 아직 안 올린 사람이 많다. `src` 가 비면 브라우저가 깨진
+          // 이미지 아이콘을 그리므로, 없으면 겹친 원으로 대신한다.
           <AvatarStack />
         ) : (
           <img className="chat-avatar" src={chat.avatar} alt="" />
@@ -73,7 +92,7 @@ function ChatPreview({ chat, selected, onSelect }) {
         </div>
       </div>
       <div className="chat-preview-meta">
-        <time>{chat.time}</time>
+        <time>{formatTime(chat.sentAt)}</time>
         {chat.unread ? <span>{chat.unread}</span> : null}
       </div>
     </button>
@@ -100,13 +119,29 @@ function TeamHeader({ name, marked, nested = false, open = true, onToggle }) {
   )
 }
 
-function ChatListPanel({ selectedChatId, onSelectChat, onOpenSettings }) {
+/**
+ * 접힘 상태를 id 로 기억한다.
+ *
+ * 팀·프로젝트가 몇 개인지 서버가 정하므로 `useState` 를 항목마다 둘 수 없다.
+ * **처음에는 모두 펼친다** — 채팅 목록에서 접혀 있는 것은 없는 것과 같아서,
+ * 사용자가 방을 못 찾는다.
+ */
+function useCollapsed() {
+  const [closed, setClosed] = useState([])
+  return {
+    isOpen: (id) => !closed.includes(id),
+    toggle: (id) => setClosed((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id])),
+  }
+}
+
+function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelectChat, onOpenSettings }) {
   const [promptVisible, setPromptVisible] = useState(true)
   const [tool, setTool] = useState('')
   const [importantOpen, setImportantOpen] = useState(true)
-  const [axOpen, setAxOpen] = useState(true)
-  const [ideaOpen, setIdeaOpen] = useState(true)
-  const [projectOpen, setProjectOpen] = useState(true)
+  const groups = useCollapsed()
+
+  const primaryChat = sidebar?.my_agent_room
+  const teams = toTeamRows(sidebar)
 
   const toggleTool = (nextTool) => {
     setTool((current) => (current === nextTool ? '' : nextTool))
@@ -160,20 +195,24 @@ function ChatListPanel({ selectedChatId, onSelectChat, onOpenSettings }) {
       ) : null}
 
       <div className="chat-list-scroll">
-        <button
-          className={selectedChatId === primaryChat.id ? 'my-bordo-card selected' : 'my-bordo-card'}
-          type="button"
-          onClick={() => onSelectChat(primaryChat.id)}
-        >
-          <div>
-            <h2>
-              <Icon className="ai-title-icon" src={icons.aiIcon} />
-              {primaryChat.title}
-            </h2>
-            <p>{primaryChat.message}</p>
-          </div>
-          <time>{primaryChat.time}</time>
-        </button>
+        {primaryChat ? (
+          <button
+            className={selectedChatId === primaryChat.id ? 'my-bordo-card selected' : 'my-bordo-card'}
+            type="button"
+            onClick={() => onSelectChat(primaryChat.id)}
+          >
+            <div>
+              <h2>
+                <Icon className="ai-title-icon" src={icons.aiIcon} />
+                {primaryChat.title}
+              </h2>
+              <p>{primaryChat.last_message
+                ? primaryChat.last_message.preview
+                : '아직 나눈 이야기가 없습니다.'}</p>
+            </div>
+            <time>{formatTime(primaryChat.last_message?.sent_at)}</time>
+          </button>
+        ) : null}
 
         <section className="chat-list-section">
           <button
@@ -187,8 +226,11 @@ function ChatListPanel({ selectedChatId, onSelectChat, onOpenSettings }) {
             </h2>
             <Icon className={importantOpen ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
           </button>
+          {importantOpen && importantRooms.length === 0 ? (
+            <p className="chat-list-empty">중요 표시된 채팅이 없습니다.</p>
+          ) : null}
           {importantOpen
-            ? importantChats.map((chat) => (
+            ? importantRooms.map((chat) => (
                 <ChatPreview
                   chat={chat}
                   key={chat.id}
@@ -199,94 +241,144 @@ function ChatListPanel({ selectedChatId, onSelectChat, onOpenSettings }) {
             : null}
         </section>
 
-        <section className="team-chat-group">
-          <TeamHeader name="AX Lions" open={axOpen} onToggle={() => setAxOpen((open) => !open)} />
-          {axOpen ? (
-            <div className="nested-team">
-              <TeamHeader
-                name="멋사 아이디어톤"
-                nested
-                open={ideaOpen}
-                onToggle={() => setIdeaOpen((open) => !open)}
-              />
-              {ideaOpen ? (
-                <div className="project-team">
-                  <button
-                    className="project-title"
-                    type="button"
-                    aria-expanded={projectOpen}
-                    onClick={() => setProjectOpen((open) => !open)}
-                  >
-                    <strong>멋사 중앙해커톤</strong>
-                    <Icon className={projectOpen ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
-                  </button>
-                  {projectOpen ? (
-                    <div className="project-chat-list">
-                      {projectChats.map((chat) => (
-                        <ChatPreview
-                          chat={chat}
-                          key={chat.id}
-                          selected={selectedChatId === chat.id}
-                          onSelect={() => onSelectChat(chat.id)}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="other-team-list">
-            {teamRows.map((team) => (
-              <TeamHeader key={team.id} name={team.name} marked={team.marked} open={false} />
-            ))}
-          </div>
-        </section>
+        {/*
+          서버가 `팀 → 프로젝트 → 방` 3층으로 준다. 목에서는 이 층이 고정된
+          이름으로 박혀 있었다(`AX Lions` · `멋사 아이디어톤`). 몇 개가 올지
+          서버가 정하므로 접힘 상태도 id 로 기억한다.
+        */}
+        {teams.map((team) => (
+          <section className="team-chat-group" key={team.id}>
+            <TeamHeader
+              name={team.name}
+              marked={team.marked}
+              open={groups.isOpen(team.id)}
+              onToggle={() => groups.toggle(team.id)}
+            />
+            {groups.isOpen(team.id) ? (
+              <div className="nested-team">
+                {team.projects.map((project) => (
+                  <div className="project-team" key={project.id}>
+                    <button
+                      className="project-title"
+                      type="button"
+                      aria-expanded={groups.isOpen(project.id)}
+                      onClick={() => groups.toggle(project.id)}
+                    >
+                      <strong>{project.name}</strong>
+                      <Icon
+                        className={groups.isOpen(project.id) ? 'ui-icon chevron open' : 'ui-icon chevron'}
+                        src={icons.expandDown}
+                      />
+                    </button>
+                    {groups.isOpen(project.id) ? (
+                      <div className="project-chat-list">
+                        {project.rooms.length === 0 ? (
+                          <p className="chat-list-empty">방이 없습니다.</p>
+                        ) : project.rooms.map((chat) => (
+                          <ChatPreview
+                            chat={chat}
+                            key={chat.id}
+                            selected={selectedChatId === chat.id}
+                            onSelect={() => onSelectChat(chat.id)}
+                          />
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ))}
       </div>
     </aside>
   )
 }
 
-function ChatMessage({ message }) {
-  if (message.type === 'date') {
+function ChatMessage({ row }) {
+  if (row.kind === 'day') {
     return (
       <button className="date-divider" type="button">
-        {message.label}
+        {row.label}
         <Icon src={icons.expandRight} />
       </button>
     )
   }
 
-  if (message.type === 'me') {
+  const { message } = row
+  const time = formatTime(message.sent_at)
+
+  if (message.is_mine) {
     return (
       <div className="message-row me">
-        <time>{message.time}</time>
-        <p className={message.large ? 'message-bubble orange large' : 'message-bubble orange'}>{message.text}</p>
+        <time>{time}</time>
+        <p className="message-bubble orange">{message.body}</p>
       </div>
     )
   }
 
   return (
     <div className="message-row bot">
-      <BordoAvatar />
+      {/* 대리인이 보낸 것과 사람이 보낸 것을 가른다. 화면에서 대리인은
+          `{이름}의 Bordo` 로 불리고 아바타도 다르다. */}
+      {message.sender?.is_agent || !message.sender?.avatar_url ? (
+        <BordoAvatar />
+      ) : (
+        <img className="chat-avatar" src={message.sender.avatar_url} alt="" />
+      )}
       <div>
-        <strong>{message.author}</strong>
+        <strong>{message.sender?.name ?? ''}</strong>
         <span>
-          <i className="message-bubble gray" />
-          <time>{message.time}</time>
+          <p className="message-bubble gray">{message.body}</p>
+          <time>{time}</time>
         </span>
       </div>
     </div>
   )
 }
 
-function ChatRoom() {
+function ChatRoom({ room, roomId }) {
   const [roomTool, setRoomTool] = useState('')
   const [messageText, setMessageText] = useState('')
-  const canSend = messageText.trim().length > 0
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
+  const canSend = messageText.trim().length > 0 && !sending && Boolean(roomId)
+
+  const { data, error, loading, setData } = useResource(
+    (signal) => (roomId ? fetchMessages(roomId, signal) : Promise.resolve(null)),
+    [roomId],
+  )
+
+  const rows = useMemo(() => withDayDividers(data?.results ?? []), [data])
 
   const toggleRoomTool = (nextTool) => {
     setRoomTool((current) => (current === nextTool ? '' : nextTool))
+  }
+
+  const submit = async (event) => {
+    event.preventDefault()
+    if (!canSend) {
+      return
+    }
+
+    const body = messageText.trim()
+    setSending(true)
+    setSendError('')
+    try {
+      // 중복 전송은 도메인 키로 막는다. `Idempotency-Key` 는 계약에만 있고
+      // 아직 동작하지 않는다.
+      const sent = await sendMessage(roomId, body, crypto.randomUUID())
+      setData((current) => ({
+        ...(current ?? { results: [] }),
+        results: [...(current?.results ?? []), sent],
+      }))
+      setMessageText('')
+    } catch (err) {
+      // 입력한 것을 지우지 않는다. 지우면 다시 칠 수밖에 없다.
+      setSendError(err?.message || '보내지 못했습니다.')
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -296,8 +388,8 @@ function ChatRoom() {
           <Icon src={icons.expandLeft} />
         </button>
         <div className="chat-room-title">
-          <strong>임수연의 Bordo</strong>
-          <span>멋사 중앙해커톤</span>
+          <strong>{room?.name ?? ''}</strong>
+          <span>{room?.context ?? ''}</span>
         </div>
         <div className="chat-room-actions">
           <IconButton label="검색" active={roomTool === 'search'} onClick={() => toggleRoomTool('search')}>
@@ -313,12 +405,22 @@ function ChatRoom() {
       </header>
 
       <div className="chat-message-scroll">
-        {messages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
+        {!roomId ? (
+          <Empty>왼쪽에서 대화를 고르십시오.</Empty>
+        ) : loading && !data ? (
+          <Loading label="대화를 불러오는 중입니다…" />
+        ) : error && !data ? (
+          <LoadError error={error} />
+        ) : rows.length === 0 ? (
+          <Empty>아직 나눈 이야기가 없습니다.</Empty>
+        ) : rows.map((row) => (
+          <ChatMessage key={row.id} row={row} />
         ))}
       </div>
 
-      <form className={canSend ? 'chat-composer can-send' : 'chat-composer'} onSubmit={(event) => event.preventDefault()}>
+      {sendError ? <p className="chat-send-error" role="alert">{sendError}</p> : null}
+
+      <form className={canSend ? 'chat-composer can-send' : 'chat-composer'} onSubmit={submit}>
         <button type="button" aria-label="첨부파일">
           <Icon src={icons.addSmall} />
         </button>
@@ -329,6 +431,7 @@ function ChatRoom() {
           aria-label="채팅 입력"
           placeholder="채팅을 입력하세요..."
           value={messageText}
+          disabled={!roomId}
           onChange={(event) => setMessageText(event.target.value)}
         />
         <button className="send" type="submit" aria-label="전송" disabled={!canSend}>
@@ -378,10 +481,6 @@ const settingItems = [
   },
 ]
 
-const promptCards = [
-  '내가 이건 말하면 안돼라고 상단에 입력한 메시지들은 모두 개인적인 내용이니까 다른 사람에게 공유하면 안돼',
-  '내가 이건 말하면 안돼라고 상단에 입력한 메시지들은 모두 개인적인 내용이니까 다른 사람에게 공유하면 안돼',
-]
 
 function SettingSwitch({ enabled, onToggle }) {
   return (
@@ -392,9 +491,38 @@ function SettingSwitch({ enabled, onToggle }) {
   )
 }
 
+/**
+ * 화면의 스위치 ↔ 서버의 설정 키.
+ *
+ * **화면은 6칸인데 서버는 4개다.** `작업 공개` · `계획 공개` · `생각 공개` 셋이
+ * `disclose_work_plan_thought` 하나에 걸려 있어 **따로 끌 수 없다.**
+ *
+ * 셋을 각각 화면에서만 기억하게 두면, 끄고 새로고침했을 때 다시 켜져 있다.
+ * 저장되지 않는 스위치는 저장된 척하는 스위치보다 낫다 — 그래서 같은 키에 묶어
+ * 함께 움직이게 뒀다. 사용자는 셋이 하나라는 것을 눈으로 본다.
+ *
+ * 쪼갤지 합칠지는 디자인 확인이 필요해 이슈로 남겼다(frontend #11).
+ */
+const SETTING_KEY = {
+  feasibility: 'mention_feasibility',
+  schedule: 'allow_schedule_change',
+  'meeting-question': 'allow_midmeeting_question',
+  'work-open': 'disclose_work_plan_thought',
+  'plan-open': 'disclose_work_plan_thought',
+  'thought-open': 'disclose_work_plan_thought',
+}
+
 function SettingsPanel() {
-  const [settings, setSettings] = useState(settingItems)
-  const [prompts, setPrompts] = useState(() => promptCards.map((text, index) => ({ id: index + 1, text })))
+  const { data: serverSettings, setData: setServerSettings } =
+    useResource((signal) => fetchAgentSettings(signal))
+  const promptsResource = useResource((signal) => fetchPrompts(signal))
+
+  const settings = settingItems.map((item) => ({
+    ...item,
+    enabled: serverSettings ? Boolean(serverSettings[SETTING_KEY[item.id]]) : item.enabled,
+  }))
+  const prompts = (promptsResource.data?.results ?? []).map((p) => ({ id: p.id, text: p.body }))
+
   const [selectedPromptId, setSelectedPromptId] = useState(1)
   const [openPromptMenuId, setOpenPromptMenuId] = useState(null)
   const [promptText, setPromptText] = useState('')
@@ -410,48 +538,77 @@ function SettingsPanel() {
     return () => window.clearTimeout(timerId)
   }, [notice])
 
-  const showNotice = (type) => {
+  const showNotice = (type, message) => {
     setNotice({
       type,
-      message: type === 'success' ? '성공적으로 수정되었습니다.' : '오류가 발생했습니다. 다시 시도해주세요.',
+      // 서버가 사유를 줬으면 그것을 그대로 쓴다. 화면이 문구를 새로 만들면
+      // 같은 상황에 두 가지 안내가 생긴다.
+      message: message ?? (type === 'success'
+        ? '성공적으로 수정되었습니다.'
+        : '오류가 발생했습니다. 다시 시도해주세요.'),
     })
   }
 
-  const toggleSetting = (settingId) => {
-    setSettings((currentSettings) =>
-      currentSettings.map((setting) =>
-        setting.id === settingId ? { ...setting, enabled: !setting.enabled } : setting,
-      ),
-    )
-    showNotice('success')
+  const toggleSetting = async (settingId) => {
+    const key = SETTING_KEY[settingId]
+    const next = !serverSettings?.[key]
+
+    // 먼저 칠하고 보낸다. 스위치는 누른 즉시 움직여야 눌린 줄 안다.
+    setServerSettings((current) => ({ ...(current ?? {}), [key]: next }))
+    try {
+      const saved = await patchAgentSettings({ [key]: next })
+      // 서버가 돌려준 값으로 덮는다. `active_version` 이 함께 올라간다.
+      //
+      // **GET 과 PATCH 의 응답 모양이 다르다.** GET 은 설정을 그대로 주는데
+      // PATCH 는 `{settings, previous_version, changed}` 로 감싸서 준다.
+      // 감싼 것을 그대로 담으면 모든 키가 `undefined` 가 되어 **스위치 여섯 개가
+      // 전부 OFF 로 보인다** — 서버 값은 멀쩡한데 화면만 거짓말을 한다.
+      setServerSettings(saved?.settings ?? saved)
+      showNotice('success')
+    } catch (err) {
+      setServerSettings((current) => ({ ...(current ?? {}), [key]: !next }))
+      showNotice('error', err?.message)
+    }
   }
 
-  const addPrompt = (event) => {
+  const addPrompt = async (event) => {
     event.preventDefault()
     const trimmedPrompt = promptText.trim()
 
     if (!trimmedPrompt) {
-      showNotice('error')
+      showNotice('error', '내용을 입력하십시오.')
       return
     }
 
-    const nextPrompt = {
-      id: Date.now(),
-      text: trimmedPrompt,
+    try {
+      const created = await createPrompt(trimmedPrompt)
+      promptsResource.setData((current) => ({
+        ...(current ?? {}),
+        results: [created, ...(current?.results ?? [])],
+      }))
+      setPromptText('')
+      setSelectedPromptId(created.id)
+      setOpenPromptMenuId(null)
+      showNotice('success')
+    } catch (err) {
+      // 입력한 것을 지우지 않는다. 지우면 다시 쓸 수밖에 없다.
+      showNotice('error', err?.message)
     }
-
-    setPrompts((currentPrompts) => [nextPrompt, ...currentPrompts])
-    setPromptText('')
-    setSelectedPromptId(nextPrompt.id)
-    setOpenPromptMenuId(null)
-    showNotice('success')
   }
 
-  const deletePrompt = (promptId) => {
-    setPrompts((currentPrompts) => currentPrompts.filter((prompt) => prompt.id !== promptId))
-    setSelectedPromptId((currentId) => (currentId === promptId ? null : currentId))
+  const removePrompt = async (promptId) => {
     setOpenPromptMenuId(null)
-    showNotice('success')
+    try {
+      await deletePrompt(promptId)
+      promptsResource.setData((current) => ({
+        ...(current ?? {}),
+        results: (current?.results ?? []).filter((p) => p.id !== promptId),
+      }))
+      setSelectedPromptId((currentId) => (currentId === promptId ? null : currentId))
+      showNotice('success')
+    } catch (err) {
+      showNotice('error', err?.message)
+    }
   }
 
   return (
@@ -529,7 +686,7 @@ function SettingsPanel() {
                 </button>
                 {openPromptMenuId === prompt.id ? (
                   <div className="prompt-menu" onClick={(event) => event.stopPropagation()}>
-                    <button type="button" onClick={() => deletePrompt(prompt.id)}>
+                    <button type="button" onClick={() => removePrompt(prompt.id)}>
                       삭제
                     </button>
                   </div>
@@ -565,22 +722,82 @@ function BordoSettingsPage({ onBack }) {
 }
 
 export function ChatPage() {
-  const [selectedChatId, setSelectedChatId] = useState('bordo')
+  const [selectedChatId, setSelectedChatId] = useState(null)
   const [view, setView] = useState('chat')
+
+  const sidebar = useResource((signal) => fetchSidebar(signal))
+  const important = useResource((signal) => fetchImportant(signal))
+
+  const importantRooms = useMemo(
+    // 중요 채팅은 **메시지 목록**으로 온다. 같은 방의 메시지가 여럿이면 방이
+    // 여러 번 나오므로 방 기준으로 합친다. 미리보기는 그 방의 가장 최근 것이다.
+    () => {
+      const seen = new Map()
+      ;(important.data?.results ?? []).forEach((row) => {
+        if (!seen.has(row.room.id)) {
+          seen.set(row.room.id, {
+            ...toPreview(row.room),
+            message: `${row.message.sender.name}: ${row.message.body}`,
+            sentAt: row.message.sent_at,
+            marked: true,
+          })
+        }
+      })
+      return [...seen.values()]
+    },
+    [important.data],
+  )
+
+  const openRoom = useMemo(() => {
+    const all = [
+      ...(sidebar.data?.my_agent_room ? [toPreview(sidebar.data.my_agent_room)] : []),
+      ...importantRooms,
+      ...toTeamRows(sidebar.data).flatMap((t) => t.projects.flatMap((p) => p.rooms)),
+    ]
+    return all.find((room) => room.id === selectedChatId) ?? null
+  }, [sidebar.data, importantRooms, selectedChatId])
+
+  // 방을 열면 읽음 워터마크를 올린다. 실패해도 대화는 보여야 하므로 삼킨다 —
+  // 미읽음 숫자가 잠깐 안 맞는 것이 대화가 안 열리는 것보다 낫다.
+  useEffect(() => {
+    if (selectedChatId) {
+      markRead(selectedChatId).catch(() => {})
+    }
+  }, [selectedChatId])
 
   if (view === 'settings') {
     return <BordoSettingsPage onBack={() => setView('chat')} />
+  }
+
+  if (sidebar.loading && !sidebar.data) {
+    return (
+      <div className="chat-page">
+        <GlobalSidebar active="chat" />
+        <Loading label="채팅 목록을 불러오는 중입니다…" />
+      </div>
+    )
+  }
+
+  if (sidebar.error && !sidebar.data) {
+    return (
+      <div className="chat-page">
+        <GlobalSidebar active="chat" />
+        <LoadError error={sidebar.error} onRetry={sidebar.reload} />
+      </div>
+    )
   }
 
   return (
     <div className="chat-page">
       <GlobalSidebar active="chat" />
       <ChatListPanel
+        importantRooms={importantRooms}
         selectedChatId={selectedChatId}
+        sidebar={sidebar.data}
         onSelectChat={setSelectedChatId}
         onOpenSettings={() => setView('settings')}
       />
-      <ChatRoom />
+      <ChatRoom room={openRoom} roomId={selectedChatId} />
     </div>
   )
 }

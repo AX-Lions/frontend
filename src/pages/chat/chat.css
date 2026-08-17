@@ -1260,3 +1260,19 @@
     padding-right: 20px;
   }
 }
+
+/* 방이 없는 프로젝트, 중요 표시가 하나도 없는 경우. 자리를 비우면 목록이
+   덜 불러와진 것처럼 보인다. */
+.chat-list-empty {
+  margin: 0;
+  padding: 8px 16px;
+  color: #626262;
+  font-size: 12px;
+}
+
+.chat-send-error {
+  margin: 0;
+  padding: 6px 16px;
+  color: #ff2a2a;
+  font-size: 12px;
+}
