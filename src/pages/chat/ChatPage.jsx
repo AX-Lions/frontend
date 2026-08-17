@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 
 import './chat.css'
-import { icons } from './chat.mock.js'
+import { icons } from './chat.icons.js'
 import {
   createPrompt,
   deletePrompt,
