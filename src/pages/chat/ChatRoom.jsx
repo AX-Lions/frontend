@@ -132,7 +132,9 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
     // 날짜로 뛴 경우는 그날 처음부터 봐야 한다. 그날 마지막 줄을 보여주면
     // 사용자는 왜 이 자리인지 알 수 없다.
     element.scrollTop = jumpDate ? 0 : element.scrollHeight
-  }, [lastMessageId, jumpDate])
+    // `roomTool` 이 의존성에 있는 것은 검색을 열면 대화 목록이 아예 사라지기
+    // 때문이다. 닫고 돌아오면 새 요소라 스크롤이 0 에서 시작한다.
+  }, [lastMessageId, jumpDate, roomTool])
 
   /*
     검색 결과에서 찾아온 줄로 옮긴다.
@@ -276,6 +278,8 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
         </div>
       </header>
 
+      {/* 검색 중에는 대화 목록을 대신 차지한다. 둘을 위아래로 나누면 결과도
+          대화도 반씩 잘려 어느 쪽도 읽을 수 없다. */}
       {roomTool === 'search' && roomId ? (
         <ChatRoomSearch
           roomId={roomId}
@@ -288,7 +292,7 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
         />
       ) : null}
 
-      {jumpDate ? (
+      {roomTool !== 'search' && jumpDate ? (
         <div className="chat-jump-banner" role="status">
           <span>{`${jumpDate} 의 대화를 보고 있습니다.`}</span>
           <button
@@ -303,15 +307,18 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
         </div>
       ) : null}
 
-      {jumpDate && roomId ? <DailySummary date={jumpDate} roomId={roomId} /> : null}
+      {roomTool !== 'search' && jumpDate && roomId ? (
+        <DailySummary date={jumpDate} roomId={roomId} />
+      ) : null}
 
+      {roomTool === 'search' ? null : (
       <div className="chat-message-scroll" ref={scrollRef}>
         {!roomId ? (
           <Empty>왼쪽에서 대화를 고르십시오.</Empty>
         ) : loading && !data ? (
           <Loading label="대화를 불러오는 중입니다…" />
         ) : error && !data ? (
-          <LoadError error={error} />
+          <LoadError error={error} onRetry={reload} />
         ) : rows.length === 0 ? (
           <Empty>
             {jumpDate ? '이 날에는 오간 대화가 없습니다.' : '아직 나눈 이야기가 없습니다.'}
@@ -343,6 +350,7 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
           </>
         )}
       </div>
+      )}
 
       <ChatComposer roomId={roomId} onSent={appendSent} />
 
