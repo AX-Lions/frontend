@@ -345,7 +345,7 @@ function ChatRoom({ room, roomId, onClose }) {
   const canSend = messageText.trim().length > 0 && !sending && Boolean(roomId)
 
   const { data, error, loading, setData } = useResource(
-    (signal) => (roomId ? fetchMessages(roomId, signal) : Promise.resolve(null)),
+    (signal) => (roomId ? fetchMessages(roomId, {}, signal) : Promise.resolve(null)),
     [roomId],
   )
 
@@ -367,7 +367,7 @@ function ChatRoom({ room, roomId, onClose }) {
     try {
       // 중복 전송은 도메인 키로 막는다. `Idempotency-Key` 는 계약에만 있고
       // 아직 동작하지 않는다.
-      const sent = await sendMessage(roomId, body, crypto.randomUUID())
+      const sent = await sendMessage(roomId, { body, clientMessageId: crypto.randomUUID() })
       setData((current) => ({
         ...(current ?? { results: [] }),
         results: [...(current?.results ?? []), sent],
