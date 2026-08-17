@@ -2,61 +2,26 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { icons } from './chat.icons.js'
 import { ChatDateCalendar } from './ChatDateCalendar.jsx'
+import { ChatMessageRow } from './ChatMessageRow.jsx'
 import { ChatRoomSearch } from './ChatRoomSearch.jsx'
 import { fetchMessages, fetchRoom, sendMessage, toPreview } from './chat.data.js'
-import { formatTime, localDate, localMonth, withDayDividers } from './chat.format.js'
-import { BordoAvatar, Icon, IconButton } from './chat.ui.jsx'
+import { localDate, localMonth, withDayDividers } from './chat.format.js'
+import { Icon, IconButton } from './chat.ui.jsx'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
-function ChatMessage({ row, focused, onOpenCalendar }) {
-  if (row.kind === 'day') {
-    return (
-      <button
-        className="date-divider"
-        type="button"
-        title={`${row.label} · 다른 날짜로 이동`}
-        onClick={() => onOpenCalendar(row.date)}
-      >
-        {row.label}
-        <Icon src={icons.expandRight} />
-      </button>
-    )
-  }
-
-  const { message } = row
-  const time = formatTime(message.sent_at)
-
-  // 검색 결과에서 넘어온 줄에 표시를 남긴다. 그냥 그 자리로 스크롤만 하면
-  // 어느 줄을 찾아 온 것인지 알 수 없다.
-  const rowClass = (base) => (focused ? `${base} focused` : base)
-
-  if (message.is_mine) {
-    return (
-      <div className={rowClass('message-row me')} data-message-id={message.id}>
-        <time>{time}</time>
-        <p className="message-bubble orange">{message.body}</p>
-      </div>
-    )
-  }
-
+/** 날짜 구분선. 누르면 그 달의 달력을 연다. */
+function DayDivider({ row, onOpenCalendar }) {
   return (
-    <div className={rowClass('message-row bot')} data-message-id={message.id}>
-      {/* 대리인이 보낸 것과 사람이 보낸 것을 가른다. 화면에서 대리인은
-          `{이름}의 Bordo` 로 불리고 아바타도 다르다. */}
-      {message.sender?.is_agent || !message.sender?.avatar_url ? (
-        <BordoAvatar />
-      ) : (
-        <img className="chat-avatar" src={message.sender.avatar_url} alt="" />
-      )}
-      <div>
-        <strong>{message.sender?.name ?? ''}</strong>
-        <span>
-          <p className="message-bubble gray">{message.body}</p>
-          <time>{time}</time>
-        </span>
-      </div>
-    </div>
+    <button
+      className="date-divider"
+      type="button"
+      title={`${row.label} · 다른 날짜로 이동`}
+      onClick={() => onOpenCalendar(row.date)}
+    >
+      {row.label}
+      <Icon src={icons.expandRight} />
+    </button>
   )
 }
 
@@ -180,6 +145,19 @@ export function ChatRoom({ room, roomId, onClose }) {
     }
   }
 
+  /**
+   * 서버가 돌려준 메시지로 그 줄만 갈아 끼운다.
+   *
+   * 목록 전체를 다시 읽지 않는 이유 — 위로 이어 붙인 페이지가 통째로 날아가고,
+   * 사용자는 중요 표시 하나 눌렀는데 읽던 자리를 잃는다.
+   */
+  const replaceMessage = (updated) => {
+    setData((current) => ({
+      ...(current ?? {}),
+      results: (current?.results ?? []).map((m) => (m.id === updated.id ? updated : m)),
+    }))
+  }
+
   const toggleRoomTool = (nextTool) => {
     setRoomTool((current) => (current === nextTool ? '' : nextTool))
   }
@@ -295,14 +273,16 @@ export function ChatRoom({ room, roomId, onClose }) {
               // 구분되지 않는다.
               <p className="chat-older-end">대화의 처음입니다.</p>
             )}
-            {rows.map((row) => (
-              <ChatMessage
-                focused={row.kind === 'message' && row.message.id === focusMessageId}
+            {rows.map((row) => (row.kind === 'day' ? (
+              <DayDivider key={row.id} row={row} onOpenCalendar={setCalendarMonth} />
+            ) : (
+              <ChatMessageRow
+                focused={row.message.id === focusMessageId}
                 key={row.id}
-                row={row}
-                onOpenCalendar={setCalendarMonth}
+                message={row.message}
+                onChanged={replaceMessage}
               />
-            ))}
+            )))}
           </>
         )}
       </div>

@@ -5,6 +5,41 @@ import { toDirectRows, toTeamRows } from './chat.data.js'
 import { formatTime } from './chat.format.js'
 import { AvatarStack, BordoAvatar, Icon, IconButton, RequestIcon, UnreadBadge } from './chat.ui.jsx'
 
+/**
+ * 중요 채팅 줄에만 붙는 `확인`.
+ *
+ * 이걸 누를 방법이 없으면 상단 `중요 채팅` 섹션을 비울 수가 없다 — 한 번
+ * 중요로 찍힌 대화가 영원히 거기 남는다. 버튼을 미리보기 안쪽에 두지 못하는
+ * 이유는 미리보기 자체가 버튼이라서다(버튼 안에 버튼).
+ */
+function ImportantConfirm({ messageId, onConfirm }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  return (
+    <div className="important-confirm">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true)
+          setError('')
+          try {
+            await onConfirm(messageId)
+          } catch (err) {
+            setError(err?.message || '확인하지 못했습니다.')
+          } finally {
+            setBusy(false)
+          }
+        }}
+      >
+        {busy ? '확인 중…' : '확인'}
+      </button>
+      {error ? <span role="alert">{error}</span> : null}
+    </div>
+  )
+}
+
 function ChatPreview({ chat, selected, onSelect }) {
   return (
     <button className={selected ? 'chat-preview selected' : 'chat-preview'} type="button" onClick={onSelect}>
@@ -116,7 +151,14 @@ function matchesRoom(room, needle) {
     .includes(needle)
 }
 
-export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelectChat, onOpenSettings }) {
+export function ChatListPanel({
+  sidebar,
+  importantRooms,
+  selectedChatId,
+  onConfirmImportant,
+  onSelectChat,
+  onOpenSettings,
+}) {
   const [promptVisible, setPromptVisible] = useState(true)
   const [tool, setTool] = useState('')
   const [query, setQuery] = useState('')
@@ -255,12 +297,14 @@ export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelec
           ) : null}
           {importantOpen
             ? visibleImportant.map((chat) => (
-                <ChatPreview
-                  chat={chat}
-                  key={chat.id}
-                  selected={selectedChatId === chat.id}
-                  onSelect={() => onSelectChat(chat.id)}
-                />
+                <div className="important-row" key={chat.id}>
+                  <ChatPreview
+                    chat={chat}
+                    selected={selectedChatId === chat.id}
+                    onSelect={() => onSelectChat(chat.id)}
+                  />
+                  <ImportantConfirm messageId={chat.messageId} onConfirm={onConfirmImportant} />
+                </div>
               ))
             : null}
         </section>

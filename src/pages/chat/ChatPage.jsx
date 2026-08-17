@@ -7,6 +7,7 @@ import { ChatListPanel } from './ChatListPanel.jsx'
 import { ChatRoom } from './ChatRoom.jsx'
 import {
   clearRoomUnread,
+  confirmMessageImportant,
   fetchImportant,
   fetchSidebar,
   markRead,
@@ -54,6 +55,9 @@ export function ChatPage() {
         if (!seen.has(row.room.id)) {
           seen.set(row.room.id, {
             ...toPreview(row.room),
+            // 확인 버튼이 이 id 를 쓴다. 방이 아니라 **메시지**를 확인하는
+            // 것이라, 방만 들고 있으면 여기서 섹션을 비울 수 없다.
+            messageId: row.message.id,
             message: `${row.message.sender.name}: ${row.message.body}`,
             sentAt: row.message.sent_at,
             marked: true,
@@ -90,6 +94,21 @@ export function ChatPage() {
 
     실패는 삼킨다. 미읽음 숫자가 잠깐 안 맞는 것이 대화가 안 열리는 것보다 낫다.
   */
+  /**
+   * 중요 메시지 확인.
+   *
+   * 표시를 내리는 것과 다르다. `is_important` 는 남고 **내 확인 기록만** 생겨서
+   * 상단 `중요 채팅` 에서만 빠진다. 이 API 를 아무도 안 불러서, 한 번 중요로
+   * 찍힌 대화는 그 섹션에 영원히 남아 있었다.
+   *
+   * 확인하면 사이드바의 `!` 뱃지도 같이 판정이 바뀌므로 둘 다 다시 읽는다.
+   */
+  const confirmImportant = async (messageId) => {
+    await confirmMessageImportant(messageId)
+    important.reload()
+    sidebar.reload()
+  }
+
   const { setData: setSidebarData, reload: reloadSidebar } = sidebar
   useEffect(() => {
     if (!selectedChatId) {
@@ -141,6 +160,7 @@ export function ChatPage() {
         importantRooms={importantRooms}
         selectedChatId={selectedChatId}
         sidebar={sidebar.data}
+        onConfirmImportant={confirmImportant}
         onSelectChat={setSelectedChatId}
         onOpenSettings={() => setView('settings')}
       />
