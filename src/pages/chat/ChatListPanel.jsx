@@ -1,9 +1,9 @@
 import { useState } from 'react'
 
 import { icons } from './chat.icons.js'
-import { toTeamRows } from './chat.data.js'
+import { toDirectRows, toTeamRows } from './chat.data.js'
 import { formatTime } from './chat.format.js'
-import { AvatarStack, BordoAvatar, Icon, IconButton, RequestIcon } from './chat.ui.jsx'
+import { AvatarStack, BordoAvatar, Icon, IconButton, RequestIcon, UnreadBadge } from './chat.ui.jsx'
 
 function ChatPreview({ chat, selected, onSelect }) {
   return (
@@ -12,9 +12,7 @@ function ChatPreview({ chat, selected, onSelect }) {
         {chat.bordo ? (
           <BordoAvatar />
         ) : chat.stacked || !chat.avatar ? (
-          // 아바타를 아직 안 올린 사람이 많다. `src` 가 비면 브라우저가 깨진
-          // 이미지 아이콘을 그리므로, 없으면 겹친 원으로 대신한다.
-          <AvatarStack />
+          <AvatarStack avatars={chat.avatars} />
         ) : (
           <img className="chat-avatar" src={chat.avatar} alt="" />
         )}
@@ -24,29 +22,64 @@ function ChatPreview({ chat, selected, onSelect }) {
             {chat.context ? <span>{chat.context}</span> : null}
             {chat.marked ? <RequestIcon small /> : null}
           </div>
-          <p>{chat.message}</p>
+          <p>{chat.message || '아직 나눈 이야기가 없습니다.'}</p>
         </div>
       </div>
       <div className="chat-preview-meta">
         <time>{formatTime(chat.sentAt)}</time>
-        {chat.unread ? <span>{chat.unread}</span> : null}
+        <UnreadBadge count={chat.unread} label={chat.name} />
       </div>
     </button>
   )
 }
 
-function TeamHeader({ name, marked, open = true, onToggle }) {
+/**
+ * 팀 한 줄.
+ *
+ * 예전에는 줄 전체가 버튼 하나였고, 그 안에 `모두 채팅 바로가기` 가 **글씨로만**
+ * 들어 있었다. 눌러도 팀이 접히기만 하고 단체방은 열리지 않았다.
+ *
+ * 그래서 접기와 바로가기를 두 버튼으로 가른다. 버튼 안에 버튼을 넣을 수 없어
+ * 줄 자체는 `div` 다.
+ *
+ * 미읽음 뱃지를 여기 그리는 이유 — 서버가 팀 노드에 하위 프로젝트·방을 **다 더한
+ * 합계**를 준다. 접혀 있을 때 그 아래 볼 것이 있는지는 이 숫자로만 알 수 있다.
+ */
+function TeamHeader({ team, open, onToggle, onOpenGroupRoom }) {
   return (
-    <button className="team-chat-header" type="button" aria-expanded={open} onClick={onToggle}>
-      <span className="team-name">
-        <strong>{name}</strong>
-        {marked ? <RequestIcon small /> : null}
-      </span>
+    <div className="team-chat-header">
+      <button className="team-name" type="button" aria-expanded={open} onClick={onToggle}>
+        <strong>{team.name}</strong>
+        {team.marked ? <RequestIcon small /> : null}
+        <UnreadBadge count={team.unread} label={team.name} />
+      </button>
       <span className="team-actions">
-        <span className="team-shortcut">모두 채팅 바로가기</span>
-        <Icon className={open ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
+        {team.groupRoomId ? (
+          <button
+            className="team-shortcut"
+            type="button"
+            onClick={() => onOpenGroupRoom(team.groupRoomId)}
+          >
+            모두 채팅 바로가기
+          </button>
+        ) : (
+          // 팀 단체방은 서버가 첫 조회 때 만들어 준다. 그래도 안 왔으면
+          // 자리를 비우지 않고 왜 없는지 적는다.
+          <span className="team-shortcut disabled" title="이 팀에는 아직 단체방이 없습니다.">
+            단체방 없음
+          </span>
+        )}
+        <button
+          className="chevron-button"
+          type="button"
+          aria-expanded={open}
+          aria-label={open ? `${team.name} 접기` : `${team.name} 펼치기`}
+          onClick={onToggle}
+        >
+          <Icon className={open ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
+        </button>
       </span>
-    </button>
+    </div>
   )
 }
 
@@ -73,6 +106,11 @@ export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelec
 
   const primaryChat = sidebar?.my_agent_room
   const teams = toTeamRows(sidebar)
+  // 어느 프로젝트에도 안 매달린 1:1 · 동료 대리인 방. 서버는 `direct_rooms` 로
+  // 따로 내려주는데 화면이 이 칸을 아예 안 그려서, 프로젝트 밖에서 건 대화는
+  // **목록에서 통째로 사라져 있었다.** 방을 못 찾으니 다시 걸고, 그러면 서버가
+  // 같은 방을 되살려 주는데도 사용자는 새 방이 생긴 줄 안다.
+  const directRooms = toDirectRows(sidebar)
 
   const toggleTool = (nextTool) => {
     setTool((current) => (current === nextTool ? '' : nextTool))
@@ -177,16 +215,35 @@ export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelec
           이름으로 박혀 있었다(`AX Lions` · `멋사 아이디어톤`). 몇 개가 올지
           서버가 정하므로 접힘 상태도 id 로 기억한다.
         */}
+        {directRooms.length > 0 ? (
+          <section className="chat-list-section">
+            <div className="section-heading">
+              <h2>개인 채팅</h2>
+            </div>
+            {directRooms.map((chat) => (
+              <ChatPreview
+                chat={chat}
+                key={chat.id}
+                selected={selectedChatId === chat.id}
+                onSelect={() => onSelectChat(chat.id)}
+              />
+            ))}
+          </section>
+        ) : null}
+
         {teams.map((team) => (
           <section className="team-chat-group" key={team.id}>
             <TeamHeader
-              name={team.name}
-              marked={team.marked}
               open={groups.isOpen(team.id)}
+              team={team}
+              onOpenGroupRoom={onSelectChat}
               onToggle={() => groups.toggle(team.id)}
             />
             {groups.isOpen(team.id) ? (
               <div className="nested-team">
+                {team.projects.length === 0 ? (
+                  <p className="chat-list-empty">이 팀에는 아직 프로젝트가 없습니다.</p>
+                ) : null}
                 {team.projects.map((project) => (
                   <div className="project-team" key={project.id}>
                     <button
@@ -195,7 +252,11 @@ export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelec
                       aria-expanded={groups.isOpen(project.id)}
                       onClick={() => groups.toggle(project.id)}
                     >
-                      <strong>{project.name}</strong>
+                      <span className="project-name">
+                        <strong>{project.name}</strong>
+                        {project.marked ? <RequestIcon small /> : null}
+                        <UnreadBadge count={project.unread} label={project.name} />
+                      </span>
                       <Icon
                         className={groups.isOpen(project.id) ? 'ui-icon chevron open' : 'ui-icon chevron'}
                         src={icons.expandDown}

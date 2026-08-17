@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import { icons } from './chat.icons.js'
-import { fetchMessages, sendMessage } from './chat.data.js'
+import { fetchMessages, fetchRoom, sendMessage, toPreview } from './chat.data.js'
 import { formatTime, withDayDividers } from './chat.format.js'
 import { BordoAvatar, Icon, IconButton } from './chat.ui.jsx'
 import { useResource } from '../../lib/useResource.js'
@@ -50,6 +50,23 @@ function ChatMessage({ row }) {
 }
 
 export function ChatRoom({ room, roomId, onClose }) {
+  /*
+    목록에 없는 방은 그 자체로 읽는다.
+
+    사이드바는 팀 단체방을 **id 로만** 준다(`group_chat_room_id`). 트리 어디에도
+    방 객체가 없어서, `모두 채팅 바로가기` 로 연 방은 제목 칸이 비어 있었다.
+    이름 없는 대화창은 어느 방인지 알 수 없다.
+
+    목록에 있는 방은 다시 읽지 않는다. 방을 옮길 때마다 이미 가진 값을 한 번 더
+    받는 요청이 나가는 것을 피한다.
+  */
+  const hasListRow = Boolean(room)
+  const detail = useResource(
+    (signal) => (roomId && !hasListRow ? fetchRoom(roomId, signal) : Promise.resolve(null)),
+    [roomId, hasListRow],
+  )
+  const header = room ?? toPreview(detail.data)
+
   const [roomTool, setRoomTool] = useState('')
   const [messageText, setMessageText] = useState('')
   const [sending, setSending] = useState(false)
@@ -107,8 +124,8 @@ export function ChatRoom({ room, roomId, onClose }) {
           <Icon src={icons.expandLeft} />
         </button>
         <div className="chat-room-title">
-          <strong>{room?.name ?? ''}</strong>
-          <span>{room?.context ?? ''}</span>
+          <strong>{header?.name ?? ''}</strong>
+          <span>{header?.context ?? ''}</span>
         </div>
         <div className="chat-room-actions">
           <IconButton label="검색" active={roomTool === 'search'} onClick={() => toggleRoomTool('search')}>

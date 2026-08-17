@@ -214,14 +214,14 @@
 
 .my-bordo-card:hover,
 .chat-preview:hover,
-.team-chat-header:hover,
+.team-name:hover,
 .project-title:hover {
   background: var(--chat-sidebar-hover);
 }
 
 .my-bordo-card:active,
 .chat-preview:active,
-.team-chat-header:active,
+.team-name:active,
 .project-title:active {
   background: var(--chat-sidebar-selected);
 }
@@ -309,10 +309,19 @@
 }
 
 .section-heading h2,
-.team-name {
+.team-name,
+.project-name {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 4px;
+}
+
+.team-name strong,
+.project-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .section-heading img,
@@ -390,6 +399,22 @@
   object-fit: cover;
 }
 
+/* 아무도 아바타를 안 올린 방. 깨진 이미지 아이콘 대신 빈 원 하나를 둔다. */
+.avatar-stack.empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--chat-white-hover);
+}
+
+.avatar-stack.empty img {
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  opacity: 0.5;
+}
+
 .chat-preview-copy {
   min-width: 0;
   flex: 1 1 auto;
@@ -439,47 +464,60 @@
   justify-content: space-between;
 }
 
-.chat-preview-meta span {
-  display: inline-flex;
-  width: 20px;
-  height: 20px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: #ff6450;
-  color: #ffffff;
-  font-size: var(--chat-fs-meta);
-}
 
 .team-chat-group {
   display: grid;
   gap: 12px;
 }
 
-.team-chat-header,
-.project-title {
+/* 줄 자체는 더 이상 버튼이 아니다. 접기 버튼과 `모두 채팅 바로가기` 버튼이
+   나란히 들어가야 하는데, 버튼 안에 버튼을 넣을 수 없다. */
+.team-chat-header {
   width: 100%;
+  min-height: 44px;
+  gap: 8px;
+}
+
+.team-name,
+.project-title {
+  min-width: 0;
   height: 44px;
   padding: 10px 12px;
   border-radius: 8px;
   text-align: left;
 }
 
-.team-chat-header.nested,
+.team-name {
+  flex: 1 1 auto;
+}
+
 .project-title {
-  height: 44px;
+  width: 100%;
 }
 
 .team-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+}
+
+.chevron-button {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.chevron-button:hover {
+  background: var(--chat-white-hover);
 }
 
 .team-shortcut {
   display: inline-flex;
-  width: 137px;
   height: 24px;
   align-items: center;
   justify-content: center;
@@ -492,9 +530,40 @@
   white-space: nowrap;
 }
 
-.team-chat-header:hover .team-shortcut,
-.project-title:hover + .project-chat-list .team-shortcut {
+button.team-shortcut:hover {
   background: #e7e7ea;
+}
+
+button.team-shortcut:active {
+  background: var(--chat-sidebar-selected);
+}
+
+/* 단체방이 없는 팀. 자리를 비우면 왜 바로가기가 없는지 알 수 없다. */
+.team-shortcut.disabled {
+  background: transparent;
+  color: var(--chat-subtle);
+}
+
+/*
+  미읽음 뱃지.
+
+  팀·프로젝트 합계는 세 자리가 쉽게 나와서 폭을 고정하지 않는다. 대신 최소
+  폭을 원 크기로 잡아 한 자리도 동그랗게 보이게 한다.
+*/
+.unread-badge {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ff6450;
+  color: #ffffff;
+  font-size: var(--chat-fs-meta);
+  font-weight: 400;
+  line-height: 1;
 }
 
 .chevron {

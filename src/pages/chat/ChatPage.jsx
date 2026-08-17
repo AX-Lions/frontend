@@ -5,7 +5,15 @@ import './chat.css'
 import { AgentSettingsPanel } from './AgentSettingsPanel.jsx'
 import { ChatListPanel } from './ChatListPanel.jsx'
 import { ChatRoom } from './ChatRoom.jsx'
-import { fetchImportant, fetchSidebar, markRead, toPreview, toTeamRows } from './chat.data.js'
+import {
+  clearRoomUnread,
+  fetchImportant,
+  fetchSidebar,
+  markRead,
+  toDirectRows,
+  toPreview,
+  toTeamRows,
+} from './chat.data.js'
 import { useResource } from '../../lib/useResource.js'
 import { LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
@@ -59,20 +67,50 @@ export function ChatPage() {
 
   const openRoom = useMemo(() => {
     const all = [
-      ...(sidebar.data?.my_agent_room ? [toPreview(sidebar.data.my_agent_room)] : []),
+      toPreview(sidebar.data?.my_agent_room),
       ...importantRooms,
+      ...toDirectRows(sidebar.data),
       ...toTeamRows(sidebar.data).flatMap((t) => t.projects.flatMap((p) => p.rooms)),
-    ]
+    ].filter(Boolean)
     return all.find((room) => room.id === selectedChatId) ?? null
   }, [sidebar.data, importantRooms, selectedChatId])
 
-  // 방을 열면 읽음 워터마크를 올린다. 실패해도 대화는 보여야 하므로 삼킨다 —
-  // 미읽음 숫자가 잠깐 안 맞는 것이 대화가 안 열리는 것보다 낫다.
+  /*
+    방을 열면 읽음 워터마크를 올린다.
+
+    예전에는 `markRead` 만 부르고 끝이었다. 서버에서는 읽힌 것이 맞는데 **사이드바
+    뱃지가 그대로 남아** 있어서, 사용자는 방을 열었다 닫아도 안 읽힌 것으로 보였다.
+
+    두 단계로 맞춘다. 먼저 트리에서 그 방 몫을 빼서 뱃지를 즉시 끄고, 이어서
+    사이드바를 다시 읽어 서버 값으로 덮는다.
+
+    뺄셈만으로는 부족하다 — 팀 단체방은 사이드바가 방 객체 없이 id 만 주므로
+    트리에서 찾을 수가 없다. 다시 읽기만 해도 안 된다 — 왕복이 끝날 때까지
+    뱃지가 남아 있어 방을 옮길 때마다 한 박자씩 늦게 꺼진다.
+
+    실패는 삼킨다. 미읽음 숫자가 잠깐 안 맞는 것이 대화가 안 열리는 것보다 낫다.
+  */
+  const { setData: setSidebarData, reload: reloadSidebar } = sidebar
   useEffect(() => {
-    if (selectedChatId) {
-      markRead(selectedChatId).catch(() => {})
+    if (!selectedChatId) {
+      return undefined
     }
-  }, [selectedChatId])
+
+    let alive = true
+    markRead(selectedChatId)
+      .then(() => {
+        if (!alive) {
+          return
+        }
+        setSidebarData((current) => clearRoomUnread(current, selectedChatId))
+        reloadSidebar()
+      })
+      .catch(() => {})
+
+    return () => {
+      alive = false
+    }
+  }, [selectedChatId, setSidebarData, reloadSidebar])
 
   if (view === 'settings') {
     return <BordoSettingsPage onBack={() => setView('chat')} />
