@@ -84,8 +84,8 @@ function Switch({ checked, disabled, onChange, label }) {
 }
 
 export function AccountPage() {
-  const me = useResource((signal) => fetchMe(signal))
-  const agent = useResource((signal) => fetchAgentSettings(signal))
+  const me = useResource((signal) => fetchMe(signal), [], { cacheKey: 'me' })
+  const agent = useResource((signal) => fetchAgentSettings(signal), [], { cacheKey: 'agent-settings' })
 
   const [draftName, setDraftName] = useState(null)
   const [draftAgentName, setDraftAgentName] = useState(null)

@@ -166,5 +166,5 @@ export function useEdgeDetails(edgeIds) {
 
 /** 로그인한 사람. 내 대리인 노드를 찾는 데 쓴다. */
 export function useMe() {
-  return useResource((signal) => fetchMe(signal).catch(() => null), [])
+  return useResource((signal) => fetchMe(signal).catch(() => null), [], { cacheKey: 'me' })
 }

@@ -50,8 +50,8 @@ export function ChatPage() {
   // 목록이 그대로 남아 아무 일도 안 일어난다.
   const [fullscreen, setFullscreen] = useState(false)
 
-  const sidebar = useResource((signal) => fetchSidebar(signal))
-  const important = useResource((signal) => fetchImportant(signal))
+  const sidebar = useResource((signal) => fetchSidebar(signal), [], { cacheKey: 'chat-sidebar' })
+  const important = useResource((signal) => fetchImportant(signal), [], { cacheKey: 'chat-important' })
 
   const importantRooms = useMemo(
     // 중요 채팅은 **메시지 목록**으로 온다. 같은 방의 메시지가 여럿이면 방이

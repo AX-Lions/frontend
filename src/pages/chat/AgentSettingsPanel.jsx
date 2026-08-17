@@ -152,8 +152,8 @@ function PromptCard({ prompt, selected, onSelect, onSave, onRemove }) {
 }
 
 export function AgentSettingsPanel() {
-  const settingsResource = useResource((signal) => fetchAgentSettings(signal))
-  const promptsResource = useResource((signal) => fetchPrompts(signal))
+  const settingsResource = useResource((signal) => fetchAgentSettings(signal), [], { cacheKey: 'agent-settings' })
+  const promptsResource = useResource((signal) => fetchPrompts(signal), [], { cacheKey: 'agent-prompts' })
   const { data: serverSettings, setData: setServerSettings } = settingsResource
 
   const prompts = promptsResource.data?.results ?? []

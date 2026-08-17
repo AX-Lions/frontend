@@ -30,7 +30,7 @@ function goInApp(event, href) {
 }
 
 export function HomePage() {
-  const { data: homeData, error, loading, reload, setData } = useResource(fetchHome)
+  const { data: homeData, error, loading, reload, setData } = useResource(fetchHome, [], { cacheKey: 'home' })
   const [favoriteMessage, setFavoriteMessage] = useState('')
   const [selectedMeetingId, setSelectedMeetingId] = useState(null)
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
