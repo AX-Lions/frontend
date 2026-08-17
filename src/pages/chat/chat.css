@@ -769,10 +769,6 @@ button.team-shortcut:active {
 }
 
 .chat-composer {
-  position: absolute;
-  right: 32px;
-  bottom: 30px;
-  left: 36px;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1579,6 +1575,119 @@ button.team-shortcut:active {
 
 .important-confirm span {
   color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+/* ─────────────────────────────── 첨부 · 입력창 */
+
+.message-files {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.message-files li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px dashed var(--chat-line);
+  border-radius: 12px;
+  font-size: var(--chat-fs-meta);
+}
+
+.message-files em {
+  color: var(--chat-subtle);
+  font-style: normal;
+}
+
+.chat-composer-wrap {
+  position: absolute;
+  right: 32px;
+  bottom: 30px;
+  left: 36px;
+  display: grid;
+  gap: 6px;
+}
+
+.composer-attachments {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 아직 안 보낸 첨부. 서버가 24시간 뒤 만료시키므로, 안 보이면 사용자는
+   파일이 사라진 줄 안다. */
+.composer-attachments li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: var(--chat-fs-meta);
+}
+
+.composer-attachments em {
+  color: var(--chat-subtle);
+  font-style: normal;
+}
+
+.composer-attachments button {
+  margin-left: auto;
+  color: var(--chat-subtle);
+}
+
+.composer-file {
+  display: none;
+}
+
+.composer-important.on {
+  background: var(--chat-orange);
+}
+
+.composer-important.on img {
+  filter: brightness(0) invert(1);
+}
+
+/* ─────────────────────────────── 그 날 요약 */
+
+.daily-summary {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 12px;
+  background: var(--chat-soft);
+}
+
+.daily-summary strong {
+  font-size: var(--chat-fs-meta);
+  color: var(--chat-subtle);
+  font-weight: 400;
+}
+
+.daily-summary p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* `요약 준비 중` 과 `요약할 게 없음` 을 같은 회색으로 두되 문구로 가른다.
+   둘 다 빈 화면이면 기능이 고장 난 것으로 읽힌다. */
+.daily-summary p.pending {
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.daily-summary ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
   font-size: var(--chat-fs-meta);
 }
 

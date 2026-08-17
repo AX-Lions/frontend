@@ -138,7 +138,27 @@ export function ChatMessageRow({ message, focused, onChanged }) {
       )
     }
 
-    return <p className={`message-bubble ${tone}`}>{message.body}</p>
+    return (
+      <>
+        {message.body ? <p className={`message-bubble ${tone}`}>{message.body}</p> : null}
+        {message.attachments?.length ? (
+          <ul className={`message-files ${tone}`}>
+            {message.attachments.map((file) => (
+              <li key={file.id}>
+                <span>{file.name}</span>
+                {/*
+                  누를 수 있는 링크로 만들지 않았다. 서버가 넣는 `url` 은
+                  `/media/chat/...` 자리표시자이고 저장소가 아직 안 붙어 있어서,
+                  누르면 404 다. **붙었다는 사실**은 보여주되 받을 수 있는 척은
+                  하지 않는다.
+                */}
+                <em>내려받기는 저장소 연결 후</em>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </>
+    )
   }
 
   const marks = (

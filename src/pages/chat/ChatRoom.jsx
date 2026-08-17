@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { icons } from './chat.icons.js'
+import { ChatComposer } from './ChatComposer.jsx'
 import { ChatDateCalendar } from './ChatDateCalendar.jsx'
 import { ChatMessageRow } from './ChatMessageRow.jsx'
 import { ChatRoomSearch } from './ChatRoomSearch.jsx'
-import { fetchMessages, fetchRoom, sendMessage, toPreview } from './chat.data.js'
+import { fetchDailySummary, fetchMessages, fetchRoom, toPreview } from './chat.data.js'
 import { localDate, localMonth, withDayDividers } from './chat.format.js'
 import { Icon, IconButton } from './chat.ui.jsx'
 import { useResource } from '../../lib/useResource.js'
@@ -22,6 +23,53 @@ function DayDivider({ row, onOpenCalendar }) {
       {row.label}
       <Icon src={icons.expandRight} />
     </button>
+  )
+}
+
+/**
+ * 그 날 대화 한 줄 요약.
+ *
+ * 날짜로 뛰었을 때만 보인다. "이 날 무슨 이야기가 오갔지"가 이 제품의 질문
+ * 자체라서, 과거 날짜를 열었을 때 요약이 있으면 50건을 읽지 않아도 된다.
+ *
+ * `status` 를 서버가 따로 주는 이유가 있다. **`요약 준비 중` 과 `요약할 게
+ * 없음` 은 다르다.** 둘 다 빈 화면으로 두면 사용자는 기능이 고장 났다고 본다.
+ */
+function DailySummary({ roomId, date }) {
+  const { data, error, loading } = useResource(
+    (signal) => fetchDailySummary(roomId, date, signal),
+    [roomId, date],
+  )
+
+  if (loading && !data) {
+    return null
+  }
+  if (error || !data) {
+    // 요약은 곁다리다. 못 읽었다고 대화 위에 오류를 띄우면 대화가 안 열린
+    // 것처럼 보인다.
+    return null
+  }
+
+  return (
+    <div className="daily-summary">
+      <strong>{`${date} 요약`}</strong>
+      {data.status === 'READY' && data.one_line ? (
+        <p>{data.one_line}</p>
+      ) : (
+        <p className="pending">
+          {data.message_count > 0
+            ? '이 날의 요약은 아직 만들어지지 않았습니다.'
+            : '이 날에는 요약할 대화가 없습니다.'}
+        </p>
+      )}
+      {data.my_todos?.length ? (
+        <ul>
+          {data.my_todos.map((todo, index) => (
+            <li key={`${todo}-${index}`}>{todo}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   )
 }
 
@@ -44,9 +92,6 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
   const header = room ?? toPreview(detail.data)
 
   const [roomTool, setRoomTool] = useState('')
-  const [messageText, setMessageText] = useState('')
-  const [sending, setSending] = useState(false)
-  const [sendError, setSendError] = useState('')
   // 달력에서 고른 날. 서버는 `date` 와 `before` 를 함께 못 받는다 — 날짜로 뛰는
   // 것과 위로 이어 보는 것은 기준점이 다르다.
   const [jumpDate, setJumpDate] = useState(null)
@@ -55,7 +100,6 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
   const [focusMessageId, setFocusMessageId] = useState(null)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [olderError, setOlderError] = useState('')
-  const canSend = messageText.trim().length > 0 && !sending && Boolean(roomId)
 
   const { data, error, loading, reload, setData } = useResource(
     (signal) => (roomId
@@ -162,33 +206,14 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
     setRoomTool((current) => (current === nextTool ? '' : nextTool))
   }
 
-  const submit = async (event) => {
-    event.preventDefault()
-    if (!canSend) {
-      return
-    }
-
-    const body = messageText.trim()
-    setSending(true)
-    setSendError('')
-    try {
-      // 중복 전송은 도메인 키로 막는다. `Idempotency-Key` 는 계약에만 있고
-      // 아직 동작하지 않는다.
-      const sent = await sendMessage(roomId, { body, clientMessageId: crypto.randomUUID() })
-      // 날짜로 뛰어 과거를 보던 중이면 최근으로 돌아온다. 안 그러면 방금 보낸
-      // 말이 화면 어디에도 없다.
-      setJumpDate(null)
-      setData((current) => ({
-        ...(current ?? { results: [] }),
-        results: [...(current?.results ?? []), sent],
-      }))
-      setMessageText('')
-    } catch (err) {
-      // 입력한 것을 지우지 않는다. 지우면 다시 칠 수밖에 없다.
-      setSendError(err?.message || '보내지 못했습니다.')
-    } finally {
-      setSending(false)
-    }
+  const appendSent = (sent) => {
+    // 날짜로 뛰어 과거를 보던 중이면 최근으로 돌아온다. 안 그러면 방금 보낸
+    // 말이 화면 어디에도 없다.
+    setJumpDate(null)
+    setData((current) => ({
+      ...(current ?? { results: [] }),
+      results: [...(current?.results ?? []), sent],
+    }))
   }
 
   return (
@@ -278,6 +303,8 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
         </div>
       ) : null}
 
+      {jumpDate && roomId ? <DailySummary date={jumpDate} roomId={roomId} /> : null}
+
       <div className="chat-message-scroll" ref={scrollRef}>
         {!roomId ? (
           <Empty>왼쪽에서 대화를 고르십시오.</Empty>
@@ -317,26 +344,7 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
         )}
       </div>
 
-      {sendError ? <p className="chat-send-error" role="alert">{sendError}</p> : null}
-
-      <form className={canSend ? 'chat-composer can-send' : 'chat-composer'} onSubmit={submit}>
-        <button type="button" aria-label="첨부파일">
-          <Icon src={icons.addSmall} />
-        </button>
-        <button type="button" aria-label="설정">
-          <Icon src={icons.filter} />
-        </button>
-        <input
-          aria-label="채팅 입력"
-          placeholder="채팅을 입력하세요..."
-          value={messageText}
-          disabled={!roomId}
-          onChange={(event) => setMessageText(event.target.value)}
-        />
-        <button className="send" type="submit" aria-label="전송" disabled={!canSend}>
-          <Icon src={icons.send} />
-        </button>
-      </form>
+      <ChatComposer roomId={roomId} onSent={appendSent} />
 
       {calendarMonth && roomId ? (
         <ChatDateCalendar
