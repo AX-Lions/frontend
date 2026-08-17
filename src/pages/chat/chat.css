@@ -1205,8 +1205,48 @@ button.team-shortcut:active {
   box-shadow: inset 0 0 0 1px #ff9d42;
 }
 
-.prompt-card.tall {
-  min-height: 190px;
+/* 수정 중인 카드. 읽을 때와 자리가 크게 달라지면 어느 카드를 고치는 중인지
+   놓친다. 테두리 색만 바꾼다. */
+.prompt-card.editing {
+  border-color: var(--settings-active);
+  grid-template-columns: minmax(0, 1fr);
+  padding: 12px;
+  cursor: default;
+}
+
+.prompt-card.editing textarea {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--settings-line);
+  border-radius: 8px;
+  outline: 0;
+  background: #ffffff;
+  color: var(--settings-ink);
+  font-size: var(--settings-fs-body);
+  line-height: 1.35;
+}
+
+.prompt-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.prompt-card-actions button {
+  width: auto;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--settings-muted);
+  font-size: var(--settings-fs-meta);
+}
+
+.prompt-card-actions button[type='submit'] {
+  background: var(--settings-point);
+  color: #ffffff;
 }
 
 .prompt-card p {

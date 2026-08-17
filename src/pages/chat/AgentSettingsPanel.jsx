@@ -6,45 +6,51 @@ import {
   fetchAgentSettings,
   fetchPrompts,
   patchAgentSettings,
+  updatePrompt,
 } from './chat.data.js'
 import { useResource } from '../../lib/useResource.js'
+import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
+/**
+ * 화면에 그릴 스위치와 그 설명.
+ *
+ * **켜짐/꺼짐 기본값을 여기 두지 않는다.** 예전에는 항목마다 `enabled` 가 박혀
+ * 있어서, 서버 값을 못 읽었을 때 그 값이 그대로 그려졌다. 사용자는 자기가
+ * 그렇게 설정해 둔 줄 알지만 실제 서버 값은 정반대일 수 있다 — **화면이 남의
+ * 설정을 지어내는 것**이다.
+ *
+ * 지금은 서버 값이 없으면 스위치를 아예 안 그린다.
+ */
 const settingItems = [
   {
     id: 'feasibility',
     title: '구현 가능성 판단',
     description: '구현 가능 여부를 Bordo가 대신 판단하고 답합니다.',
-    enabled: true,
   },
   {
     id: 'schedule',
     title: '일정 수정 여부 판단',
     description: '일정 수정 여부를 Bordo가 대신 판단하고 수정합니다.',
-    enabled: true,
   },
   {
     id: 'meeting-question',
     title: '회의 중간 질문',
     description: '회의 중간에 Bordo가 질문할 수 있습니다.',
-    enabled: false,
   },
   {
     id: 'work-open',
     title: '작업 공개',
     description: '개인이 진행한 작업을 타 팀원에게 공개합니다.',
-    enabled: false,
   },
   {
     id: 'plan-open',
     title: '계획 공개',
     description: '개인이 세운 계획을 타 팀원에게 공개합니다.',
-    enabled: true,
   },
   {
     id: 'thought-open',
     title: '생각 공개',
     description: '개인의 생각을 타 팀원에게 공개합니다.',
-    enabled: false,
   },
 ]
 
@@ -78,19 +84,81 @@ const SETTING_KEY = {
   'thought-open': 'disclose_work_plan_thought',
 }
 
+function PromptCard({ prompt, selected, onSelect, onSave, onRemove }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(prompt.body)
+
+  if (editing) {
+    return (
+      <form
+        className="prompt-card editing"
+        onSubmit={(event) => {
+          event.preventDefault()
+          const body = draft.trim()
+          if (!body) {
+            return
+          }
+          onSave(prompt.id, body)
+          setEditing(false)
+        }}
+      >
+        <textarea
+          aria-label="시스템 프롬프트 수정"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        <div className="prompt-card-actions">
+          <button type="submit" disabled={!draft.trim()}>저장</button>
+          <button type="button" onClick={() => { setDraft(prompt.body); setEditing(false) }}>취소</button>
+        </div>
+      </form>
+    )
+  }
+
+  return (
+    <article
+      className={selected ? 'prompt-card selected' : 'prompt-card'}
+      onClick={() => { onSelect(prompt.id); setMenuOpen(false) }}
+    >
+      <p>{prompt.body}</p>
+      <button
+        className={menuOpen ? 'active' : ''}
+        type="button"
+        aria-label="시스템 프롬프트 메뉴"
+        aria-expanded={menuOpen}
+        onClick={(event) => {
+          event.stopPropagation()
+          onSelect(prompt.id)
+          setMenuOpen((open) => !open)
+        }}
+      >
+        ⋮
+      </button>
+      {menuOpen ? (
+        <div className="prompt-menu" onClick={(event) => event.stopPropagation()}>
+          {/* 서버에 `PATCH /me/agent/prompts/{id}` 가 있는데 화면에 고칠 길이
+              없었다. 한 글자 고치려고 지우고 다시 쓰면 순서가 바뀐다. */}
+          <button type="button" onClick={() => { setDraft(prompt.body); setEditing(true); setMenuOpen(false) }}>
+            수정
+          </button>
+          <button type="button" onClick={() => { setMenuOpen(false); onRemove(prompt.id) }}>
+            삭제
+          </button>
+        </div>
+      ) : null}
+    </article>
+  )
+}
+
 export function AgentSettingsPanel() {
-  const { data: serverSettings, setData: setServerSettings } =
-    useResource((signal) => fetchAgentSettings(signal))
+  const settingsResource = useResource((signal) => fetchAgentSettings(signal))
   const promptsResource = useResource((signal) => fetchPrompts(signal))
+  const { data: serverSettings, setData: setServerSettings } = settingsResource
 
-  const settings = settingItems.map((item) => ({
-    ...item,
-    enabled: serverSettings ? Boolean(serverSettings[SETTING_KEY[item.id]]) : item.enabled,
-  }))
-  const prompts = (promptsResource.data?.results ?? []).map((p) => ({ id: p.id, text: p.body }))
+  const prompts = promptsResource.data?.results ?? []
 
-  const [selectedPromptId, setSelectedPromptId] = useState(1)
-  const [openPromptMenuId, setOpenPromptMenuId] = useState(null)
+  const [selectedPromptId, setSelectedPromptId] = useState(null)
   const [promptText, setPromptText] = useState('')
   const [notice, setNotice] = useState(null)
   const [pendingKeys, setPendingKeys] = useState([])
@@ -168,7 +236,6 @@ export function AgentSettingsPanel() {
       }))
       setPromptText('')
       setSelectedPromptId(created.id)
-      setOpenPromptMenuId(null)
       showNotice('success')
     } catch (err) {
       // 입력한 것을 지우지 않는다. 지우면 다시 쓸 수밖에 없다.
@@ -176,8 +243,20 @@ export function AgentSettingsPanel() {
     }
   }
 
+  const savePrompt = async (promptId, body) => {
+    try {
+      const saved = await updatePrompt(promptId, body)
+      promptsResource.setData((current) => ({
+        ...(current ?? {}),
+        results: (current?.results ?? []).map((p) => (p.id === promptId ? saved : p)),
+      }))
+      showNotice('success')
+    } catch (err) {
+      showNotice('error', err?.message)
+    }
+  }
+
   const removePrompt = async (promptId) => {
-    setOpenPromptMenuId(null)
     try {
       await deletePrompt(promptId)
       promptsResource.setData((current) => ({
@@ -208,21 +287,34 @@ export function AgentSettingsPanel() {
       <div className="settings-scroll">
         <section className="settings-section">
           <h2>세부 설정</h2>
-          <div className="settings-list">
-            {settings.map((item) => (
-              <div className="settings-row" key={item.id}>
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
+          {/*
+            서버 값을 모르는 동안에는 스위치를 그리지 않는다.
+
+            예전에는 목 기본값(`구현 가능성 판단` ON 등)이 그려졌다. 사용자는
+            자기 설정을 보고 있다고 믿는데 서버 값은 정반대일 수 있고, 그러면
+            **끄려고 누른 스위치가 오히려 켜진다.**
+          */}
+          {settingsResource.loading && !serverSettings ? (
+            <Loading label="대리인 설정을 불러오는 중입니다…" />
+          ) : settingsResource.error && !serverSettings ? (
+            <LoadError error={settingsResource.error} onRetry={settingsResource.reload} />
+          ) : (
+            <div className="settings-list">
+              {settingItems.map((item) => (
+                <div className="settings-row" key={item.id}>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <p>{item.description}</p>
+                  </div>
+                  <SettingSwitch
+                    disabled={pendingKeys.includes(SETTING_KEY[item.id])}
+                    enabled={Boolean(serverSettings?.[SETTING_KEY[item.id]])}
+                    onToggle={() => toggleSetting(item.id)}
+                  />
                 </div>
-                <SettingSwitch
-                  disabled={pendingKeys.includes(SETTING_KEY[item.id])}
-                  enabled={item.enabled}
-                  onToggle={() => toggleSetting(item.id)}
-                />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className="settings-section prompt-section">
@@ -239,43 +331,21 @@ export function AgentSettingsPanel() {
             </button>
           </form>
           <div className="prompt-card-list">
-            {prompts.map((prompt, index) => (
-              <article
-                className={[
-                  'prompt-card',
-                  index > 0 ? 'tall' : '',
-                  selectedPromptId === prompt.id ? 'selected' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
+            {promptsResource.loading && !promptsResource.data ? (
+              <Loading label="프롬프트를 불러오는 중입니다…" />
+            ) : promptsResource.error && !promptsResource.data ? (
+              <LoadError error={promptsResource.error} onRetry={promptsResource.reload} />
+            ) : prompts.length === 0 ? (
+              <Empty>아직 넣어 둔 지시가 없습니다.</Empty>
+            ) : prompts.map((prompt) => (
+              <PromptCard
                 key={prompt.id}
-                onClick={() => {
-                  setSelectedPromptId(prompt.id)
-                  setOpenPromptMenuId(null)
-                }}
-              >
-                <p>{prompt.text}</p>
-                <button
-                  className={openPromptMenuId === prompt.id ? 'active' : ''}
-                  type="button"
-                  aria-label="시스템 프롬프트 메뉴"
-                  aria-expanded={openPromptMenuId === prompt.id}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setSelectedPromptId(prompt.id)
-                    setOpenPromptMenuId((currentId) => (currentId === prompt.id ? null : prompt.id))
-                  }}
-                >
-                  ⋮
-                </button>
-                {openPromptMenuId === prompt.id ? (
-                  <div className="prompt-menu" onClick={(event) => event.stopPropagation()}>
-                    <button type="button" onClick={() => removePrompt(prompt.id)}>
-                      삭제
-                    </button>
-                  </div>
-                ) : null}
-              </article>
+                prompt={prompt}
+                selected={selectedPromptId === prompt.id}
+                onRemove={removePrompt}
+                onSave={savePrompt}
+                onSelect={setSelectedPromptId}
+              />
             ))}
           </div>
         </section>
