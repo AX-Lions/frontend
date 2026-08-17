@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { LoadError, Loading } from '../../shared/components/LoadState.jsx'
 import { useResource } from '../../lib/useResource.js'
+import { navigate } from '../../app/navigation.js'
 import { logout } from '../../lib/api.js'
 import {
   TONES,
@@ -316,6 +317,14 @@ export function AccountPage() {
               </div>
             ))}
           </div>
+          {/* 두 화면의 스위치 개수가 다른 것을 사용자가 먼저 발견하면 "어느 쪽이
+              진짜지" 가 된다. 다르다는 것과 그 이유를 화면이 먼저 말한다. */}
+          <p className="account-note">
+            채팅의 <strong>Bordo 설정</strong>에서는 마지막 항목이
+            <em> 작업 · 계획 · 생각 </em>스위치 세 개로 나뉘어 보입니다.
+            서버에는 이 셋을 담는 칸이 하나뿐이라 <strong>셋은 언제나 함께 켜지고
+            함께 꺼집니다.</strong> 하나만 끄고 싶다면 따로 요청해 주세요.
+          </p>
         </section>
 
         <section className="account-section">
@@ -342,6 +351,27 @@ export function AccountPage() {
               저장
             </button>
           </form>
+        </section>
+
+        <section className="account-section">
+          <h2>시스템 프롬프트</h2>
+          <p className="account-hint">
+            대리인에게 미리 일러둘 말은 채팅 화면의 <strong>Bordo 설정</strong>에
+            있습니다. 같은 대리인의 설정인데 화면이 둘로 갈려 있고 서로 오갈 길이
+            없어서, 여기서 가는 길을 둡니다.
+          </p>
+          <button
+            className="account-link"
+            type="button"
+            onClick={() => navigate('/chat')}
+          >
+            채팅으로 이동
+          </button>
+          {/* 채팅의 설정 화면은 주소가 따로 없고 화면 안의 상태로만 열린다.
+              바로 데려다줄 수 없으므로 **어디를 눌러야 하는지까지** 적는다. */}
+          <p className="account-hint account-hint-after">
+            채팅 화면 왼쪽 레일의 <strong>AI 대리인 설정</strong> 아이콘을 누르면 열립니다.
+          </p>
         </section>
 
         <section className="account-section account-danger">

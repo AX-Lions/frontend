@@ -76,6 +76,31 @@
   line-height: 1.6;
 }
 
+/* 입력·버튼 **뒤에** 붙는 안내. 위쪽 여백만 필요하다. */
+.account-hint-after {
+  margin: 10px 0 0;
+}
+
+/*
+ * 규칙 설명. 힌트와 달리 **왜 이렇게 동작하는지**를 말하므로 눈에 걸려야 한다.
+ * 힌트와 같은 회색으로 두면 아무도 안 읽고, 두 화면의 스위치 개수가 다른 것을
+ * 사용자가 먼저 발견한다.
+ */
+.account-note {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--sidebar);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.account-note strong {
+  color: var(--text);
+}
+
 /* ── 이름 */
 
 .account-name-row {
@@ -261,6 +286,30 @@
   .account-tone {
     transition: none;
   }
+}
+
+/* ── 다른 화면으로 */
+
+/*
+ * 링크처럼 보이되 `<button>` 이다. 채팅의 설정 화면은 주소가 없고 화면 안의
+ * 상태로만 열려서 `<a href>` 로 데려다줄 수가 없다. 생김새를 링크로 맞추면
+ * 눌러도 주소가 안 바뀌는 이유를 설명할 수 없으므로, 버튼으로 둔다.
+ */
+.account-link {
+  padding: 10px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-link::after {
+  content: ' →';
+}
+
+.account-link:hover {
+  background: var(--sidebar);
 }
 
 /* ── 로그아웃 */
