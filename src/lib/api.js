@@ -163,6 +163,18 @@ export async function request(path, options = {}) {
     if (ok) {
       response = await send(path, { ...options, _retried: true })
     }
+
+    // 갱신했는데도 401 이면 그 토큰으로는 아무것도 못 한다.
+    //
+    // `/auth/refresh` 는 서명만 본다. 계정이 지워졌거나 비활성화된 뒤에도
+    // **새 액세스 토큰이 멀쩡히 발급되고**, 그걸로 다시 부르면 또 401 이다.
+    // 여기서 지우지 않으면 화면은 "유효하지 않은 토큰입니다" 를 띄운 채로 멈추고,
+    // 사용자는 로그인 화면으로 돌아갈 방법이 없다 — 새로고침해도 같은 화면이다.
+    //
+    // 지우면 `onAuthChange` 가 돌아 화면이 스스로 로그인으로 간다.
+    if (response.status === 401) {
+      clearTokens()
+    }
   }
 
   if (response.status === 204) {
