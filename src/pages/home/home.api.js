@@ -33,7 +33,11 @@ export function setMeetingFavorite(meetingId, on) {
  *
  * `sources` 는 **이 회의에서 대리인이 근거로 쓸 자료 종류**다. 빈 배열은
  * "아무것도 쓰지 않는다" 는 뜻이고 제한 없음이 아니다.
+ *
+ * `prompt` 는 **반드시 함께 보낸다.** 서버가 키의 유무를 가리지 않고
+ * `prompt` 를 빈 문자열로 덮어쓰기 때문에, 빼면 이미 저장돼 있던 사전 지시가
+ * 저장 한 번에 지워진다.
  */
-export function setDelegation(meetingId, { enabled, sources }) {
-  return api.post(`/meetings/${meetingId}/delegate`, { enabled, sources })
+export function setDelegation(meetingId, { enabled, sources, prompt }) {
+  return api.post(`/meetings/${meetingId}/delegate`, { enabled, sources, prompt })
 }

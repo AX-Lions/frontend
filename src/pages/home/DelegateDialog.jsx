@@ -18,6 +18,18 @@ import './delegate.css'
  *
  * "대리인은 보내되 내 기록은 쓰지 마라" 는 성립한다. 회의 발언만 듣고 답하거나,
  * 근거가 없으면 유보한다. 그래서 하나도 안 고른 상태를 막지 않는다.
+ *
+ * ## 사전 지시를 여기서 받는다
+ *
+ * `POST /meetings/{id}/delegate` 의 `prompt` 는 **키가 없어도 빈 문자열로
+ * 덮어쓴다** (`request.data.get("prompt", "") or ""`). 그래서 이 팝업이 `prompt`
+ * 를 안 보내면 Discord 나 다른 경로로 넣어 둔 사전 지시가 **저장을 누르는 순간
+ * 사라진다.** 자료 범위만 다시 고르려던 사람이 지시를 잃는다.
+ *
+ * 화면에서 입력을 받아 항상 함께 보낸다. 서버를 고쳐 "키가 없으면 유지" 로
+ * 바꾸는 편이 안전하지만, 그래도 이 팝업은 **지금 무엇이 들어 있는지 보여
+ * 줘야 한다** — 안 보이면 사용자는 대리인이 무슨 지시를 들고 회의에 가는지
+ * 모른 채 맡기게 된다.
  */
 
 const SOURCES = [
@@ -49,6 +61,8 @@ export function DelegateDialog({ schedule, onClose, onSaved }) {
   const current = schedule.delegation
   // `null` 은 고른 적 없음이라 전부다. `[]` 는 전부 끈 것이라 그대로 둔다.
   const [picked, setPicked] = useState(current?.sources ?? ALL)
+  // 서버에 있던 지시를 그대로 띄운다. 빈 칸으로 시작하면 저장 한 번에 지워진다.
+  const [prompt, setPrompt] = useState(current?.prompt ?? '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const closeRef = useRef(null)
@@ -78,8 +92,10 @@ export function DelegateDialog({ schedule, onClose, onSaved }) {
         return
       }
 
+      // `textarea` 를 빠뜨리면 사전 지시 칸이 순환에서 빠져 키보드로는
+      // 지시를 못 쓴다.
       const focusable = dialogRef.current?.querySelectorAll(
-        'button:not([disabled]), input:not([disabled]), [href]')
+        'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [href]')
       if (!focusable?.length) {
         return
       }
@@ -119,7 +135,11 @@ export function DelegateDialog({ schedule, onClose, onSaved }) {
       // 순서를 화면 순으로 맞춰 보낸다. 고른 순서대로 보내면 같은 조합인데
       // 응답이 매번 다른 순서로 와서 다시 열 때 칸 순서가 흔들린다.
       const sources = ALL.filter((v) => picked.includes(v))
-      const saved = await setDelegation(schedule.meeting_id, { enabled, sources })
+      // 취소(`enabled === false`) 에서도 지시를 함께 보낸다. 빼면 서버가 빈
+      // 문자열로 덮어써, 대리 참석을 껐다가 다시 켜는 사람이 지시를 잃는다.
+      const saved = await setDelegation(schedule.meeting_id, {
+        enabled, sources, prompt: prompt.trim(),
+      })
       onSaved(schedule.meeting_id, saved)
       onClose()
     } catch (err) {
@@ -152,6 +172,19 @@ export function DelegateDialog({ schedule, onClose, onSaved }) {
         </header>
 
         <div className="delegate-body">
+          <label className="delegate-prompt">
+            <strong>대리인에게 미리 일러둘 것</strong>
+            <em>이 회의에서만 쓰입니다. 비워 두면 평소 설정대로 판단합니다.</em>
+            <textarea
+              value={prompt}
+              disabled={busy}
+              rows={3}
+              maxLength={1000}
+              placeholder="예) 일정 확정은 하지 말고 의견만 전해 주세요."
+              onChange={(event) => setPrompt(event.target.value)}
+            />
+          </label>
+
           <p className="delegate-lead">
             대리인이 이 회의에서 <strong>근거로 쓸 자료</strong>를 고르십시오.
             고르지 않은 자료는 검색되지 않습니다.

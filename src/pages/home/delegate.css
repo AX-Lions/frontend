@@ -61,6 +61,46 @@
   padding: 0 22px 8px;
 }
 
+/* 사전 지시. 자료 범위보다 위에 둔다 — 무엇을 맡기는지가 먼저다. */
+.delegate-prompt {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.delegate-prompt strong {
+  display: block;
+  font-size: 14px;
+}
+
+.delegate-prompt em {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.delegate-prompt textarea {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.delegate-prompt textarea:focus {
+  border-color: var(--text);
+  outline: none;
+}
+
 .delegate-lead {
   margin: 0 0 14px;
   color: var(--muted);
