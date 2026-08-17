@@ -5,6 +5,7 @@ import { FlowBoardPage } from '../pages/flowBoard/FlowBoardPage.jsx'
 import { ChatPage } from '../pages/chat/ChatPage.jsx'
 import { LoginPage } from '../pages/auth/LoginPage.jsx'
 import { SignupPage } from '../pages/auth/SignupPage.jsx'
+import { AccountPage } from '../pages/account/AccountPage.jsx'
 import { currentPath, subscribeToPath } from './navigation.js'
 import { isSignedIn, onAuthChange } from '../lib/auth.js'
 
@@ -58,6 +59,10 @@ export function AppRouter() {
 
   if (path === '/chat') {
     return <ChatPage />
+  }
+
+  if (path === '/account') {
+    return <AccountPage />
   }
 
   return <HomePage />
