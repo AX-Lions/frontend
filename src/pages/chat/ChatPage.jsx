@@ -5,6 +5,7 @@ import './chat.css'
 import { AgentSettingsPanel } from './AgentSettingsPanel.jsx'
 import { ChatListPanel } from './ChatListPanel.jsx'
 import { ChatRoom } from './ChatRoom.jsx'
+import { ChatSettingsPanel } from './ChatSettingsPanel.jsx'
 import {
   clearRoomUnread,
   confirmMessageImportant,
@@ -41,7 +42,13 @@ function BordoSettingsPage({ onBack }) {
 
 export function ChatPage() {
   const [selectedChatId, setSelectedChatId] = useState(null)
+  // `chat` 대화창 · `room-settings` 채팅 설정 · `agent` 대리인 설정.
+  // 앞의 둘은 오른쪽 칸만 바뀌고, 대리인 설정만 화면을 통째로 덮는다.
   const [view, setView] = useState('chat')
+  const [notice, setNotice] = useState('')
+  // 전체 화면 = 목록과 전역 메뉴를 접는 것. 대화창 안에 두면 목록을 접어도
+  // 목록이 그대로 남아 아무 일도 안 일어난다.
+  const [fullscreen, setFullscreen] = useState(false)
 
   const sidebar = useResource((signal) => fetchSidebar(signal))
   const important = useResource((signal) => fetchImportant(signal))
@@ -131,7 +138,9 @@ export function ChatPage() {
     }
   }, [selectedChatId, setSidebarData, reloadSidebar])
 
-  if (view === 'settings') {
+  // 대리인 설정만 화면을 통째로 덮는다. 채팅 설정은 오른쪽 칸만 바뀐다 —
+  // 어느 대화의 설정을 보고 있는지는 왼쪽 목록에서 눈으로 확인해야 한다.
+  if (view === 'agent') {
     return <BordoSettingsPage onBack={() => setView('chat')} />
   }
 
@@ -154,9 +163,9 @@ export function ChatPage() {
   }
 
   return (
-    <div className="chat-page">
-      <GlobalSidebar active="chat" />
-      <ChatListPanel
+    <div className={fullscreen ? 'chat-page fullscreen' : 'chat-page'}>
+      {fullscreen ? null : <GlobalSidebar active="chat" />}
+      {fullscreen ? null : <ChatListPanel
         importantRooms={importantRooms}
         selectedChatId={selectedChatId}
         sidebar={sidebar.data}
@@ -167,21 +176,58 @@ export function ChatPage() {
           setSelectedChatId(room.id)
           sidebar.reload()
         }}
-        onSelectChat={setSelectedChatId}
-        onOpenSettings={() => setView('settings')}
-      />
-      {/*
-        `key` 로 방마다 새 인스턴스를 만든다. 대화창은 날짜 이동 · 이어 붙인
-        페이지 · 입력 중인 글을 자기 안에 들고 있는데, 방을 옮길 때 이것들이
-        남아 있으면 **다른 방에 쓰던 글이 따라온다.** 방마다 `useEffect` 로
-        하나씩 되돌리는 것보다 통째로 새로 만드는 쪽이 빠뜨릴 것이 없다.
-      */}
-      <ChatRoom
-        key={selectedChatId ?? 'none'}
-        room={openRoom}
-        roomId={selectedChatId}
-        onClose={() => setSelectedChatId(null)}
-      />
+        onSelectChat={(id) => {
+          setSelectedChatId(id)
+          // 설정을 보다가 다른 대화를 고르면 그 대화를 연다. 설정 화면에
+          // 머물면 방금 고른 대화가 어디로 갔는지 알 수 없다.
+          setView('chat')
+        }}
+        onOpenAgentSettings={() => setView('agent')}
+        onOpenChatSettings={() => setView('room-settings')}
+      />}
+      {view === 'room-settings' ? (
+        <ChatSettingsPanel
+          room={openRoom}
+          roomId={selectedChatId}
+          onClose={() => setView('chat')}
+          onLeft={(message) => {
+            // 나간 방을 열어 둘 수 없다. 목록에서도 빠지므로 대화 선택을 지운다.
+            setSelectedChatId(null)
+            setView('chat')
+            setNotice(message)
+            sidebar.reload()
+          }}
+          onRenamed={() => {
+            setView('chat')
+            sidebar.reload()
+          }}
+        />
+      ) : (
+        /*
+          `key` 로 방마다 새 인스턴스를 만든다. 대화창은 날짜 이동 · 이어 붙인
+          페이지 · 입력 중인 글을 자기 안에 들고 있는데, 방을 옮길 때 이것들이
+          남아 있으면 **다른 방에 쓰던 글이 따라온다.** 방마다 `useEffect` 로
+          하나씩 되돌리는 것보다 통째로 새로 만드는 쪽이 빠뜨릴 것이 없다.
+        */
+        <ChatRoom
+          key={selectedChatId ?? 'none'}
+          fullscreen={fullscreen}
+          room={openRoom}
+          roomId={selectedChatId}
+          onClose={() => setSelectedChatId(null)}
+          onOpenSettings={() => setView('room-settings')}
+          onToggleFullscreen={() => setFullscreen((on) => !on)}
+        />
+      )}
+
+      {/* 나간 결과처럼 화면이 사라진 뒤에야 알 수 있는 것을 알린다. 아무 말도
+          없으면 사용자는 대화가 왜 없어졌는지 모른다. */}
+      {notice ? (
+        <p className="chat-page-notice" role="status" aria-live="polite">
+          {notice}
+          <button type="button" aria-label="닫기" onClick={() => setNotice('')}>×</button>
+        </p>
+      ) : null}
     </div>
   )
 }

@@ -159,7 +159,8 @@ export function ChatListPanel({
   onConfirmImportant,
   onCreatedRoom,
   onSelectChat,
-  onOpenSettings,
+  onOpenAgentSettings,
+  onOpenChatSettings,
 }) {
   const [promptVisible, setPromptVisible] = useState(true)
   const [tool, setTool] = useState('')
@@ -209,26 +210,12 @@ export function ChatListPanel({
           <IconButton label="채팅 생성" active={tool === 'create'} onClick={() => toggleTool('create')}>
             <Icon src={icons.add} />
           </IconButton>
-          {/* 톱니와 반짝이가 **같은 화면**을 열고 있었다. 톱니는 채팅 설정,
-              반짝이는 대리인 설정이다. 아래에서 둘을 가른다. */}
-          <IconButton
-            label="AI 대리인 설정"
-            active={tool === 'ai'}
-            onClick={() => {
-              toggleTool('ai')
-              onOpenSettings()
-            }}
-          >
+          {/* 톱니와 반짝이가 **같은 화면**을 열고 있었다. 톱니를 누른 사람은
+              채팅 설정을 기대하는데 대리인 설정이 떴다. 둘을 가른다. */}
+          <IconButton label="AI 대리인 설정" onClick={onOpenAgentSettings}>
             <Icon src={icons.ai} />
           </IconButton>
-          <IconButton
-            label="채팅 설정"
-            active={tool === 'settings'}
-            onClick={() => {
-              toggleTool('settings')
-              onOpenSettings()
-            }}
-          >
+          <IconButton label="채팅 설정" onClick={onOpenChatSettings}>
             <Icon src={icons.setting} />
           </IconButton>
         </div>

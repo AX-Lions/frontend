@@ -25,7 +25,7 @@ function DayDivider({ row, onOpenCalendar }) {
   )
 }
 
-export function ChatRoom({ room, roomId, onClose }) {
+export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, onToggleFullscreen }) {
   /*
     목록에 없는 방은 그 자체로 읽는다.
 
@@ -57,7 +57,7 @@ export function ChatRoom({ room, roomId, onClose }) {
   const [olderError, setOlderError] = useState('')
   const canSend = messageText.trim().length > 0 && !sending && Boolean(roomId)
 
-  const { data, error, loading, setData } = useResource(
+  const { data, error, loading, reload, setData } = useResource(
     (signal) => (roomId
       ? fetchMessages(roomId, { date: jumpDate ?? undefined }, signal)
       : Promise.resolve(null)),
@@ -209,15 +209,45 @@ export function ChatRoom({ room, roomId, onClose }) {
           <span>{header?.context ?? ''}</span>
         </div>
         <div className="chat-room-actions">
-          <IconButton label="검색" active={roomTool === 'search'} onClick={() => toggleRoomTool('search')}>
+          <IconButton
+            label="검색"
+            active={roomTool === 'search'}
+            disabled={!roomId}
+            onClick={() => toggleRoomTool('search')}
+          >
             <Icon src={icons.search} />
           </IconButton>
-          <IconButton label="전체 화면" active={roomTool === 'fullscreen'} onClick={() => toggleRoomTool('fullscreen')}>
+          {/* 전체 화면은 목록을 접는 것이다. 예전에는 버튼 색만 바뀌고
+              화면은 그대로였다. */}
+          <IconButton label={fullscreen ? '전체 화면 끄기' : '전체 화면'} active={fullscreen} onClick={onToggleFullscreen}>
             <Icon src={icons.fullscreen} />
           </IconButton>
-          <IconButton label="메뉴" active={roomTool === 'menu'} onClick={() => toggleRoomTool('menu')}>
-            <Icon src={icons.menu} />
-          </IconButton>
+          <div className="room-menu-wrap">
+            <IconButton
+              label="메뉴"
+              active={roomTool === 'menu'}
+              disabled={!roomId}
+              onClick={() => toggleRoomTool('menu')}
+            >
+              <Icon src={icons.menu} />
+            </IconButton>
+            {roomTool === 'menu' ? (
+              <div className="room-menu">
+                <button type="button" onClick={() => { setRoomTool(''); onOpenSettings() }}>
+                  채팅 설정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setRoomTool(''); setCalendarMonth(jumpDate ?? localDate(new Date())) }}
+                >
+                  날짜로 이동
+                </button>
+                <button type="button" onClick={() => { setRoomTool(''); reload() }}>
+                  대화 새로 읽기
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
 

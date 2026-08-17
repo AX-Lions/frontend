@@ -47,6 +47,11 @@
   font-size: var(--chat-fs-body);
 }
 
+/* 전체 화면. 목록과 전역 메뉴를 아예 안 그리므로 칸도 하나만 남긴다. */
+.chat-page.fullscreen {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .chat-page button,
 .chat-page input,
 .chat-page textarea {
@@ -1797,6 +1802,213 @@ button.team-shortcut:active {
 
 .chat-calendar-footer button {
   color: var(--chat-muted);
+}
+
+/* ─────────────────────────────── 방 메뉴 · 알림 · 채팅 설정 */
+
+.room-menu-wrap {
+  position: relative;
+}
+
+.room-menu {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  z-index: 6;
+  display: grid;
+  min-width: 120px;
+  overflow: hidden;
+  border: 1px solid var(--chat-line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+}
+
+.room-menu button {
+  height: 34px;
+  padding: 0 12px;
+  color: var(--chat-ink);
+  font-size: var(--chat-fs-meta);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.room-menu button:hover {
+  background: var(--chat-white-hover);
+}
+
+/* 화면이 사라진 뒤에야 알 수 있는 것(나가기 결과 등)을 알린다. */
+.chat-page-notice {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 16px;
+  transform: translateX(-50%);
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: var(--chat-fs-meta);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+}
+
+.chat-page-notice button {
+  color: var(--chat-subtle);
+}
+
+.chat-settings {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 32px 32px 30px;
+  background: #ffffff;
+}
+
+.chat-settings-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+}
+
+.chat-settings-header h1 {
+  margin: 0;
+  font-size: var(--chat-fs-page);
+}
+
+.chat-settings-header button {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--chat-soft);
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-header button:hover {
+  background: var(--chat-white-hover);
+}
+
+.chat-settings-scroll {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+}
+
+.chat-settings-section {
+  display: grid;
+  gap: 12px;
+  padding: 24px 0;
+  max-width: 560px;
+}
+
+.chat-settings-section + .chat-settings-section {
+  border-top: 1px solid var(--chat-line);
+}
+
+.chat-settings-section h2 {
+  margin: 0;
+  font-size: var(--chat-fs-title);
+}
+
+.chat-settings-info {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.chat-settings-info dt {
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-info dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-settings-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-settings-form input {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  outline: 0;
+  color: var(--chat-ink);
+}
+
+.chat-settings-form input:focus {
+  border-color: var(--chat-point);
+}
+
+.chat-settings-form button {
+  height: 34px;
+  flex: 0 0 auto;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--chat-point);
+  color: #ffffff;
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-form button:disabled {
+  background: var(--chat-soft);
+  color: var(--chat-disabled);
+  cursor: default;
+}
+
+.chat-settings-form button.danger {
+  background: #ff2a2a;
+  color: #ffffff;
+}
+
+/* 서버에 없는 것은 자리를 비우지 않고 없다고 적는다. 스위치를 그려 놓고 아무
+   데도 안 보내면 사용자는 껐다고 믿고 알림을 계속 받는다. */
+.chat-settings-note {
+  margin: 0;
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+  line-height: 1.5;
+}
+
+.chat-settings-error {
+  margin: 0;
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-danger {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid #ffd0cb;
+  border-radius: 999px;
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-danger:hover {
+  background: #fff5f4;
 }
 
 /* ─────────────────────────────── 새 채팅 */
