@@ -144,7 +144,18 @@ export function ChatPage() {
         onSelectChat={setSelectedChatId}
         onOpenSettings={() => setView('settings')}
       />
-      <ChatRoom room={openRoom} roomId={selectedChatId} onClose={() => setSelectedChatId(null)} />
+      {/*
+        `key` 로 방마다 새 인스턴스를 만든다. 대화창은 날짜 이동 · 이어 붙인
+        페이지 · 입력 중인 글을 자기 안에 들고 있는데, 방을 옮길 때 이것들이
+        남아 있으면 **다른 방에 쓰던 글이 따라온다.** 방마다 `useEffect` 로
+        하나씩 되돌리는 것보다 통째로 새로 만드는 쪽이 빠뜨릴 것이 없다.
+      */}
+      <ChatRoom
+        key={selectedChatId ?? 'none'}
+        room={openRoom}
+        roomId={selectedChatId}
+        onClose={() => setSelectedChatId(null)}
+      />
     </div>
   )
 }

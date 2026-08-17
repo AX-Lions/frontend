@@ -1305,3 +1305,167 @@ button.team-shortcut:active {
   color: #ff2a2a;
   font-size: var(--chat-fs-meta);
 }
+
+/* ─────────────────────────────── 이전 대화 · 날짜 이동 */
+
+.chat-older {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.chat-older button {
+  height: 28px;
+  padding: 0 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-older button:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.chat-older p {
+  margin: 0;
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+/* "더 없음" 도 상태다. 아무것도 안 그리면 덜 불러온 것과 구분되지 않는다. */
+.chat-older-end {
+  margin: 0;
+  padding-bottom: 8px;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  text-align: center;
+}
+
+.chat-jump-banner {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: var(--chat-soft);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-jump-banner button {
+  color: var(--chat-point);
+  font-weight: 700;
+}
+
+/* ─────────────────────────────── 겹쳐 뜨는 것 (달력 등) */
+
+.chat-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+}
+
+.chat-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  background: rgb(0 0 0 / 24%);
+}
+
+.chat-calendar {
+  position: relative;
+  width: 300px;
+  padding: 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 12%);
+}
+
+.chat-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.chat-calendar-header strong {
+  font-size: var(--chat-fs-title);
+}
+
+.chat-calendar-header button {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--chat-muted);
+}
+
+.chat-calendar-header button:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.chat-calendar-header button:disabled {
+  color: var(--chat-disabled);
+  cursor: default;
+}
+
+.chat-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.chat-calendar-weekday {
+  padding: 4px 0;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  text-align: center;
+}
+
+/*
+  대화가 없는 날도 자리를 지킨다. 지우면 달력이 아니라 목록이 되어, 그 날이
+  몇 번째 주 무슨 요일인지 알 수 없다.
+*/
+.chat-calendar-day {
+  height: 32px;
+  border-radius: 8px;
+  color: var(--chat-disabled);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-calendar-day.has-chat {
+  color: var(--chat-ink);
+  font-weight: 700;
+}
+
+.chat-calendar-day.has-chat:hover {
+  background: var(--chat-white-hover);
+}
+
+.chat-calendar-day.selected {
+  background: var(--chat-point);
+  color: #ffffff;
+}
+
+.chat-calendar-day:disabled {
+  cursor: default;
+}
+
+.chat-calendar-note,
+.chat-calendar-footer {
+  margin: 12px 0 0;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  text-align: center;
+}
+
+.chat-calendar-footer button {
+  color: var(--chat-muted);
+}
