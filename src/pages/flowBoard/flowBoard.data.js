@@ -18,14 +18,27 @@ import { api } from '../../lib/api.js'
  * 렌더러를 하나만 만들면 되도록 백엔드가 맞춰 둔 것이다.
  */
 
-/** 서버의 `content_type` → 화면의 tone. 뱃지 색과 아이콘이 여기에 걸려 있다. */
+/**
+ * 서버의 `content_type` → 화면의 tone. 뱃지 색과 아이콘이 여기에 걸려 있다.
+ *
+ * **회의 6종과 작업 5종을 한 표에 둔다.** 코드가 겹치지 않아 섞일 일이 없고,
+ * 나눠 두면 `toneOf()` 를 부르는 쪽마다 지금이 어느 모드인지 알아야 한다.
+ * 작업 5종이 빠져 있어서 작업 모드 뱃지가 전부 `기타` 회색으로 나왔다.
+ */
 export const TONE_OF = {
+  // 회의 모드
   OPINION: 'opinion',
   REQUEST: 'request',
   CHANGE: 'change',
   SCHEDULE: 'schedule',
   CONCLUSION: 'conclusion',
   ETC: 'etc',
+  // 작업 모드
+  WORK: 'work',
+  REVISION: 'revision',
+  FEEDBACK: 'feedback',
+  SHARE: 'share',
+  AI_LOOKUP: 'aiLookup',
 }
 
 export function toneOf(contentType) {
@@ -79,6 +92,22 @@ export function fetchBriefing(meetingId, signal) {
 
 export function fetchEdge(edgeId, signal) {
   return api.get(`/flow-edges/${edgeId}`, undefined, { signal })
+}
+
+/** 헤더의 회의 선택(▼)이 띄울 목록. */
+export function fetchProjectMeetings(projectId, signal) {
+  return api.get(`/projects/${projectId}/meetings`, undefined, { signal })
+}
+
+/**
+ * 로그인한 사람.
+ *
+ * 대리인 노드가 `임수연의 Bordo` 로 박혀 있었다. **누가 봐도 임수연의 것**이라
+ * 다른 사람은 자기 대리인을 찾을 수 없었다. 어느 대리인 노드가 내 것인지는
+ * `nodes[].user_id` 와 이 id 를 맞춰 봐야 안다.
+ */
+export function fetchMe(signal) {
+  return api.get('/users/me', undefined, { signal })
 }
 
 /**
