@@ -98,23 +98,61 @@ function useCollapsed() {
   }
 }
 
+/**
+ * 목록 걸러 보기.
+ *
+ * **서버에 방 검색 API 가 없다.** `/chat/rooms/{id}/search` 는 방 하나 안의
+ * 메시지를 찾는 것이라 여기 쓸 수 없다. 그래서 이건 검색이 아니라 **이미
+ * 받아 온 목록을 좁히는 것**이고, 화면에도 그렇게 적는다.
+ *
+ * 없는 API 를 목으로 때우지 않는다. 목록에 없는 방은 여기서도 안 나온다.
+ */
+function matchesRoom(room, needle) {
+  if (!needle) {
+    return true
+  }
+  return `${room.name ?? ''} ${room.context ?? ''} ${room.message ?? ''}`
+    .toLowerCase()
+    .includes(needle)
+}
+
 export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelectChat, onOpenSettings }) {
   const [promptVisible, setPromptVisible] = useState(true)
   const [tool, setTool] = useState('')
+  const [query, setQuery] = useState('')
   const [importantOpen, setImportantOpen] = useState(true)
   const groups = useCollapsed()
 
+  const needle = tool === 'search' ? query.trim().toLowerCase() : ''
   const primaryChat = sidebar?.my_agent_room
   const teams = toTeamRows(sidebar)
+    .map((team) => ({
+      ...team,
+      projects: team.projects
+        .map((project) => ({ ...project, rooms: project.rooms.filter((r) => matchesRoom(r, needle)) }))
+        // 걸러 보는 중에는 이름이 맞는 프로젝트도 남긴다. 방이 하나도 안 걸려도
+        // 그 프로젝트가 있다는 것 자체가 답일 수 있다.
+        .filter((project) => !needle
+          || project.rooms.length > 0
+          || project.name.toLowerCase().includes(needle)),
+    }))
+    .filter((team) => !needle
+      || team.projects.length > 0
+      || team.name.toLowerCase().includes(needle))
   // 어느 프로젝트에도 안 매달린 1:1 · 동료 대리인 방. 서버는 `direct_rooms` 로
   // 따로 내려주는데 화면이 이 칸을 아예 안 그려서, 프로젝트 밖에서 건 대화는
   // **목록에서 통째로 사라져 있었다.** 방을 못 찾으니 다시 걸고, 그러면 서버가
   // 같은 방을 되살려 주는데도 사용자는 새 방이 생긴 줄 안다.
-  const directRooms = toDirectRows(sidebar)
+  const directRooms = toDirectRows(sidebar).filter((room) => matchesRoom(room, needle))
+  const visibleImportant = importantRooms.filter((room) => matchesRoom(room, needle))
 
   const toggleTool = (nextTool) => {
     setTool((current) => (current === nextTool ? '' : nextTool))
   }
+
+  // 걸러 보는 중에는 접힘을 무시한다. 접힌 팀 안에 답이 있으면 사용자는
+  // 걸렀는데도 아무것도 안 나온 것으로 본다.
+  const isOpen = (id) => Boolean(needle) || groups.isOpen(id)
 
   return (
     <aside className="chat-list-panel" aria-label="채팅 목록">
@@ -163,6 +201,23 @@ export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelec
         </div>
       ) : null}
 
+      {tool === 'search' ? (
+        <div className="chat-list-search">
+          <input
+            aria-label="채팅 목록 걸러 보기"
+            placeholder="이름 · 최근 메시지로 좁히기"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          {query ? (
+            <button type="button" aria-label="지우기" onClick={() => setQuery('')}>×</button>
+          ) : null}
+          {/* 서버에 방 검색 API 가 없다. 이건 검색이 아니라 이미 받아 온 목록을
+              좁히는 것이라, 그렇다고 적어 둔다. */}
+          <p>불러온 목록 안에서만 찾습니다.</p>
+        </div>
+      ) : null}
+
       <div className="chat-list-scroll">
         {primaryChat ? (
           <button
@@ -195,11 +250,11 @@ export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelec
             </h2>
             <Icon className={importantOpen ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
           </button>
-          {importantOpen && importantRooms.length === 0 ? (
+          {importantOpen && visibleImportant.length === 0 ? (
             <p className="chat-list-empty">중요 표시된 채팅이 없습니다.</p>
           ) : null}
           {importantOpen
-            ? importantRooms.map((chat) => (
+            ? visibleImportant.map((chat) => (
                 <ChatPreview
                   chat={chat}
                   key={chat.id}
@@ -234,12 +289,12 @@ export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelec
         {teams.map((team) => (
           <section className="team-chat-group" key={team.id}>
             <TeamHeader
-              open={groups.isOpen(team.id)}
+              open={isOpen(team.id)}
               team={team}
               onOpenGroupRoom={onSelectChat}
               onToggle={() => groups.toggle(team.id)}
             />
-            {groups.isOpen(team.id) ? (
+            {isOpen(team.id) ? (
               <div className="nested-team">
                 {team.projects.length === 0 ? (
                   <p className="chat-list-empty">이 팀에는 아직 프로젝트가 없습니다.</p>
@@ -249,7 +304,7 @@ export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelec
                     <button
                       className="project-title"
                       type="button"
-                      aria-expanded={groups.isOpen(project.id)}
+                      aria-expanded={isOpen(project.id)}
                       onClick={() => groups.toggle(project.id)}
                     >
                       <span className="project-name">
@@ -258,11 +313,11 @@ export function ChatListPanel({ sidebar, importantRooms, selectedChatId, onSelec
                         <UnreadBadge count={project.unread} label={project.name} />
                       </span>
                       <Icon
-                        className={groups.isOpen(project.id) ? 'ui-icon chevron open' : 'ui-icon chevron'}
+                        className={isOpen(project.id) ? 'ui-icon chevron open' : 'ui-icon chevron'}
                         src={icons.expandDown}
                       />
                     </button>
-                    {groups.isOpen(project.id) ? (
+                    {isOpen(project.id) ? (
                       <div className="project-chat-list">
                         {project.rooms.length === 0 ? (
                           <p className="chat-list-empty">방이 없습니다.</p>

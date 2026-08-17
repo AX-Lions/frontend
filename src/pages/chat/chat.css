@@ -1362,6 +1362,160 @@ button.team-shortcut:active {
   font-weight: 700;
 }
 
+/* ─────────────────────────────── 찾기 */
+
+.chat-list-search {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 0 24px 8px;
+}
+
+.chat-list-search input {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: #ffffff;
+  outline: 0;
+  color: var(--chat-ink);
+}
+
+.chat-list-search input:focus {
+  border-color: var(--chat-point);
+}
+
+.chat-list-search button {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--chat-subtle);
+}
+
+.chat-list-search button:hover {
+  background: var(--chat-white-hover);
+}
+
+/* 이게 서버 검색이 아니라는 것을 화면에 적는다. 안 적으면 "찾았는데 없다"가
+   "이 방은 없다"로 읽힌다. */
+.chat-list-search p {
+  width: 100%;
+  margin: 0;
+  padding-left: 12px;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-search-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-search-bar input {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  outline: 0;
+  color: var(--chat-ink);
+}
+
+.chat-search-bar input:focus {
+  border-color: var(--chat-point);
+}
+
+.chat-search-bar button {
+  height: 32px;
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--chat-soft);
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search-bar button:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.chat-search-bar button:disabled {
+  color: var(--chat-disabled);
+  cursor: default;
+}
+
+.chat-search-results {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  gap: 4px;
+  overflow-y: auto;
+  padding-bottom: 72px;
+  scrollbar-width: none;
+}
+
+.chat-search-count {
+  margin: 0;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search-hit {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.chat-search-hit:hover {
+  background: var(--chat-white-hover);
+}
+
+.chat-search-hit-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search-hit-meta strong {
+  color: var(--chat-ink);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search-hit-body {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.4;
+}
+
+/* 검색 결과에서 찾아온 줄. 자리로 옮기기만 하면 어느 줄을 찾아온 것인지
+   알 수 없다. */
+.message-row.focused .message-bubble {
+  box-shadow: 0 0 0 2px var(--chat-point);
+}
+
 /* ─────────────────────────────── 겹쳐 뜨는 것 (달력 등) */
 
 .chat-overlay {

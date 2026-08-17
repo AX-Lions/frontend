@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { icons } from './chat.icons.js'
 import { ChatDateCalendar } from './ChatDateCalendar.jsx'
+import { ChatRoomSearch } from './ChatRoomSearch.jsx'
 import { fetchMessages, fetchRoom, sendMessage, toPreview } from './chat.data.js'
 import { formatTime, localDate, localMonth, withDayDividers } from './chat.format.js'
 import { BordoAvatar, Icon, IconButton } from './chat.ui.jsx'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
-function ChatMessage({ row, onOpenCalendar }) {
+function ChatMessage({ row, focused, onOpenCalendar }) {
   if (row.kind === 'day') {
     return (
       <button
@@ -26,9 +27,13 @@ function ChatMessage({ row, onOpenCalendar }) {
   const { message } = row
   const time = formatTime(message.sent_at)
 
+  // 검색 결과에서 넘어온 줄에 표시를 남긴다. 그냥 그 자리로 스크롤만 하면
+  // 어느 줄을 찾아 온 것인지 알 수 없다.
+  const rowClass = (base) => (focused ? `${base} focused` : base)
+
   if (message.is_mine) {
     return (
-      <div className="message-row me">
+      <div className={rowClass('message-row me')} data-message-id={message.id}>
         <time>{time}</time>
         <p className="message-bubble orange">{message.body}</p>
       </div>
@@ -36,7 +41,7 @@ function ChatMessage({ row, onOpenCalendar }) {
   }
 
   return (
-    <div className="message-row bot">
+    <div className={rowClass('message-row bot')} data-message-id={message.id}>
       {/* 대리인이 보낸 것과 사람이 보낸 것을 가른다. 화면에서 대리인은
           `{이름}의 Bordo` 로 불리고 아바타도 다르다. */}
       {message.sender?.is_agent || !message.sender?.avatar_url ? (
@@ -81,6 +86,8 @@ export function ChatRoom({ room, roomId, onClose }) {
   // 것과 위로 이어 보는 것은 기준점이 다르다.
   const [jumpDate, setJumpDate] = useState(null)
   const [calendarMonth, setCalendarMonth] = useState(null)
+  // 검색 결과에서 찾아온 메시지. 그 자리로 스크롤하고 표시를 남긴다.
+  const [focusMessageId, setFocusMessageId] = useState(null)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [olderError, setOlderError] = useState('')
   const canSend = messageText.trim().length > 0 && !sending && Boolean(roomId)
@@ -117,6 +124,21 @@ export function ChatRoom({ room, roomId, onClose }) {
     // 사용자는 왜 이 자리인지 알 수 없다.
     element.scrollTop = jumpDate ? 0 : element.scrollHeight
   }, [lastMessageId, jumpDate])
+
+  /*
+    검색 결과에서 찾아온 줄로 옮긴다.
+
+    위 효과보다 **뒤에** 있어야 한다. 날짜로 뛰면 위 효과가 맨 위로 올리는데,
+    찾아온 줄이 그날 한가운데 있으면 사용자는 왜 이 화면인지 알 수 없다.
+    효과는 선언된 순서로 도니, 여기서 덮는다.
+  */
+  useEffect(() => {
+    if (!focusMessageId) {
+      return
+    }
+    const target = scrollRef.current?.querySelector(`[data-message-id="${focusMessageId}"]`)
+    target?.scrollIntoView({ block: 'center' })
+  }, [focusMessageId, lastMessageId])
 
   /**
    * 위로 50건 더.
@@ -221,10 +243,30 @@ export function ChatRoom({ room, roomId, onClose }) {
         </div>
       </header>
 
+      {roomTool === 'search' && roomId ? (
+        <ChatRoomSearch
+          roomId={roomId}
+          onClose={() => setRoomTool('')}
+          onPick={(date, messageId) => {
+            setJumpDate(date)
+            setFocusMessageId(messageId)
+            setRoomTool('')
+          }}
+        />
+      ) : null}
+
       {jumpDate ? (
         <div className="chat-jump-banner" role="status">
           <span>{`${jumpDate} 의 대화를 보고 있습니다.`}</span>
-          <button type="button" onClick={() => setJumpDate(null)}>최근 대화로</button>
+          <button
+            type="button"
+            onClick={() => {
+              setJumpDate(null)
+              setFocusMessageId(null)
+            }}
+          >
+            최근 대화로
+          </button>
         </div>
       ) : null}
 
@@ -254,7 +296,12 @@ export function ChatRoom({ room, roomId, onClose }) {
               <p className="chat-older-end">대화의 처음입니다.</p>
             )}
             {rows.map((row) => (
-              <ChatMessage key={row.id} row={row} onOpenCalendar={setCalendarMonth} />
+              <ChatMessage
+                focused={row.kind === 'message' && row.message.id === focusMessageId}
+                key={row.id}
+                row={row}
+                onOpenCalendar={setCalendarMonth}
+              />
             ))}
           </>
         )}
