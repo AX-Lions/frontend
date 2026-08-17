@@ -23,9 +23,26 @@ export function formatTime(iso) {
   return Number.isNaN(at.getTime()) ? '' : TIME.format(at)
 }
 
-function dayKey(iso) {
-  const at = new Date(iso)
-  return `${at.getFullYear()}-${at.getMonth()}-${at.getDate()}`
+/**
+ * `2026-08-14` — 보는 사람의 시간대 기준 날짜.
+ *
+ * `toISOString().slice(0, 10)` 을 쓰면 안 된다. 그건 UTC 기준이라 한국에서
+ * 새벽 1시에 보낸 메시지가 **전날로 묶인다.**
+ *
+ * 서버의 `active-dates` · `?date=` 는 장고 시간대(Asia/Seoul) 기준이라, 다른
+ * 시간대에서 보면 하루가 어긋날 수 있다. 지금은 팀이 모두 같은 시간대라
+ * 문제가 안 되지만, 시간대가 갈리는 순간 서버가 날짜 기준을 정해 줘야 한다.
+ */
+export function localDate(at) {
+  const year = at.getFullYear()
+  const month = String(at.getMonth() + 1).padStart(2, '0')
+  const day = String(at.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+/** `2026-08` — 달력이 한 번에 읽는 단위. */
+export function localMonth(date) {
+  return date.slice(0, 7)
 }
 
 /**
@@ -40,9 +57,12 @@ export function withDayDividers(messages) {
   let lastDay = null
 
   messages.forEach((message) => {
-    const key = dayKey(message.sent_at)
+    const at = new Date(message.sent_at)
+    const key = localDate(at)
     if (key !== lastDay) {
-      out.push({ kind: 'day', id: `day-${key}`, label: DAY.format(new Date(message.sent_at)) })
+      // `date` 를 같이 실어 둔다. 구분선을 누르면 그 달의 달력을 여는데,
+      // 화면에서 `2026년 8월 14일 금요일` 을 되파싱하는 것보다 낫다.
+      out.push({ kind: 'day', id: `day-${key}`, date: key, label: DAY.format(at) })
       lastDay = key
     }
     out.push({ kind: 'message', id: message.id, message })
