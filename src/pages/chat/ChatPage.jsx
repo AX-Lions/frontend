@@ -337,7 +337,7 @@ function ChatMessage({ row }) {
   )
 }
 
-function ChatRoom({ room, roomId }) {
+function ChatRoom({ room, roomId, onClose }) {
   const [roomTool, setRoomTool] = useState('')
   const [messageText, setMessageText] = useState('')
   const [sending, setSending] = useState(false)
@@ -384,7 +384,14 @@ function ChatRoom({ room, roomId }) {
   return (
     <main className="chat-room" aria-label="채팅창">
       <header className="chat-room-header">
-        <button className="back-button" type="button" aria-label="뒤로가기">
+        {/*
+          `onClick` 이 없어 **눌러도 아무 일도 일어나지 않았다.** 화살표가 있으니
+          사용자는 눌러 보고, 안 되면 화면이 멈춘 줄 안다.
+
+          대화를 닫아 목록만 남긴다. 브라우저 뒤로가기를 부르면 채팅 화면 자체를
+          떠나 버리는데, 이 자리의 화살표가 뜻하는 것은 **대화에서 나오기**다.
+        */}
+        <button className="back-button" type="button" aria-label="뒤로가기" onClick={onClose}>
           <Icon src={icons.expandLeft} />
         </button>
         <div className="chat-room-title">
@@ -815,7 +822,7 @@ export function ChatPage() {
         onSelectChat={setSelectedChatId}
         onOpenSettings={() => setView('settings')}
       />
-      <ChatRoom room={openRoom} roomId={selectedChatId} />
+      <ChatRoom room={openRoom} roomId={selectedChatId} onClose={() => setSelectedChatId(null)} />
     </div>
   )
 }
