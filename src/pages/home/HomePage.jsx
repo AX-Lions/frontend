@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './Sidebar.jsx'
 import { DelegateDialog } from './DelegateDialog.jsx'
+import { AgentDock } from './AgentDock.jsx'
+import { BriefingPrompt } from './BriefingPrompt.jsx'
+import { CreateProjectDialog } from './CreateProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
+import { navigate } from '../../app/navigation.js'
 import { useResource } from '../../lib/useResource.js'
+import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
 const starIcons = {
@@ -10,10 +15,18 @@ const starIcons = {
   inactive: '/icons/Starunactive.svg',
 }
 
-const chatIcons = {
-  add: '/chat-icons/add-round.svg',
-  filter: '/chat-icons/filter-alt.svg',
-  send: '/chat-icons/send-hor.svg',
+function isModifiedClick(event) {
+  return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+    || (event.button !== undefined && event.button !== 0)
+}
+
+/** 앱 안 링크는 문서를 다시 받지 않는다. 새 탭으로 여는 클릭은 그대로 둔다. */
+function goInApp(event, href) {
+  if (isModifiedClick(event)) {
+    return
+  }
+  event.preventDefault()
+  navigate(href)
 }
 
 export function HomePage() {
@@ -23,6 +36,13 @@ export function HomePage() {
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
   const [pendingFavorites, setPendingFavorites] = useState([])
   const [delegateFor, setDelegateFor] = useState(null)
+  const [addingProject, setAddingProject] = useState(false)
+  // 브리핑 팝업은 한 번만 뜬다. `homeData` 를 다시 읽을 때마다 뜨면, 별 하나
+  // 눌렀다고 팝업이 다시 올라온다.
+  const [briefingSeen, setBriefingSeen] = useState(false)
+  // 자동 열기는 상태가 아니라 ref 다. 상태로 두면 effect 안에서 setState 를
+  // 부르게 되고 렌더가 한 번 더 돈다 — 어차피 화면에 아무것도 안 그리는 값이다.
+  const autoOpenedRef = useRef(false)
 
   /** 저장한 결과를 목록에 반영한다. 전체를 다시 읽으면 스크롤이 튄다. */
   const applyDelegation = (meetingId, saved) => setData((current) => (current ? {
@@ -45,6 +65,44 @@ export function HomePage() {
 
     return () => window.clearTimeout(timerId)
   }, [favoriteMessage])
+
+  const briefing = homeData?.briefing_pending ?? {}
+  const autoOpenBriefing = Boolean(briefing.exists && briefing.always_open && briefing.meeting_id)
+
+  /*
+    `홈 진입 시 자동 열기` 를 켠 사람은 팝업을 볼 이유가 없다. 이미 답을 해
+    둔 질문이므로 그대로 브리핑으로 보낸다.
+
+    `replace: true` 로 보낸다. push 로 쌓으면 브리핑에서 뒤로 가기를 눌렀을 때
+    홈이 다시 자동으로 브리핑을 열어 **뒤로 가기가 막힌다.**
+  */
+  useEffect(() => {
+    if (!autoOpenBriefing || autoOpenedRef.current) {
+      return
+    }
+    autoOpenedRef.current = true
+    navigate(`/flow-board?meeting=${briefing.meeting_id}&source=bordo-briefing`,
+      { replace: true })
+  }, [autoOpenBriefing, briefing.meeting_id])
+
+  /*
+    프로젝트 하나가 어느 회의로 열리는지.
+
+    플로우 화면이 지금 읽는 것은 `?meeting` 뿐이라, 사이드바 프로젝트 링크에
+    회의 id 를 실어 줘야 그 프로젝트 화면이 뜬다. 최근 회의 목록이 이미
+    `project_id` 를 들고 있으므로 추가 요청 없이 짝을 지을 수 있다.
+
+    목록은 최신순이라 먼저 나온 것을 남긴다.
+  */
+  const meetingIdByProject = useMemo(() => {
+    const map = {}
+    ;(homeData?.recent_meetings ?? []).forEach((m) => {
+      if (m.project_id && !map[m.project_id]) {
+        map[m.project_id] = m.meeting_id
+      }
+    })
+    return map
+  }, [homeData])
 
   /**
    * 별을 먼저 칠하고 서버에 보낸다.
@@ -92,9 +150,12 @@ export function HomePage() {
     }
   }
 
+  // 전역 레일은 **읽는 중에도 실패해도 자리에 있어야 한다.** 홈이 안 불러와졌다고
+  // 채팅·설정으로 갈 길까지 사라지면, 사용자는 새로고침 말고 할 수 있는 것이 없다.
   if (loading && !homeData) {
     return (
       <div className="home-layout">
+        <GlobalSidebar active="home" />
         <Sidebar favoriteProjects={[]} recentProjects={[]} />
         <main className="home-main"><Loading label="홈을 불러오는 중입니다…" /></main>
       </div>
@@ -104,6 +165,7 @@ export function HomePage() {
   if (error && !homeData) {
     return (
       <div className="home-layout">
+        <GlobalSidebar active="home" />
         <Sidebar favoriteProjects={[]} recentProjects={[]} />
         <main className="home-main"><LoadError error={error} onRetry={reload} /></main>
       </div>
@@ -113,13 +175,21 @@ export function HomePage() {
   const recentMeetings = homeData.recent_meetings ?? []
   const todaySchedule = homeData.today_schedule ?? []
   const summary = homeData.recent_meeting_summary
-  const briefing = homeData.briefing_pending ?? {}
+  const briefingHref = briefing.exists
+    ? `/flow-board?meeting=${briefing.meeting_id}&source=bordo-briefing`
+    : null
 
   return (
     <div className="home-layout">
+      <GlobalSidebar active="home" user={{ name: homeData.user_name }} />
       <Sidebar
         favoriteProjects={homeData.favorite_projects ?? []}
         recentProjects={homeData.recent_projects ?? []}
+        shortcuts={homeData.shortcuts}
+        userName={homeData.user_name}
+        avatarUrl={homeData.user_avatar_url}
+        meetingIdByProject={meetingIdByProject}
+        onAddProject={() => setAddingProject(true)}
       />
 
       <main className="home-main">
@@ -138,24 +208,35 @@ export function HomePage() {
                 <br />
                 Bordo에 오신 것을 환영합니다.
               </h1>
-              <a
-                className={briefing.exists ? 'ai-brief-button' : 'ai-brief-button disabled'}
-                href={
-                  briefing.exists
-                    ? `/flow-board?meeting=${briefing.meeting_id}&source=bordo-briefing`
-                    : '/'
-                }
-                aria-disabled={briefing.exists ? undefined : 'true'}
-              >
-                Bordo 브리핑 보러가기
-              </a>
+              {briefingHref ? (
+                <a
+                  className="ai-brief-button"
+                  href={briefingHref}
+                  onClick={(event) => goInApp(event, briefingHref)}
+                >
+                  Bordo 브리핑 보러가기
+                </a>
+              ) : (
+                // 브리핑이 없을 때 `href="/"` 인 버튼을 두면 눌러서 홈이 다시
+                // 뜬다. 갈 곳이 없으면 링크가 아니라 안내다.
+                <span className="ai-brief-button disabled" aria-disabled="true">
+                  새 브리핑 없음
+                </span>
+              )}
             </div>
           </section>
 
           <section className="recent-section" aria-labelledby="recent-title">
             <div className="section-heading">
               <h2 id="recent-title">최근 회의</h2>
-              <a className="section-arrow" href="/" aria-label="최근 회의 더보기">
+              {/* 회의 목록 화면이 따로 없다. 회의 화면으로 보낸다 — 전역
+                  레일의 `회의` 와 같은 자리다. */}
+              <a
+                className="section-arrow"
+                href="/flow-board"
+                aria-label="회의 화면으로"
+                onClick={(event) => goInApp(event, '/flow-board')}
+              >
                 <img src="/icons/Expandright.svg" alt="" aria-hidden="true" />
               </a>
             </div>
@@ -164,40 +245,54 @@ export function HomePage() {
               <Empty>아직 참여한 회의가 없습니다.</Empty>
             ) : (
               <div className="project-strip">
-                {recentMeetings.slice(0, 5).map((meeting) => (
-                  <article
-                    className={
-                      selectedMeetingId === meeting.meeting_id ? 'project-card selected' : 'project-card'
-                    }
-                    key={meeting.meeting_id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedMeetingId(meeting.meeting_id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault()
-                        setSelectedMeetingId(meeting.meeting_id)
+                {recentMeetings.slice(0, 5).map((meeting) => {
+                  const href = `/flow-board?meeting=${meeting.meeting_id}`
+
+                  return (
+                    <article
+                      className={
+                        selectedMeetingId === meeting.meeting_id ? 'project-card selected' : 'project-card'
                       }
-                    }}
-                  >
-                    <a className="project-card-link" href={`/flow-board?meeting=${meeting.meeting_id}`}>
-                      {/* 회의가 자기 프로젝트 이름을 들고 온다. 프로젝트 목록에서
-                          찾을 필요가 없다 — 목록에 없는 프로젝트의 회의도 있다. */}
-                      <span className="meeting-company">{meeting.project_name}</span>
-                      <strong>{meeting.title}</strong>
-                      <time>{meeting.displayed_at}</time>
-                    </a>
-                    <button
-                      className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
-                      type="button"
-                      aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
-                      disabled={pendingFavorites.includes(meeting.meeting_id)}
-                      onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
+                      key={meeting.meeting_id}
                     >
-                      <img src={meeting.is_favorite ? starIcons.active : starIcons.inactive} alt="" />
-                    </button>
-                  </article>
-                ))}
+                      <a
+                        className="project-card-link"
+                        href={href}
+                        onClick={(event) => {
+                          setSelectedMeetingId(meeting.meeting_id)
+                          goInApp(event, href)
+                        }}
+                      >
+                        {/* 회의가 자기 프로젝트 이름을 들고 온다. 프로젝트 목록에서
+                            찾을 필요가 없다 — 목록에 없는 프로젝트의 회의도 있다. */}
+                        <span className="meeting-company">{meeting.project_name}</span>
+                        <strong>{meeting.title}</strong>
+
+                        {/*
+                          이 서비스가 답하려는 질문이 "내가 없는 동안 무슨 일이
+                          있었지" 다. **그 질문에 해당하는 회의를 골라내는 표시가
+                          이 뱃지**인데 서버(`recent_meetings[].missed`)만 주고
+                          화면이 그리지 않았다. 다섯 장이 전부 똑같아 보였다.
+                        */}
+                        <span className="card-foot">
+                          {meeting.missed ? (
+                            <span className="missed-badge">불참한 회의</span>
+                          ) : null}
+                          <time>{meeting.displayed_at}</time>
+                        </span>
+                      </a>
+                      <button
+                        className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
+                        type="button"
+                        aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
+                        disabled={pendingFavorites.includes(meeting.meeting_id)}
+                        onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
+                      >
+                        <img src={meeting.is_favorite ? starIcons.active : starIcons.inactive} alt="" />
+                      </button>
+                    </article>
+                  )
+                })}
               </div>
             )}
           </section>
@@ -206,9 +301,11 @@ export function HomePage() {
             <article className="schedule-panel">
               <div className="section-heading">
                 <h2>오늘 일정</h2>
-                <a className="section-arrow" href="/" aria-label="오늘 일정 더보기">
-                  <img src="/icons/Expandright.svg" alt="" aria-hidden="true" />
-                </a>
+                {/*
+                  전체 일정 화면이 아직 없다. `href="/"` 짜리 화살표를 두면
+                  눌렀을 때 홈이 다시 뜨는데, 그건 "없다" 가 아니라 "고장" 으로
+                  읽힌다. 갈 곳이 생기면 그때 붙인다.
+                */}
               </div>
               <div className="schedule-content">
                 {todaySchedule.length === 0 ? (
@@ -254,13 +351,21 @@ export function HomePage() {
                         >
                           {schedule.delegation.delegated ? '대리 참석 중' : '회의에 참여하지 않아요'}
                         </button>
-                      ) : (
+                      ) : schedule.action?.url ? (
                         <button
                           type="button"
-                          disabled={!schedule.action?.url}
                           onClick={() => window.open(schedule.action.url, '_blank', 'noopener')}
                         >
-                          {schedule.action?.label ?? '회의 참여하기'}
+                          {schedule.action.label ?? '회의 참여하기'}
+                        </button>
+                      ) : (
+                        // 링크가 없는 회의는 서비스 안에서 연다. 비활성 버튼을
+                        // 두면 그 회의만 갈 데가 없어 보인다.
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/flow-board?meeting=${schedule.meeting_id}`)}
+                        >
+                          {schedule.action?.label ?? '보러가기'}
                         </button>
                       )}
                     </div>
@@ -272,9 +377,16 @@ export function HomePage() {
             <article className="summary-panel">
               <div className="section-heading">
                 <h2>최근 회의</h2>
-                <a className="section-arrow" href="/" aria-label="최근 회의 더보기">
-                  <img src="/icons/Expandright.svg" alt="" aria-hidden="true" />
-                </a>
+                {summary ? (
+                  <a
+                    className="section-arrow"
+                    href={`/flow-board?meeting=${summary.meeting_id}`}
+                    aria-label={`${summary.title} 자세히 보기`}
+                    onClick={(event) => goInApp(event, `/flow-board?meeting=${summary.meeting_id}`)}
+                  >
+                    <img src="/icons/Expandright.svg" alt="" aria-hidden="true" />
+                  </a>
+                ) : null}
               </div>
               {/* 회의를 한 번도 안 한 팀은 요약이 없다. 카드를 빈 채로 두면
                   못 불러온 것처럼 보인다. */}
@@ -289,7 +401,11 @@ export function HomePage() {
                     </div>
                     <div className="summary-state">
                       <time>{summary.displayed_at}</time>
-                      <span className="summary-badge">{summary.status}</span>
+                      {/* 뱃지 문구는 서버가 정한다. 참석/불참에 따라 색이
+                          갈려야 하므로 상태만 클래스로 옮긴다. */}
+                      <span className={summary.missed ? 'summary-badge' : 'summary-badge attended'}>
+                        {summary.status}
+                      </span>
                     </div>
                   </div>
 
@@ -320,22 +436,7 @@ export function HomePage() {
           </section>
         </div>
 
-        <div className="chat-dock" role="group" aria-label="Bordo 채팅">
-          <div className="chat-tools">
-            <button type="button" aria-label="추가">
-              <img src={chatIcons.add} alt="" />
-            </button>
-            <button type="button" aria-label="필터">
-              <img src={chatIcons.filter} alt="" />
-            </button>
-          </div>
-          <button className="chat-input" type="button">
-            Bordo에게 물어보세요...
-          </button>
-          <button className="chat-send" type="button" aria-label="전송">
-            <img src={chatIcons.send} alt="" />
-          </button>
-        </div>
+        <AgentDock />
       </main>
 
       {delegateFor ? (
@@ -344,6 +445,22 @@ export function HomePage() {
           onClose={() => setDelegateFor(null)}
           onSaved={applyDelegation}
         />
+      ) : null}
+
+      {addingProject ? (
+        <CreateProjectDialog
+          onClose={() => setAddingProject(false)}
+          // 만든 프로젝트를 목록 맨 위에 얹는다. 홈 전체를 다시 읽으면 방금
+          // 만든 것을 찾으려고 사용자가 목록을 훑어야 한다.
+          onCreated={(project) => setData((current) => (current ? {
+            ...current,
+            recent_projects: [project, ...(current.recent_projects ?? [])],
+          } : current))}
+        />
+      ) : null}
+
+      {briefing.exists && !briefing.always_open && !briefingSeen ? (
+        <BriefingPrompt briefing={briefing} onClose={() => setBriefingSeen(true)} />
       ) : null}
     </div>
   )

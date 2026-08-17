@@ -33,7 +33,65 @@ export function setMeetingFavorite(meetingId, on) {
  *
  * `sources` 는 **이 회의에서 대리인이 근거로 쓸 자료 종류**다. 빈 배열은
  * "아무것도 쓰지 않는다" 는 뜻이고 제한 없음이 아니다.
+ *
+ * `prompt` 는 **반드시 함께 보낸다.** 서버가 키의 유무를 가리지 않고
+ * `prompt` 를 빈 문자열로 덮어쓰기 때문에, 빼면 이미 저장돼 있던 사전 지시가
+ * 저장 한 번에 지워진다.
  */
-export function setDelegation(meetingId, { enabled, sources }) {
-  return api.post(`/meetings/${meetingId}/delegate`, { enabled, sources })
+export function setDelegation(meetingId, { enabled, sources, prompt }) {
+  return api.post(`/meetings/${meetingId}/delegate`, { enabled, sources, prompt })
+}
+
+/**
+ * 브리핑 팝업의 결과.
+ *
+ * `always_open` 은 **다음에도 홈에 들어오면 바로 열지**다. 취소를 눌러도
+ * 이 값은 저장한다 — 체크박스는 "지금 볼 것인가" 가 아니라 "앞으로 어떻게
+ * 할 것인가" 라 두 결정이 다르다.
+ */
+export function dismissBriefing(alwaysOpen) {
+  return api.post('/me/briefing-dismiss', { always_open: alwaysOpen })
+}
+
+// ─────────────────────────────────────────── 홈의 AI 채팅 dock
+//
+// 채팅 화면의 방(`/chat/rooms/...`)과 **다른 것**이다. 이쪽은 대리인과 나
+// 둘뿐인 대화(`/me/agent/conversations`)라 상대도 읽음도 없다. 같은 화면처럼
+// 보인다고 방 API 로 합치면 참여자 없는 방이 생긴다.
+
+export function fetchConversations(signal) {
+  return api.get('/me/agent/conversations', undefined, { signal })
+}
+
+export function createConversation(title) {
+  return api.post('/me/agent/conversations', { title })
+}
+
+export function fetchConversationMessages(conversationId, signal) {
+  return api.get(`/me/agent/conversations/${conversationId}/messages`, undefined, { signal })
+}
+
+/**
+ * 보내기.
+ *
+ * **응답은 202 다.** 서버는 메시지를 받아 두기만 하고 대리인의 답은 나중에
+ * 만든다(`run.status: "RECEIVED"`). 그래서 이 함수가 돌아왔다고 답이 온 것이
+ * 아니다 — 부르는 쪽이 기다리는 중임을 화면에 남겨야 한다.
+ */
+export function sendAgentMessage(conversationId, body) {
+  return api.post(`/me/agent/conversations/${conversationId}/messages`, { body })
+}
+
+// ─────────────────────────────────────────── 프로젝트 추가
+//
+// 프로젝트는 팀 밑에 생긴다. 홈 응답에는 프로젝트가 있는 팀만 실려 오므로,
+// 팀 목록은 팝업을 열 때 따로 읽는다 — 프로젝트가 하나도 없는 팀에
+// 첫 프로젝트를 만드는 것이 이 버튼을 누르는 가장 흔한 이유다.
+
+export function fetchTeams(signal) {
+  return api.get('/teams', undefined, { signal })
+}
+
+export function createProject(teamId, name) {
+  return api.post(`/teams/${teamId}/projects`, { name })
 }

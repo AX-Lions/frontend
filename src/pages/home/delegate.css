@@ -61,6 +61,46 @@
   padding: 0 22px 8px;
 }
 
+/* 사전 지시. 자료 범위보다 위에 둔다 — 무엇을 맡기는지가 먼저다. */
+.delegate-prompt {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.delegate-prompt strong {
+  display: block;
+  font-size: 14px;
+}
+
+.delegate-prompt em {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.delegate-prompt textarea {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.delegate-prompt textarea:focus {
+  border-color: var(--text);
+  outline: none;
+}
+
 .delegate-lead {
   margin: 0 0 14px;
   color: var(--muted);
@@ -169,6 +209,61 @@
 .delegate-cancel:hover:not(:disabled) {
   background: var(--sidebar);
   color: var(--text);
+}
+
+/* 팝업 안의 한 줄짜리 입력. 프로젝트 추가처럼 값을 받는 팝업이 공유한다. */
+.dialog-field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.dialog-field strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.dialog-field input,
+.dialog-field select {
+  display: block;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.dialog-field input:focus,
+.dialog-field select:focus {
+  border-color: var(--text);
+  outline: none;
+}
+
+.dialog-field select:disabled {
+  color: var(--muted);
+}
+
+.briefing-always {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.briefing-always input {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  accent-color: #111111;
 }
 
 @media (prefers-reduced-motion: reduce) {
