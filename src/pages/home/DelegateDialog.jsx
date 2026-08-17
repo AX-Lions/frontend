@@ -52,6 +52,7 @@ export function DelegateDialog({ schedule, onClose, onSaved }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const closeRef = useRef(null)
+  const dialogRef = useRef(null)
 
   // 열리면 바로 닫기 버튼에 초점을 준다. 키보드만 쓰는 사람이 팝업 안으로
   // 들어오지 못하면 뒤 화면을 계속 훑게 된다.
@@ -59,12 +60,47 @@ export function DelegateDialog({ schedule, onClose, onSaved }) {
     closeRef.current?.focus()
   }, [])
 
+  /*
+    Esc 로 닫고, Tab 은 팝업 안에서만 돈다.
+
+    가둬 두지 않으면 `Shift+Tab` 한 번에 **뒤 화면으로 빠져나간다.** 팝업은
+    DOM 상 맨 뒤에 있어서 앞쪽 요소로 그대로 넘어가고, 마우스로는 뒤가 막혀
+    있는데 키보드로는 뚫리는 상태가 된다. 그러면 어디에 초점이 있는지 모르는 채
+    보이지 않는 버튼을 누르게 된다.
+  */
   useEffect(() => {
     const onKey = (event) => {
       if (event.key === 'Escape') {
         onClose()
+        return
+      }
+      if (event.key !== 'Tab') {
+        return
+      }
+
+      const focusable = dialogRef.current?.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]), [href]')
+      if (!focusable?.length) {
+        return
+      }
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      // 팝업 밖에 있으면 (뒤 화면에서 Tab 으로 들어온 경우) 안으로 데려온다.
+      if (!dialogRef.current.contains(document.activeElement)) {
+        event.preventDefault()
+        first.focus()
+        return
+      }
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
       }
     }
+
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
@@ -100,7 +136,13 @@ export function DelegateDialog({ schedule, onClose, onSaved }) {
       // 팝업이 사라진다.
       onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
-      <div className="delegate-dialog" role="dialog" aria-modal="true" aria-labelledby="delegate-title">
+      <div
+        className="delegate-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delegate-title"
+        ref={dialogRef}
+      >
         <header className="delegate-header">
           <div>
             <h2 id="delegate-title">회의에 참여하지 않아요</h2>
