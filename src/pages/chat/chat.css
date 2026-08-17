@@ -3,7 +3,27 @@
   box-sizing: border-box;
 }
 
+/*
+  글자 크기는 넷이 아니라 셋이다.
+  ─────────────────────────────
+  고치기 전에는 본문이 12 · 13 · 14 · 16px 네 종류였다. 가장 나빴던 것은
+  **내 말풍선 12px, 상대 말풍선 16px** 이라 같은 대화의 두 줄이 서로 다른
+  크기로 보인 것이다. 상대 말풍선은 아무도 크기를 정해 준 적이 없어서 브라우저
+  기본값 16px 을 그대로 받고 있었다.
+
+  그래서 `.chat-page` 자체에 본문 크기를 못 박는다. 규칙을 빠뜨린 요소가
+  브라우저 기본값으로 튀지 않게 하는 것이 이 한 줄의 목적이다.
+
+    제목 16 · 본문 14 · 보조 12
+
+  화면 이름(h1)만 24 로 하나 더 둔다. 그 외에 이 셋을 벗어나는 값은 글이 아니라
+  **표시**인 것뿐이고, 각 자리에 왜 예외인지 적어 뒀다.
+*/
 .chat-page {
+  --chat-fs-page: 24px;
+  --chat-fs-title: 16px;
+  --chat-fs-body: 14px;
+  --chat-fs-meta: 12px;
   --chat-ink: #1f1f1f;
   --chat-muted: #60646c;
   --chat-subtle: #92969d;
@@ -24,10 +44,12 @@
   overflow: hidden;
   background: #ffffff;
   color: var(--chat-ink);
+  font-size: var(--chat-fs-body);
 }
 
 .chat-page button,
-.chat-page input {
+.chat-page input,
+.chat-page textarea {
   font: inherit;
 }
 
@@ -79,7 +101,7 @@
 
 .chat-list-header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--chat-fs-page);
   font-weight: 700;
   line-height: 1;
 }
@@ -145,7 +167,7 @@
   border: 1px dashed var(--chat-line);
   border-radius: 999px;
   background: #ffffff;
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   line-height: 1.2;
   text-align: center;
   white-space: nowrap;
@@ -155,7 +177,7 @@
   width: 14px;
   height: 14px;
   color: var(--chat-subtle);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   line-height: 1;
   border-radius: 999px;
 }
@@ -226,21 +248,21 @@
   align-items: center;
   gap: 4px;
   margin: 0 0 12px;
-  font-size: 20px;
+  font-size: var(--chat-fs-title);
   font-weight: 700;
 }
 
 .my-bordo-card p,
 .chat-preview p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--chat-fs-body);
   line-height: 1.2;
 }
 
 .my-bordo-card time,
 .chat-preview time {
   color: var(--chat-subtle);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
 }
 
 .chat-list-section,
@@ -281,7 +303,7 @@
 .section-heading h2,
 .team-chat-header strong {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--chat-fs-title);
   font-weight: 700;
   line-height: 1;
 }
@@ -384,7 +406,7 @@
 
 .chat-preview-title strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--chat-fs-body);
   flex: 0 1 auto;
   font-weight: 700;
   min-width: 0;
@@ -395,7 +417,7 @@
 .chat-preview-title span {
   overflow: hidden;
   color: var(--chat-muted);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -426,7 +448,7 @@
   border-radius: 999px;
   background: #ff6450;
   color: #ffffff;
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
 }
 
 .team-chat-group {
@@ -464,7 +486,7 @@
   padding: 5px 12px;
   border-radius: 999px;
   background: #eeeef0;
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   font-weight: 400;
   line-height: 1;
   white-space: nowrap;
@@ -494,8 +516,10 @@
   gap: 8px;
 }
 
+/* 프로젝트는 팀 아래 한 단계 안이지만 같은 `제목` 이다. 층마다 크기를 한
+   단계씩 줄이면 세 번째 층에서 본문보다 작아진다. 층은 들여쓰기로 나타낸다. */
 .project-title strong {
-  font-size: 16px;
+  font-size: var(--chat-fs-title);
   font-weight: 700;
 }
 
@@ -543,13 +567,13 @@
 }
 
 .chat-room-title strong {
-  font-size: 20px;
+  font-size: var(--chat-fs-title);
   font-weight: 700;
 }
 
 .chat-room-title span {
   color: var(--chat-muted);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
 }
 
 .chat-room-actions {
@@ -585,7 +609,7 @@
 }
 
 .message-row.bot strong {
-  font-size: 14px;
+  font-size: var(--chat-fs-body);
   font-weight: 400;
 }
 
@@ -602,7 +626,7 @@
 
 .message-row time {
   color: var(--chat-subtle);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
 }
 
 .message-bubble {
@@ -617,13 +641,11 @@
   background: var(--chat-white-hover);
 }
 
+/* 여기가 가장 나빴다. 내 말풍선만 12px 이라 상대 말풍선(크기 지정이 없어
+   브라우저 기본값 16px)과 나란히 놓이면 같은 대화의 두 줄이 다른 글이었다.
+   말풍선은 색만 다르고 글은 같은 본문이다. */
 .message-bubble.orange {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: var(--chat-orange);
-  font-size: 12px;
-  text-align: center;
 }
 
 .date-divider {
@@ -637,7 +659,7 @@
   padding: 4px 24px;
   border-radius: 999px;
   background: var(--chat-white-hover);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   transition:
     background 120ms ease,
     transform 120ms ease;
@@ -699,7 +721,7 @@
   border: 0;
   outline: 0;
   color: var(--chat-ink);
-  font-size: 13px;
+  font-size: var(--chat-fs-body);
 }
 
 .chat-composer input::placeholder {
@@ -740,7 +762,13 @@
   box-sizing: border-box;
 }
 
+/* 채팅과 같은 위계를 쓴다. 두 화면이 톱니 하나로 이어져 있어서, 크기 규칙이
+   갈리면 넘어가는 순간 글이 커졌다 작아졌다 한다. */
 .settings-page {
+  --settings-fs-page: 24px;
+  --settings-fs-title: 16px;
+  --settings-fs-body: 14px;
+  --settings-fs-meta: 12px;
   --settings-ink: #1f1f1f;
   --settings-muted: #60646c;
   --settings-disabled: #b8bbc0;
@@ -758,9 +786,11 @@
   overflow: hidden;
   background: #ffffff;
   color: var(--settings-ink);
+  font-size: var(--settings-fs-body);
 }
 
 .settings-page button,
+.settings-page input,
 .settings-page textarea {
   font: inherit;
 }
@@ -804,7 +834,7 @@
   border: 1px solid var(--settings-line);
   border-radius: 8px;
   background: #ffffff;
-  font-size: 12px;
+  font-size: var(--settings-fs-meta);
   line-height: 1;
   box-shadow: 0 8px 24px rgb(0 0 0 / 6%);
 }
@@ -824,7 +854,7 @@
 
 .settings-header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--settings-fs-page);
   font-weight: 700;
   line-height: 1;
 }
@@ -853,7 +883,7 @@
 
 .settings-section h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--settings-fs-title);
   font-weight: 700;
   line-height: 1;
 }
@@ -874,7 +904,7 @@
 .settings-row strong {
   display: block;
   margin-bottom: 4px;
-  font-size: 16px;
+  font-size: var(--settings-fs-title);
   font-weight: 700;
   line-height: 1;
 }
@@ -882,8 +912,8 @@
 .settings-row p {
   margin: 0;
   color: var(--settings-muted);
-  font-size: 13px;
-  line-height: 1.2;
+  font-size: var(--settings-fs-meta);
+  line-height: 1.35;
 }
 
 .settings-switch {
@@ -942,6 +972,9 @@
   background: #00c79a;
 }
 
+/* 위계에서 벗어난 유일한 자리다. 24px 짜리 스위치 안에 `OFF` 세 글자가
+   들어가야 해서 보조(12px)로는 손잡이를 밀어낸다. 이건 읽는 글이 아니라
+   스위치 상태 표시라, 본문 위계에 넣지 않고 여기서만 정한다. */
 .settings-switch-label {
   position: absolute;
   top: 50%;
@@ -993,7 +1026,7 @@
   background: transparent;
   color: var(--settings-ink);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--settings-fs-body);
   line-height: 1.35;
 }
 
@@ -1008,6 +1041,8 @@
   border-radius: 999px;
   background: var(--settings-soft);
   color: var(--settings-disabled);
+  /* `↳` 는 글이 아니라 아이콘 대용이다. 다른 아이콘 버튼(24px 박스 안 16~18px)
+     과 크기를 맞추는 값이지 본문 위계가 아니다. */
   font-size: 16px;
   line-height: 1;
   transition:
@@ -1083,7 +1118,7 @@
   margin: 0;
   padding-top: 5px;
   color: var(--settings-ink);
-  font-size: 12px;
+  font-size: var(--settings-fs-body);
   line-height: 1.35;
 }
 
@@ -1093,6 +1128,7 @@
   border-radius: 999px;
   background: transparent;
   color: var(--settings-muted);
+  /* `⋮` 도 아이콘 대용이다. 위 `↳` 와 같은 이유로 위계 밖에 둔다. */
   font-size: 18px;
   line-height: 1;
 }
@@ -1120,7 +1156,7 @@
   height: 32px;
   border-radius: 0;
   color: var(--settings-ink);
-  font-size: 12px;
+  font-size: var(--settings-fs-body);
   text-align: center;
 }
 
@@ -1141,6 +1177,7 @@
   margin: 0;
   color: rgba(0, 38, 98, 0.1);
   font-family: Georgia, 'Times New Roman', serif;
+  /* 배경에 깔리는 워드마크. 읽는 글이 아니라 그림이라 위계 밖이다. */
   font-size: 64px;
   font-style: italic;
   font-weight: 700;
@@ -1169,12 +1206,12 @@
   margin: 0;
   padding: 8px 16px;
   color: #626262;
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
 }
 
 .chat-send-error {
   margin: 0;
   padding: 6px 16px;
   color: #ff2a2a;
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
 }
