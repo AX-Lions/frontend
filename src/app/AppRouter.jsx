@@ -30,11 +30,10 @@ export function AppRouter() {
   const path = usePath()
   const signedIn = useSignedIn()
 
-  if (path === '/signup') {
-    return <SignupPage />
-  }
-
   if (!signedIn) {
+    if (path === '/signup') {
+      return <SignupPage />
+    }
     // 주소를 바꾸지 않고 **로그인 화면을 그린다.**
     //
     // `/flow-board` 로 들어온 사람을 `/login` 으로 밀어내면, 로그인 뒤에
@@ -44,7 +43,12 @@ export function AppRouter() {
   }
 
   if (PUBLIC.has(path)) {
-    // 이미 로그인한 사람이 로그인 화면을 볼 이유가 없다.
+    // 이미 로그인한 사람이 인증 화면을 볼 이유가 없다.
+    //
+    // **`/signup` 을 로그인 여부보다 먼저 보면 안 된다.** 로그인한 사람이
+    // 주소로 들어와 가입을 마치면 `signup()` 과 `login()` 이 둘 다
+    // `setTokens()` 를 불러 **지금 로그인한 계정의 토큰을 새 계정 것으로
+    // 덮어쓴다.** 아무 경고 없이 계정이 바뀐다.
     return <HomePage />
   }
 
