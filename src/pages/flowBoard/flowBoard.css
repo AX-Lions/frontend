@@ -2289,3 +2289,13 @@
 .flow-workspace.has-record-panel {
   grid-template-columns: minmax(0, 1fr) 360px;
 }
+
+/* 안건이 아직 없는 회의, 결정이 하나도 없는 열. 자리를 비우면 못 불러온 것처럼
+   보인다 — "아무 일도 없었다" 와 "못 불러왔다" 는 다른 이야기다. */
+.index-empty,
+.summary-column-empty {
+  margin: 0;
+  padding: 8px 4px;
+  color: var(--muted);
+  font-size: 12px;
+}

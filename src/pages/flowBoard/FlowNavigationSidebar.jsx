@@ -11,16 +11,19 @@ export function FlowNavigationSidebar({
   isScrolled,
   onCategorySelect,
   onFilterCollapseToggle,
+  onContentToggle,
   onIndexSelect,
+  onParticipantToggle,
   onScroll,
   onSidebarToggle,
   participants,
+  teamName,
 }) {
   return (
     <aside className={isCollapsed ? 'flow-sidebar is-collapsed' : 'flow-sidebar'} aria-label="회의 탐색">
       <header className={isScrolled ? 'team-header is-scrolled' : 'team-header'}>
         <a className="team-name" href="/">
-          AX Lions
+          {teamName ?? '　'}
         </a>
         <button className="team-refresh" type="button" aria-label="새로고침">
           <img src={icons.refresh} alt="" />
@@ -59,15 +62,22 @@ export function FlowNavigationSidebar({
 
         <section className="sidebar-section index-section" aria-labelledby="index-title">
           <h2 id="index-title">인덱스</h2>
+          {/*
+            인덱스는 안건이다. 문자열이 아니라 `{id, label, related_edge_ids}` 라
+            누르면 그 안건에 걸린 화살표로 갈 수 있다. 라벨을 key 로 쓰면 같은
+            제목의 안건이 둘일 때 하나가 사라진다.
+          */}
           <nav className="index-list">
-            {indexes.map((item) => (
+            {indexes.length === 0 ? (
+              <p className="index-empty">잡힌 안건이 없습니다.</p>
+            ) : indexes.map((item) => (
               <button
-                className={activeIndex === item ? 'selected' : ''}
+                className={activeIndex?.id === item.id ? 'selected' : ''}
                 type="button"
-                key={item}
+                key={item.id}
                 onClick={() => onIndexSelect(item)}
               >
-                {item}
+                {item.label}
               </button>
             ))}
           </nav>
@@ -90,11 +100,20 @@ export function FlowNavigationSidebar({
             참여자
             <img src={icons.expandDown} alt="" />
           </button>
+          {/*
+            `defaultChecked` 에서 `checked` 로 바꿨다. 체크가 조회 조건이 되면서
+            **누른 것과 실제로 걸린 조건이 갈리면 안 되기** 때문이다. 되돌아온
+            결과와 체크 상태가 어긋나면 사용자는 필터가 고장 났다고 본다.
+          */}
           {!collapsedFilters.participants
             ? participants.map((participant) => (
-                <label className="check-row" key={participant.name}>
-                  <span>{participant.name}</span>
-                  <input type="checkbox" defaultChecked={participant.checked} />
+                <label className="check-row" key={participant.id ?? participant.name}>
+                  <span>{participant.label ?? participant.name}</span>
+                  <input
+                    type="checkbox"
+                    checked={participant.checked}
+                    onChange={() => onParticipantToggle?.(participant.id)}
+                  />
                   <img className="checked-icon" src={icons.checked} alt="" />
                   <img className="unchecked-icon" src={icons.unchecked} alt="" />
                 </label>
@@ -113,12 +132,16 @@ export function FlowNavigationSidebar({
           </button>
           {!collapsedFilters.content
             ? contentFilters.map((filter) => (
-                <label className="check-row content-row" key={filter.name}>
+                <label className="check-row content-row" key={filter.value ?? filter.name}>
                   <span>
                     <FlowMetricBadge tone={filter.tone} />
                     {filter.name}
                   </span>
-                  <input type="checkbox" defaultChecked={filter.checked} />
+                  <input
+                    type="checkbox"
+                    checked={filter.checked}
+                    onChange={() => onContentToggle?.(filter.value)}
+                  />
                   <img className="checked-icon" src={icons.checked} alt="" />
                   <img className="unchecked-icon" src={icons.unchecked} alt="" />
                 </label>
