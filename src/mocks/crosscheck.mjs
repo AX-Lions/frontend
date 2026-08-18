@@ -22,6 +22,13 @@ import { activeDates, chatSidebar, roomDetails, roomMessages } from './data/chat
 import { agentConversations, conversationMessages } from './data/agent.js'
 import { PEOPLE } from './data/people.js'
 
+/** 화면과 같은 방식으로 날짜를 자른다 (`data/chat.js` 의 것과 같다). */
+function localDate(iso) {
+  const at = new Date(iso)
+  return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}`
+    + `-${String(at.getDate()).padStart(2, '0')}`
+}
+
 const bad = []
 const ok = (cond, msg) => { if (!cond) bad.push(msg) }
 
@@ -120,7 +127,14 @@ ok(chatSidebar.my_agent_room?.id === home.shortcuts?.agent_room_id,
 // 7. 활동일에 실제 메시지가 있는가 — 어긋나면 구분선을 눌러도 빈 날
 for (const [rid, ad] of Object.entries(activeDates)) {
   const msgs = roomMessages[rid]?.results ?? []
-  const days = new Set(msgs.map((m) => (m.sent_at ?? '').slice(0, 10)))
+  /*
+    **로컬 날짜로 자른다.** 화면이 그렇게 자르기 때문이다.
+
+    `slice(0, 10)` 은 UTC 날짜다. 한국에서 새벽 0~9시에 이 검사를 돌리면
+    데이터는 `08-19` 로 묶어 뒀는데 검사는 `08-18` 로 읽어, 멀쩡한 데이터가
+    어긋난 것으로 나온다. 실제로 새벽 1시에 돌렸다가 3건이 잡혔다.
+  */
+  const days = new Set(msgs.map((m) => localDate(m.sent_at)))
   for (const d of ad.active_dates ?? []) {
     ok(days.has(d), `방 ${rid.slice(0, 8)} 의 활동일 ${d} 에 메시지가 없다`)
   }
