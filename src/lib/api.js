@@ -172,7 +172,13 @@ export async function request(path, options = {}) {
     // 사용자는 로그인 화면으로 돌아갈 방법이 없다 — 새로고침해도 같은 화면이다.
     //
     // 지우면 `onAuthChange` 가 돌아 화면이 스스로 로그인으로 간다.
-    if (response.status === 401) {
+    //
+    // **`ok` 일 때만이다.** 갱신이 실패했을 때의 처분은 이미 `refreshTokens` 가
+    // 정했다 — 서버가 거절했으면 거기서 지웠고, 네트워크 때문이면 일부러
+    // 남겨 뒀다. 여기서 `response.status` 만 보고 다시 지우면 그 결정을
+    // 뒤집는다. 지하철에서 잠깐 끊긴 것만으로 **멀쩡한 refresh 토큰까지 날아가
+    // 로그인 화면으로 튕긴다.**
+    if (ok && response.status === 401) {
       clearTokens()
     }
   }

@@ -87,16 +87,45 @@ export function dedupe(key, run) {
   if (running) {
     return running
   }
+
   const promise = run()
     .then((data) => {
-      writeCache(key, data)
+      // **버려진 요청은 캐시에 쓰지 않는다.**
+      //
+      // `evict` 로 밀어낸 뒤에도 이 약속은 계속 살아서 언젠가 도착한다. 그때
+      // 그대로 담으면 방금 지운 값이 되살아난다 — 방을 읽어 뱃지를 껐는데
+      // 읽기 전에 출발한 응답이 뒤늦게 와서 뱃지를 다시 켜는 식이다.
+      // 아직 내가 등록된 요청일 때만 담는다.
+      if (inflight.get(key) === promise) {
+        writeCache(key, data)
+      }
       return data
     })
     .finally(() => {
-      inflight.delete(key)
+      if (inflight.get(key) === promise) {
+        inflight.delete(key)
+      }
     })
+
   inflight.set(key, promise)
   return promise
+}
+
+/**
+ * 이 키로 담아 둔 것과 **진행 중인 것까지** 버린다.
+ *
+ * `dedupe` 는 같은 키가 나가 있으면 신선도를 따지지 않고 그것을 나눠 준다.
+ * 그래서 무언가를 바꾼 직후에 부르는 `다시 읽기` 가 **바꾸기 전에 출발한
+ * 응답**을 새 값으로 받아 든다. 낙관적으로 고쳐 둔 화면이 옛 값으로 되돌아가고,
+ * 그 옛 값이 캐시에도 남는다.
+ *
+ * 바꾼 사람이 이것을 부르면 다음 조회는 반드시 새로 나간다.
+ */
+export function evict(key) {
+  if (key) {
+    store.delete(key)
+    inflight.delete(key)
+  }
 }
 
 /**
@@ -111,9 +140,11 @@ export function invalidate(prefix) {
     inflight.clear()
     return
   }
-  for (const key of store.keys()) {
+  // **진행 중인 것도 함께 버린다.** 담아 둔 것만 지우면, 지우기 직전에 출발한
+  // 요청이 뒤늦게 도착해 방금 지운 값을 그대로 되살린다.
+  for (const key of [...store.keys(), ...inflight.keys()]) {
     if (key.startsWith(prefix)) {
-      store.delete(key)
+      evict(key)
     }
   }
 }

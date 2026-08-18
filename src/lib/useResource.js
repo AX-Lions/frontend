@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { cacheKeyFor, dedupe, readCache, writeCache } from './resourceCache.js'
+import { cacheKeyFor, dedupe, evict, readCache, writeCache } from './resourceCache.js'
 
 /**
  * 화면 하나가 API 하나를 읽는 흐름.
@@ -105,7 +105,19 @@ export function useResource(load, deps = [], options = {}) {
   }, [key, nonce, fullKey])
 
   const sameKey = result.key === key
-  const reload = useCallback(() => setNonce((n) => n + 1), [])
+
+  /*
+    담아 둔 것을 버리고 다시 읽는다.
+
+    **`nonce` 만 올리면 부족하다.** `dedupe` 는 같은 키로 나가 있는 요청이 있으면
+    신선도를 따지지 않고 그것을 나눠 준다. 그래서 무언가를 바꾼 직후의 `다시
+    읽기` 가 **바꾸기 전에 출발한 응답**을 새 값으로 받아 든다 — 방을 열어 뱃지를
+    껐는데 그 뱃지가 되살아나는 것이 그것이다. 먼저 밀어내야 새로 나간다.
+  */
+  const reload = useCallback(() => {
+    evict(fullKey)
+    setNonce((n) => n + 1)
+  }, [fullKey])
 
   const setData = useCallback((update) => {
     setResult((current) => {
@@ -117,13 +129,27 @@ export function useResource(load, deps = [], options = {}) {
     })
   }, [fullKey])
 
+  /*
+    조회 조건이 바뀌었을 때, **그 조건으로 담아 둔 것이 이미 있으면 그것을 쓴다.**
+
+    `readCache` 를 첫 마운트에서만 보면 이 경우를 놓친다. 필터에서 한 사람을
+    껐다가 곧바로 다시 켜면 키가 원래대로 돌아오는데, 그 응답은 몇 초 전에
+    담아 둔 그대로다. 그런데도 판이 통째로 비워지고 스피너가 돌았다 — 사용자
+    입장에서는 **되돌렸을 뿐인데 처음부터 다시 그리는 것**으로 보인다.
+
+    뒤에서는 어차피 다시 읽는다(effect 는 키가 바뀔 때마다 돈다). 담아 둔 것은
+    그 사이를 메우는 용도다.
+  */
+  const cachedForKey = sameKey ? undefined : readCache(fullKey)
+  const hasCached = cachedForKey !== undefined
+
   return {
     // 다시 읽는 동안에도 **이미 보여 주던 것은 남긴다.** 화면이 잠깐 비었다가
     // 다시 차면 사용자는 무언가 사라진 줄 안다. 다만 조회 조건(`deps`)이 바뀌면
-    // 그건 다른 것이므로 비운다.
-    data: sameKey ? result.data : null,
+    // 그건 다른 것이므로 비운다 — 담아 둔 것이 없을 때만.
+    data: sameKey ? result.data : (hasCached ? cachedForKey : null),
     error: sameKey ? result.error : null,
-    loading: !(sameKey && result.nonce === nonce),
+    loading: !(sameKey && result.nonce === nonce) && !hasCached,
     reload,
     setData,
   }

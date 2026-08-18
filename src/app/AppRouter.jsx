@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 
 import { PageLoading } from '../shared/components/LoadState.jsx'
+import { ScreenBoundary } from './ScreenBoundary.jsx'
 import { currentPath, subscribeToPath } from './navigation.js'
 import { isSignedIn, onAuthChange } from '../lib/auth.js'
 
@@ -100,9 +101,13 @@ function useSignedIn() {
  */
 function Screen({ children }) {
   return (
-    <Suspense fallback={<PageLoading label="화면을 여는 중입니다…" />}>
-      {children}
-    </Suspense>
+    // `Suspense` 는 **기다리는 것**만 다룬다. 조각을 못 받은 것은 실패라
+    // 그대로 렌더 단계로 올라가고, 잡아 주는 것이 없으면 앱이 통째로 사라진다.
+    <ScreenBoundary>
+      <Suspense fallback={<PageLoading label="화면을 여는 중입니다…" />}>
+        {children}
+      </Suspense>
+    </ScreenBoundary>
   )
 }
 

@@ -96,9 +96,25 @@ export function useFlowOptions(mode, meetingId, projectId) {
     if (!scopeId) {
       return Promise.resolve(null)
     }
-    return (mode === WORK_MODE
+    /*
+      **여기서 실패를 삼키면 안 된다.**
+
+      이 조회는 아래 `useFlowGraph` 와 캐시 키가 같아 `dedupe` 로 합쳐진다.
+      합쳐진다는 것은 **먼저 등록한 쪽의 약속을 뒤엣것이 그대로 받는다**는
+      뜻이다. 이 훅이 먼저 돌므로(화면에서 위에 있다), 여기에 `.catch(() => null)`
+      을 달면 캔버스 쪽 `error` 가 통째로 사라진다.
+
+      그러면 서버가 500 을 내도 화면에는 `이 회의에서 오간 내용이 없습니다.` 가
+      뜬다. **장애가 "이 회의엔 아무 일도 없었다" 로 둔갑하고**, `다시 시도`
+      버튼조차 안 그려진다. 이 서비스가 묻는 질문이 "내가 없는 동안 무슨 일이
+      있었지" 인데 그 답을 틀리게 말하는 셈이다.
+
+      거절은 그대로 흘려보낸다. 이 훅을 쓰는 쪽은 `error` 를 읽지 않고
+      `data` 가 없으면 필터 목록을 비우므로, 삼키지 않아도 전과 같다.
+    */
+    return mode === WORK_MODE
       ? fetchProjectFlow(scopeId, {}, signal)
-      : fetchMeetingFlow(scopeId, {}, signal)).catch(() => null)
+      : fetchMeetingFlow(scopeId, {}, signal)
     // `deps` 모양을 `useFlowGraph` 와 **글자 그대로 맞춘다.** 캐시 키는
     // `deps` 를 직렬화해 만들므로, 하나라도 다르면 같은 무필터 조회가 두 키에
     // 담겨 요청이 두 번 나간다. 필터를 걸기 시작하면 뒤의 두 칸이 달라져
@@ -171,7 +187,15 @@ export function useEdgeDetails(edgeIds) {
   )
 }
 
-/** 로그인한 사람. 내 대리인 노드를 찾는 데 쓴다. */
+/**
+ * 로그인한 사람. 내 대리인 노드를 찾는 데 쓴다.
+ *
+ * **캐시 이름이 `me` 가 아니다.** 개인 설정 화면도 "나" 를 읽지만 그쪽은
+ * `GET /auth/me` 이고 여기는 `GET /users/me` 다. 이름이 같으면 `dedupe` 가
+ * 둘을 한 요청으로 합쳐, 먼저 도착한 쪽 응답이 다른 화면의 것으로 쓰인다.
+ * 여기에 붙은 `.catch(() => null)` 까지 그쪽이 물려받아, 개인 설정이 오류
+ * 대신 **빈 입력칸**을 그리게 된다. 부르는 곳이 다르면 키도 달라야 한다.
+ */
 export function useMe() {
-  return useResource((signal) => fetchMe(signal).catch(() => null), [], { cacheKey: 'me' })
+  return useResource((signal) => fetchMe(signal).catch(() => null), [], { cacheKey: 'flow-me' })
 }
