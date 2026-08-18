@@ -90,16 +90,20 @@ export function useFlowIndexes(meetingId, mode) {
  * 사라져 **다시 켤 방법이 없다.** 한 번 더 부르는 값이 있다.
  */
 export function useFlowOptions(mode, meetingId, projectId) {
+  const scopeId = mode === WORK_MODE ? projectId : meetingId
+
   return useResource((signal) => {
-    if (mode === WORK_MODE) {
-      return projectId
-        ? fetchProjectFlow(projectId, {}, signal).catch(() => null)
-        : Promise.resolve(null)
+    if (!scopeId) {
+      return Promise.resolve(null)
     }
-    return meetingId
-      ? fetchMeetingFlow(meetingId, {}, signal).catch(() => null)
-      : Promise.resolve(null)
-  }, [mode, meetingId, projectId])
+    return (mode === WORK_MODE
+      ? fetchProjectFlow(scopeId, {}, signal)
+      : fetchMeetingFlow(scopeId, {}, signal)).catch(() => null)
+    // `deps` 모양을 `useFlowGraph` 와 **글자 그대로 맞춘다.** 캐시 키는
+    // `deps` 를 직렬화해 만들므로, 하나라도 다르면 같은 무필터 조회가 두 키에
+    // 담겨 요청이 두 번 나간다. 필터를 걸기 시작하면 뒤의 두 칸이 달라져
+    // 저절로 갈린다.
+  }, [mode, scopeId, true, '', ''], { cacheKey: 'flow' })
 }
 
 /**
@@ -127,6 +131,9 @@ export function useFlowGraph({ mode, meetingId, projectId, participantIds, conte
     },
     // 배열을 그대로 넣으면 매 렌더마다 새 배열이라 끝없이 다시 읽는다.
     [mode, scopeId, enabled, participantIds.join(','), contentTypes.join(',')],
+    // 아무것도 안 걸렀을 때 `useFlowOptions` 와 **키가 완전히 같아져** 두
+    // 요청이 하나로 합쳐진다. 그쪽 `deps` 도 이 모양에 맞춰 뒀다.
+    { cacheKey: 'flow' },
   )
 }
 
