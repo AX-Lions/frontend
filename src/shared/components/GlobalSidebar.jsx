@@ -1,4 +1,6 @@
 import { AppLink } from '../../app/AppLink.jsx'
+import { api } from '../../lib/api.js'
+import { useResource } from '../../lib/useResource.js'
 import './GlobalSidebar.css'
 
 /**
@@ -51,9 +53,33 @@ const globalNavItems = [
 */
 const accountItem = { id: 'account', href: '/account', label: '개인 설정' }
 
+/** 요청함 카드 전부의 `답변·확인·승인 필요` 를 더한다. 뱃지는 "몇 개나 남았나" 하나다. */
+function pendingTotal(inbox) {
+  return (inbox?.groups ?? []).reduce((sum, group) => (
+    sum + group.items.reduce((s, item) => (
+      s + item.needs_answer + item.needs_confirm + item.needs_approval
+    ), 0)
+  ), 0)
+}
+
 export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, user }) {
   const className = (id, base) => (active === id ? `${base} active` : base)
   const current = (id) => (active === id ? 'page' : undefined)
+
+  /*
+    요청함 뱃지.
+
+    `InboxPage` 와 같은 `cacheKey`(`inbox`) 를 쓴다 — 레일은 모든 화면에 떠
+    있으므로 화면마다 따로 부르면 페이지를 옮길 때마다 `/me/inbox` 가 다시
+    나간다. 같은 키를 쓰면 `useResource` 가 나눠 쓰거나 캐시를 먼저 보여준다.
+
+    오류는 그냥 둔다. 아직 실서버에 없는 주소라 실서버 모드에서는 항상
+    실패하는데, 뱃지 하나 때문에 레일에 오류를 띄우면 정작 화면 이동이
+    막힌 것처럼 보인다 — 뱃지가 없는 것으로 조용히 넘어간다.
+  */
+  const { data: inbox } = useResource(
+    (signal) => api.get('/me/inbox', undefined, { signal }), [], { cacheKey: 'inbox' })
+  const inboxBadge = pendingTotal(inbox)
 
   // 레일에는 아이콘만 보인다. 여러 계정을 오가는 사람이 지금 누구로 로그인해
   // 있는지 확인할 자리가 여기뿐이라, 이름을 받으면 라벨에 함께 적는다.
@@ -77,6 +103,9 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
             onClick={(event) => onNavigate?.(event, item)}
           >
             <img src={item.icon} alt="" />
+            {item.id === 'inbox' && inboxBadge > 0 ? (
+              <span className="global-sidebar-badge">{inboxBadge > 99 ? '99+' : inboxBadge}</span>
+            ) : null}
           </AppLink>
         ))}
       </nav>
