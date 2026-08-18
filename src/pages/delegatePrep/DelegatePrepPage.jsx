@@ -523,6 +523,38 @@ export function DelegatePrepPage() {
     setStanceText('')
     setEditing(false)
     setEditingId(null)
+
+    /*
+      새로 답하면 **다음 논쟁점으로 넘어간다.**
+
+      세 줄을 차례로 답하는 것이 이 화면에서 하는 일인데, 저장할 때마다 목록으로
+      돌아가 다음 줄을 찾아 누르게 하면 같은 동작을 논쟁점 수만큼 반복한다.
+      다음 줄이 펼쳐지면서 그 줄의 예측 근거가 바로 보이고 칸도 그 줄을 가리킨다.
+
+      **고칠 때는 넘어가지 않는다.** 그 한 장을 바로잡으러 온 것이지 다음을
+      쓰러 온 것이 아니라, 넘어가 버리면 방금 고친 결과를 확인할 자리를 잃는다.
+
+      마지막 줄이면 아무 데도 가지 않고 닫는다. 첫 줄로 되돌리면 이미 답한 것을
+      다시 답하라는 뜻으로 읽힌다.
+    */
+    const next = editingId
+      ? openRow
+      : (rows
+        .filter((row) => row.order > openRow.order)
+        .sort((a, b) => a.order - b.order)[0] ?? null)
+
+    setOpenId(next?.id ?? null)
+
+    /*
+      쓰던 칸에 초점을 남긴다.
+
+      보낸 단추는 칸이 비는 순간 꺼진다. 초점을 옮겨 두지 않으면 그 단추와 함께
+      사라져 문서 맨 앞으로 풀리고, 키보드로 쓰던 사람은 목록을 처음부터 다시
+      훑어야 다음 칸에 닿는다.
+    */
+    if (next) {
+      window.requestAnimationFrame(() => stanceInputRef.current?.focus())
+    }
   }
 
   if (!meetingId) {
