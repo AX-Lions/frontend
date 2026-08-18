@@ -1,4 +1,5 @@
 import { isMockMode } from './enabled.js'
+import { appendTo, patch, patchedOf, withAppended } from './store.js'
 
 /**
  * 주소 하나를 가상 데이터로 답한다.
@@ -59,6 +60,48 @@ function notMocked(path) {
   return error
 }
 
+
+/**
+ * 부르는 순서대로 늘어나는 번호.
+ *
+ * `Date.now()` 만 쓰면 같은 밀리초에 만든 둘이 **같은 id** 가 되어, 화면이
+ * 목록을 그릴 때 React 가 둘을 같은 것으로 보고 하나만 그린다. 사용자 말과
+ * 대리인 답을 연달아 만드는 자리라 실제로 겹친다.
+ */
+let seq = 0
+function nextId() {
+  seq += 1
+  return `${Date.now()}-${seq}`
+}
+
+/**
+ * 가상 대리인의 답.
+ *
+ * 무엇을 물어도 같은 말을 한다. 진짜처럼 답하려면 모델이 필요한데, 여기는
+ * **서버가 없을 때 화면을 보는 자리**다. 다만 아무 말도 안 하면 화면이
+ * `답을 준비하고 있습니다` 에서 멈춰, 대리인이 고장 난 것처럼 보인다.
+ *
+ * 답에 유보를 넣어 둔다 — 유보는 실패가 아니라 이 서비스의 차별점이고,
+ * 화면이 그것을 어떻게 그리는지 볼 수 있어야 한다.
+ */
+const AGENT_REPLY = '가상 데이터 모드라 실제로 찾아보지는 못했습니다. '
+  + '진짜 서버에서는 이 질문에 회의 기록과 작업 기록을 근거로 답하고, '
+  + '근거가 모자라면 지어내지 않고 본인 확인이 필요하다고 남깁니다.'
+
+/**
+ * 이번에 등록한 불참을 홈 응답에 비춘다.
+ *
+ * 저장은 됐는데 홈이 그것을 안 읽으면 버튼이 `회의에 참여하지 않아요` 그대로라,
+ * 사용자는 저장이 안 된 줄 알고 다시 누른다.
+ */
+function applyDelegations(home) {
+  const today = (home.today_schedule ?? []).map((s) => {
+    const saved = s.meeting_id ? patchedOf(`delegate:${s.meeting_id}`) : null
+    return saved ? { ...s, delegation: { ...s.delegation, ...saved } } : s
+  })
+  return { ...home, today_schedule: today }
+}
+
 /** `/meetings/{id}/flow` 처럼 id 가 낀 주소를 가른다. */
 function segments(path) {
   return path.split('?')[0].split('/').filter(Boolean)
@@ -69,7 +112,10 @@ function resolve(path, method, body) {
   const [a, b, c] = s
 
   if (method === 'GET') {
-    if (path === '/home') return viewerHome()
+    if (path === '/home') {
+      // 불참 등록이 홈에 비쳐야 버튼이 `대리 참석 중` 으로 바뀐다.
+      return applyDelegations(viewerHome())
+    }
     if (path === '/auth/me' || path === '/users/me') return viewerMe()
     if (path === '/teams') return viewerTeams()
 
@@ -96,7 +142,12 @@ function resolve(path, method, body) {
     if (path.startsWith('/chat/candidates')) return chatCandidates
     if (a === 'chat' && b === 'rooms' && !c) return chatRooms
     if (a === 'chat' && b === 'rooms' && c && !s[3]) return roomDetails[c] ?? null
-    if (a === 'chat' && b === 'rooms' && s[3] === 'messages') return roomMessages[c] ?? { results: [], next_before: null, has_older: false, has_newer: false }
+    if (a === 'chat' && b === 'rooms' && s[3] === 'messages') {
+      const base = roomMessages[c] ?? { results: [], next_before: null, has_older: false, has_newer: false }
+      // 이번 방문에 보낸 말을 뒤에 잇는다. 안 이으면 화면이 다시 읽는 순간
+      // 방금 보낸 말이 사라진다.
+      return { ...base, results: withAppended(`room:${c}`, base.results ?? []) }
+    }
     if (a === 'chat' && b === 'rooms' && s[3] === 'active-dates') return activeDates[c] ?? null
     if (a === 'chat' && b === 'rooms' && s[3] === 'daily-summary') {
       const date = new URLSearchParams(path.split('?')[1] || '').get('date')
@@ -104,11 +155,22 @@ function resolve(path, method, body) {
     }
     if (a === 'chat' && b === 'rooms' && s[3] === 'search') return { count: 0, results: [] }
 
-    if (path === '/me/agent/settings') return viewerAgentSettings()
+    if (path === '/me/agent/settings') {
+      // 이번에 고친 것을 덮어 얹는다. 안 얹으면 말투를 바꾸고 화면을 다시
+      // 읽는 순간 원래대로 돌아간다.
+      return { ...viewerAgentSettings(), ...(patchedOf('agent-settings') ?? {}) }
+    }
     if (path === '/me/agent/prompts') return viewerAgentPrompts()
     if (path === '/me/agent/conversations') return viewerConversations()
     if (a === 'me' && s[2] === 'conversations' && s[4] === 'messages') {
-      return viewerConversationMessages(s[3]) ?? { results: [], next_before: null }
+      const base = viewerConversationMessages(s[3]) ?? { results: [], next_before: null }
+      /*
+        **여기가 제일 중요하다.** `AgentDock` 은 보낸 뒤 3초마다 이 목록을
+        다시 읽어 화면을 통째로 갈아 끼운다. 이번에 보낸 것을 안 이으면
+        내 말이 3초 뒤에 조용히 사라지고, 오류도 안내도 없어 사용자는
+        자기 말이 안 갔는지 화면이 고장 났는지 구별하지 못한다.
+      */
+      return { ...base, results: withAppended(`conv:${s[3]}`, base.results ?? []) }
     }
   }
 
@@ -140,13 +202,74 @@ function resolve(path, method, body) {
     if (path === '/auth/logout') return null
     if (a === 'chat' && s[3] === 'read') return null
     if (path === '/me/briefing-dismiss') return { dismissed: true }
-    if (a === 'me' && s[2] === 'conversations' && s[4] === 'messages') {
-      return {
-        id: `mock-msg-${Date.now()}`, role: 'USER', body: body?.body ?? '',
-        sent_at: new Date().toISOString(), run: { status: 'RECEIVED', run_id: null },
-      }
+
+    /*
+      채팅 메시지.
+
+      **`sent_at` 이 반드시 있어야 한다.** 없으면 화면이 `new Date(undefined)`
+      로 날짜 구분선을 만들려다 렌더 도중에 터지고, 채팅 화면 전체가 오류
+      화면으로 바뀐다. 입력한 말도 같이 사라진다.
+    */
+    if (a === 'chat' && b === 'rooms' && s[3] === 'messages') {
+      return appendTo(`room:${c}`, {
+        id: `mock-msg-${nextId()}`,
+        room_id: c,
+        sender_id: viewerMe().id,
+        sender_name: viewerMe().name,
+        is_mine: true,
+        body: body?.body ?? '',
+        sent_at: new Date().toISOString(),
+        is_important: false,
+        confirmed_at: null,
+        edited_at: null,
+        attachments: [],
+      })
     }
-    return { ...(body ?? {}), id: `mock-${Date.now()}`, ok: true }
+
+    /*
+      대리인 대화.
+
+      사용자 메시지를 담아 두고, **대리인 답도 만들어 둔다.** 화면이 3초마다
+      다시 읽으며 마지막이 사용자 말이면 계속 기다리는데, 답이 영영 안 오면
+      30초 뒤 `대리인이 아직 답하지 않았습니다` 로 끝난다. 가상 데이터에서
+      대리인이 입을 다무는 것은 보여 줄 상태가 아니다.
+    */
+    if (a === 'me' && s[2] === 'conversations' && s[4] === 'messages') {
+      const key = `conv:${s[3]}`
+      const mine = appendTo(key, {
+        id: `mock-msg-${nextId()}`,
+        role: 'USER',
+        body: body?.body ?? '',
+        sent_at: new Date().toISOString(),
+        run: null,
+      })
+      appendTo(key, {
+        id: `mock-msg-${nextId()}`,
+        role: 'AGENT',
+        body: AGENT_REPLY,
+        sent_at: new Date().toISOString(),
+        run: { status: 'DONE', run_id: `mock-run-${nextId()}` },
+      })
+      return { ...mine, run: { status: 'RECEIVED', run_id: null } }
+    }
+
+    // 대리인 설정. 부분 갱신이라 **보낸 것만** 얹는다 — 통째로 돌려주면
+    // 안 보낸 스위치가 전부 꺼지고 대리인 이름이 지워진다.
+    if (path === '/me/agent/settings') {
+      return { ...viewerAgentSettings(), ...patch('agent-settings', body ?? {}) }
+    }
+
+    // 불참 등록. 홈이 이것을 읽어 버튼을 `대리 참석 중` 으로 바꾼다.
+    if (a === 'meetings' && c === 'delegate') {
+      const saved = patch(`delegate:${b}`, {
+        delegated: body?.enabled !== false,
+        prompt: body?.prompt ?? '',
+        sources: body?.sources ?? null,
+      })
+      return { meeting_id: b, ...saved }
+    }
+
+    return { ...(body ?? {}), id: `mock-${nextId()}`, ok: true }
   }
 
   return undefined
@@ -156,8 +279,29 @@ export function shouldMock() {
   return isMockMode()
 }
 
-export async function serveMock(path, { method = 'GET', body } = {}) {
-  const data = resolve(path, method, body)
+/**
+ * 화면이 보낸 쿼리를 주소에 붙인다.
+ *
+ * `api.get(path, params, options)` 은 쿼리를 **`path` 가 아니라 `params` 로**
+ * 넘긴다. URL 조립은 진짜 요청을 보내는 `send()` 가 하는데, 가상 모드는 그
+ * 함수를 건너뛰므로 여기서 같은 일을 해 줘야 한다.
+ *
+ * 이걸 빠뜨려서 `category=WORK` · `date=` · 필터가 전부 mock 에 안 닿았다.
+ * 작업 모드에 회의 안건이 뜨고, 날짜 요약이 늘 비고, 필터를 만져도 판이
+ * 그대로였다 — **요청은 나가는데 받는 쪽이 자기 것으로 세지 않은 것**이다.
+ */
+function withQuery(path, params) {
+  const entries = Object.entries(params ?? {})
+    .filter(([, v]) => v !== undefined && v !== null && v !== '')
+  if (!entries.length) {
+    return path
+  }
+  const search = new URLSearchParams(entries.map(([k, v]) => [k, String(v)]))
+  return `${path}${path.includes('?') ? '&' : '?'}${search}`
+}
+
+export async function serveMock(path, { method = 'GET', body, params } = {}) {
+  const data = resolve(withQuery(path, params), method, body)
   if (data === undefined) {
     throw notMocked(path)
   }
