@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { navigate } from '../../app/navigation.js'
 import { LiveMeetingPrompt } from '../../shared/components/LiveMeetingPrompt.jsx'
 import { globalNavItems } from '../../shared/constants/globalNav.js'
 import { useChatBadge } from '../../shared/hooks/useChatBadge.js'
 import { useInboxBadge } from '../../shared/hooks/useInboxBadge.js'
+import { useIsTeamLead } from '../../shared/hooks/useIsTeamLead.js'
 import { useLiveMeeting } from '../../shared/hooks/useLiveMeeting.js'
 
 /**
@@ -67,14 +68,44 @@ export function Sidebar({
     recent: true,
     favorite: true,
   })
+  const [meetingMenuOpen, setMeetingMenuOpen] = useState(false)
   const searchInputRef = useRef(null)
+  const meetingMenuRef = useRef(null)
 
   const inboxBadge = useInboxBadge()
   const chatBadge = useChatBadge()
+  const isTeamLead = useIsTeamLead()
   const {
     liveMeeting, promptOpen, secondsLeft, responding,
     openPrompt, respondDecline, respondJoin,
   } = useLiveMeeting()
+
+  /*
+    `회의 시작하기 · 회의 일정 보기` 드롭다운(시안 `692:7910`)은 바깥을
+    눌러도 닫혀야 한다 — 안 닫히면 다음에 누른 것을 가리고, 사용자는 왜
+    안 눌리는지 모른 채 같은 자리를 다시 누른다. `Escape` 도 같은 이유로 받는다.
+  */
+  useEffect(() => {
+    if (!meetingMenuOpen) {
+      return undefined
+    }
+    const close = (event) => {
+      if (!meetingMenuRef.current?.contains(event.target)) {
+        setMeetingMenuOpen(false)
+      }
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        setMeetingMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [meetingMenuOpen])
 
   const toggleSection = (section) => {
     setOpenSections((current) => ({
@@ -195,6 +226,74 @@ export function Sidebar({
                     >
                       <img src="/icons/LiveMeetingIcon.svg" alt="" />
                     </button>
+                  )
+                }
+
+                /*
+                  팀장에게는 `회의` 를 눌렀을 때 곧장 이동하지 않고 먼저
+                  묻는다(시안 `692:7910`) — 회의를 시작할지, 잡힌 일정을
+                  볼지. 팀장이 아니면 원래대로 `/flow-board` 로 바로 간다.
+                */
+                if (item.id === 'meeting' && isTeamLead) {
+                  return (
+                    <div className="sidebar-meeting-menu" key={item.id} ref={meetingMenuRef}>
+                      <button
+                        type="button"
+                        className={meetingMenuOpen ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
+                        aria-label={item.label}
+                        aria-haspopup="menu"
+                        aria-expanded={meetingMenuOpen}
+                        title={item.label}
+                        onClick={() => setMeetingMenuOpen((open) => !open)}
+                      >
+                        <img src={item.icon} alt="" />
+                      </button>
+
+                      {meetingMenuOpen ? (
+                        <div className="sidebar-meeting-panel" role="menu">
+                          {/*
+                            디스코드가 실제 회의 자리다 — "시작" 은 그리로
+                            보내는 것이지, 서버가 따로 만드는 행위가 아니다.
+                          */}
+                          <a
+                            className="sidebar-meeting-row"
+                            role="menuitem"
+                            href={discord?.connected && discord.url ? discord.url : undefined}
+                            aria-disabled={!(discord?.connected && discord.url)}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            onClick={(event) => {
+                              if (!(discord?.connected && discord.url)) {
+                                event.preventDefault()
+                                return
+                              }
+                              setMeetingMenuOpen(false)
+                            }}
+                          >
+                            <img src="/icons/SignalStart.svg" alt="" />
+                            회의 시작하기
+                          </a>
+                          <hr />
+                          {/*
+                            회의 일정을 달력으로 모아 보는 화면은 아직 없다.
+                            생기기 전까지는 그나마 가장 가까운 `/flow-board`
+                            로 보낸다.
+                          */}
+                          <a
+                            className="sidebar-meeting-row"
+                            role="menuitem"
+                            href="/flow-board"
+                            onClick={(event) => {
+                              setMeetingMenuOpen(false)
+                              goInApp(event, '/flow-board')
+                            }}
+                          >
+                            <img src="/icons/CalendarCheck.svg" alt="" />
+                            회의 일정 보기
+                          </a>
+                        </div>
+                      ) : null}
+                    </div>
                   )
                 }
 

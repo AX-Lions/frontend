@@ -208,6 +208,62 @@ body,
   background: rgba(255, 100, 80, 0.2);
 }
 
+/* 팀장의 `회의 시작하기 · 회의 일정 보기` 드롭다운(시안 `692:7910`). */
+.sidebar-meeting-menu {
+  position: relative;
+}
+
+.sidebar-meeting-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  padding: 8px;
+  gap: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-meeting-panel hr {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.sidebar-meeting-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 6px;
+  color: #1f1f1f;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.sidebar-meeting-row:hover {
+  background: #f3f4f6;
+}
+
+.sidebar-meeting-row[aria-disabled='true'] {
+  color: #b8bbc0;
+  cursor: default;
+}
+
+.sidebar-meeting-row[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+.sidebar-meeting-row img {
+  width: 24px;
+  height: 24px;
+}
+
 .sidebar-icon-badge {
   position: absolute;
   top: -2px;
