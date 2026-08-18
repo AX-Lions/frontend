@@ -17,6 +17,8 @@
  * 로직을 건드리게 된다.
  */
 
+import { invalidate } from './resourceCache.js'
+
 const ACCESS = 'bordo.access_token'
 const REFRESH = 'bordo.refresh_token'
 
@@ -58,6 +60,10 @@ export function setTokens(body) {
 }
 
 export function clearTokens() {
+  // 담아 둔 조회 결과도 함께 버린다. 남겨 두면 다음 사람이 로그인했을 때
+  // **이전 사람의 회의 제목이 첫 화면에 비쳐 보인다** — 캐시가 stale-while-
+  // revalidate 라 새 데이터가 오기 전 한 프레임 동안 옛것을 그리기 때문이다.
+  invalidate()
   localStorage.removeItem(ACCESS)
   localStorage.removeItem(REFRESH)
   emit()

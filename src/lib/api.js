@@ -32,6 +32,7 @@ import {
   getRefreshToken,
   setTokens,
 } from './auth.js'
+import { serveMock, shouldMock } from '../mocks/index.js'
 
 const BASE = '/api/v1'
 
@@ -154,6 +155,19 @@ async function send(path, { method = 'GET', body, params, signal, auth = true } 
 }
 
 export async function request(path, options = {}) {
+  /*
+    가상 데이터 모드면 여기서 끝난다.
+
+    **한 곳에서만 가른다.** 화면마다 조회 함수를 바꾸면 바꾼 곳만 가짜가 되고
+    안 바꾼 곳은 진짜를 불러, 서버가 없을 때 화면 절반만 뜨는 상태가 된다.
+    모든 호출이 이 함수를 지나가므로 여기가 유일한 갈림길이다.
+
+    `login` · `signup` 도 이 함수를 쓰므로 로그인까지 서버 없이 된다.
+  */
+  if (shouldMock()) {
+    return serveMock(path, options)
+  }
+
   let response = await send(path, options)
 
   // 만료된 토큰은 한 번만 갱신하고 그 요청을 다시 보낸다.
@@ -162,6 +176,24 @@ export async function request(path, options = {}) {
     const ok = await ensureRefreshed()
     if (ok) {
       response = await send(path, { ...options, _retried: true })
+    }
+
+    // 갱신했는데도 401 이면 그 토큰으로는 아무것도 못 한다.
+    //
+    // `/auth/refresh` 는 서명만 본다. 계정이 지워졌거나 비활성화된 뒤에도
+    // **새 액세스 토큰이 멀쩡히 발급되고**, 그걸로 다시 부르면 또 401 이다.
+    // 여기서 지우지 않으면 화면은 "유효하지 않은 토큰입니다" 를 띄운 채로 멈추고,
+    // 사용자는 로그인 화면으로 돌아갈 방법이 없다 — 새로고침해도 같은 화면이다.
+    //
+    // 지우면 `onAuthChange` 가 돌아 화면이 스스로 로그인으로 간다.
+    //
+    // **`ok` 일 때만이다.** 갱신이 실패했을 때의 처분은 이미 `refreshTokens` 가
+    // 정했다 — 서버가 거절했으면 거기서 지웠고, 네트워크 때문이면 일부러
+    // 남겨 뒀다. 여기서 `response.status` 만 보고 다시 지우면 그 결정을
+    // 뒤집는다. 지하철에서 잠깐 끊긴 것만으로 **멀쩡한 refresh 토큰까지 날아가
+    // 로그인 화면으로 튕긴다.**
+    if (ok && response.status === 401) {
+      clearTokens()
     }
   }
 
