@@ -208,21 +208,29 @@ body,
   background: rgba(255, 100, 80, 0.2);
 }
 
-/* 팀장의 `회의 시작하기 · 회의 일정 보기` 드롭다운(시안 `692:7910`). */
-.sidebar-meeting-menu {
+/*
+  팀장의 `회의 시작하기 · 회의 일정 보기` 드롭다운(시안 `692:7910`).
+
+  자리 잡는 기준은 이 단추가 아니라 `.sidebar-icon-row` 다 — `.sidebar` 에
+  `overflow: hidden` 이 걸려 있어(작은 화면에서 프로젝트 목록이 넘치지
+  않게 하는 규칙), 회의 아이콘 기준으로 오른쪽에 펼치면 사이드바 폭(240px)
+  을 넘는 부분이 그대로 잘렸다. 아이콘 줄 오른쪽 끝에 붙이면 어느 아이콘을
+  눌렀든 사이드바 안에 들어온다.
+*/
+.sidebar-icon-row {
   position: relative;
 }
 
 .sidebar-meeting-panel {
   position: absolute;
   top: calc(100% + 8px);
-  left: 0;
+  right: 8px;
   z-index: 20;
   display: flex;
   flex-direction: column;
-  width: 200px;
-  padding: 8px;
-  gap: 8px;
+  width: 152px;
+  padding: 6px;
+  gap: 6px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #ffffff;
@@ -242,7 +250,7 @@ body,
   padding: 4px;
   border-radius: 6px;
   color: #1f1f1f;
-  font-size: 14px;
+  font-size: 12px;
   text-decoration: none;
 }
 
@@ -260,8 +268,8 @@ body,
 }
 
 .sidebar-meeting-row img {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
 }
 
 .sidebar-icon-badge {
