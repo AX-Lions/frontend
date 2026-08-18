@@ -36,6 +36,7 @@ import {
 import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
 import { teamMembers } from './data/home.js'
 import { inbox } from './data/inbox.js'
+import { TEAM } from './data/people.js'
 import {
   activeDates, chatCandidates, chatRooms,
   dailySummaries, roomDetails, roomMessages,
@@ -59,6 +60,22 @@ function notMocked(path) {
   error.details = { path }
   error.retryable = false
   error.status = 501
+  return error
+}
+
+/**
+ * 가상 데이터 안에서 실제로 실패하는 요청.
+ *
+ * `notMocked` 와 달리 **주소는 있는데 값이 틀린 경우**다. `details` 를
+ * 필드별 배열로 주면 화면이 그 칸 밑에 그대로 찍는다(`authErrors.js`).
+ */
+function mockError({ code, message, details, status = 422 }) {
+  const error = new Error(message)
+  error.name = 'ApiError'
+  error.code = code
+  error.details = details ?? {}
+  error.retryable = false
+  error.status = status
   return error
 }
 
@@ -279,6 +296,36 @@ function resolve(path, method, body) {
       }
     }
     if (path === '/auth/logout') return null
+
+    /*
+      회원가입의 이메일 인증 · 초대 코드 확인(시안 `707:6492`).
+
+      **백엔드에 아직 없는 주소다** — 이 화면 안에서만 흉내 낸다. 인증번호는
+      실제로 보내지 않으므로 고정값 `123456` 을 받는다. 초대 코드는
+      `BRD-XXXX-XXXX` 모양만 맞으면 통과시킨다(`home.api.js` 의
+      `createInviteCode` 가 만드는 모양과 같다).
+    */
+    if (path === '/auth/signup/email-code') return { sent: true }
+    if (path === '/auth/signup/email-code/confirm') {
+      if (body?.code !== '123456') {
+        throw mockError({
+          code: 'INVALID_EMAIL_CODE',
+          message: '인증번호가 올바르지 않습니다.',
+          details: { code: ['인증번호가 올바르지 않습니다. (데모: 123456)'] },
+        })
+      }
+      return { verified: true }
+    }
+    if (path === '/auth/signup/invite-code/verify') {
+      if (!/^BRD-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(body?.code ?? '')) {
+        throw mockError({
+          code: 'INVALID_INVITE_CODE',
+          message: '유효하지 않은 초대 코드입니다.',
+          details: { code: ['유효하지 않은 초대 코드입니다. (데모: BRD- 뒤에 4자리-4자리)'] },
+        })
+      }
+      return { valid: true, team_name: TEAM.name }
+    }
     if (a === 'chat' && s[3] === 'read') {
       patch(`room-read:${c}`, { read: true })
       return null

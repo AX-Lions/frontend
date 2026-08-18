@@ -241,6 +241,32 @@ export async function signup(payload) {
   return body
 }
 
+/*
+  이메일 인증 · 팀 초대 코드 확인(회원가입, 시안 `707:6492`).
+
+  **아직 백엔드에 없는 주소다.** 지금 가입은 이메일·비밀번호·이름만 받고
+  인증 절차가 없고, 초대 코드는 가입 뒤 `POST /teams/join` 으로만 받는다
+  (`home.api.js` 의 `joinTeam`). 시안은 가입 화면 안에서 이메일을 인증하고
+  초대 코드까지 확인하는 것을 전제로 하므로, 화면이 계약을 먼저 정한다
+  (`CLAUDE.md`) — 백엔드가 이 셋을 받으면 그 순간부터 실제로 동작한다.
+  그 전까지는 가상 데이터 모드에서만 확인할 수 있다.
+*/
+export function sendSignupEmailCode(email) {
+  return request('/auth/signup/email-code', { method: 'POST', auth: false, body: { email } })
+}
+
+export function confirmSignupEmailCode(email, code) {
+  return request('/auth/signup/email-code/confirm', {
+    method: 'POST', auth: false, body: { email, code },
+  })
+}
+
+export function verifyInviteCode(code) {
+  return request('/auth/signup/invite-code/verify', {
+    method: 'POST', auth: false, body: { code },
+  })
+}
+
 export async function logout() {
   try {
     await request('/auth/logout', {
