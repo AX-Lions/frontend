@@ -1,0 +1,335 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import {
+  createConversation,
+  fetchConversationMessages,
+  fetchConversations,
+  sendAgentMessage,
+} from './home.api.js'
+
+/**
+ * 홈 하단의 대리인 대화.
+ *
+ * 입력창·전송·추가·필터가 전부 핸들러 없는 껍데기였다. 눌러도 아무 일이
+ * 없으니 "고장난 화면" 으로 읽힌다.
+ *
+ * ## 왜 답이 바로 안 오는가를 화면에 드러낸다
+ *
+ * `POST /me/agent/conversations/{id}/messages` 는 **202** 로 답한다. 서버는
+ * 메시지를 적어 두기만 하고 대리인의 답은 워커가 나중에 만든다
+ * (`run.status: "RECEIVED"`). 그래서 보통의 채팅처럼 "보냈다 → 곧 답" 이
+ * 아니다.
+ *
+ * 이걸 감추면 사용자는 답이 안 오는 것을 **자기 메시지가 안 갔다**고 읽고
+ * 같은 말을 여러 번 보낸다. 그래서 두 가지를 나눠 보여준다.
+ *
+ *     보냈다          내 말풍선이 목록에 남는다
+ *     기다리는 중     대리인 자리에 `답을 준비하고 있습니다` 가 뜬다
+ *
+ * ## 답을 어떻게 받아 오나
+ *
+ * 실시간 채널(`/ws`)이 아직 이 대화에 붙어 있지 않다. 그래서 보낸 뒤 잠깐
+ * 동안만 목록을 다시 읽어 본다. 계속 도는 폴링을 두지 않는 이유는, 답이
+ * 영영 안 올 수도 있는데(워커가 아직 없다) 그 사이 홈이 계속 요청을 쏘면
+ * 서버 로그가 이 화면 하나로 덮이기 때문이다. 정해진 횟수만 보고 멈추면서
+ * **왜 멈췄는지 화면에 남긴다.**
+ */
+
+const icons = {
+  add: '/chat-icons/add-round.svg',
+  list: '/chat-icons/menu.svg',
+  send: '/chat-icons/send-hor.svg',
+}
+
+/** 답을 기다리며 다시 읽어 보는 간격과 횟수. */
+const POLL_MS = 3000
+const POLL_TRIES = 10
+
+export function AgentDock() {
+  const [open, setOpen] = useState(false)
+  const [showList, setShowList] = useState(false)
+  const [conversations, setConversations] = useState([])
+  const [conversationId, setConversationId] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [draft, setDraft] = useState('')
+  const [sending, setSending] = useState(false)
+  const [waiting, setWaiting] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const streamRef = useRef(null)
+
+  // 열려 있을 때만 목록을 읽는다. 홈에 들어오자마자 부르면 첫 화면 요청이
+  // 하나 더 늘어나는데, dock 을 열지 않는 사람이 더 많다.
+  useEffect(() => {
+    if (!open) {
+      return undefined
+    }
+
+    const controller = new AbortController()
+    let alive = true
+
+    fetchConversations(controller.signal)
+      .then((body) => {
+        if (!alive) {
+          return
+        }
+        const rows = body?.results ?? []
+        setConversations(rows)
+        // 마지막으로 하던 대화를 이어서 연다. 매번 새 대화로 시작하면
+        // 어제 물어본 것을 다시 찾을 방법이 없다.
+        setConversationId((current) => current ?? rows[0]?.id ?? null)
+      })
+      .catch((err) => {
+        if (alive && err?.name !== 'AbortError') {
+          setError(err?.message || '대화 목록을 불러오지 못했습니다.')
+        }
+      })
+
+    return () => {
+      alive = false
+      controller.abort()
+    }
+  }, [open])
+
+  // 고른 대화의 메시지.
+  //
+  // 여기서 목록을 비우지 않는다. 대화를 바꾸거나 새로 시작하는 자리에서
+  // 이미 비우고 있고, effect 안에서 setState 를 부르면 렌더가 한 번 더 돈다.
+  useEffect(() => {
+    if (!open || !conversationId) {
+      return undefined
+    }
+
+    const controller = new AbortController()
+    let alive = true
+
+    fetchConversationMessages(conversationId, controller.signal)
+      .then((body) => {
+        if (alive) {
+          setMessages(body?.results ?? [])
+        }
+      })
+      .catch((err) => {
+        if (alive && err?.name !== 'AbortError') {
+          setError(err?.message || '대화를 불러오지 못했습니다.')
+        }
+      })
+
+    return () => {
+      alive = false
+      controller.abort()
+    }
+  }, [open, conversationId])
+
+  const stopWaiting = useCallback(() => {
+    window.clearInterval(streamRef.current)
+    streamRef.current = null
+  }, [])
+
+  // 화면을 떠날 때 기다리던 것을 멈춘다. 안 멈추면 사라진 컴포넌트가 계속
+  // 서버를 부른다.
+  useEffect(() => stopWaiting, [stopWaiting])
+
+  /**
+   * 답이 왔는지 정해진 횟수만 확인한다.
+   *
+   * 마지막 메시지가 내 것이 아니게 되면 답이 온 것이다. 개수로 세지 않는
+   * 이유는, 대리인이 두 개를 이어서 남기거나 내가 하나 더 보내는 경우
+   * 개수만으로는 무엇이 늘었는지 알 수 없기 때문이다.
+   */
+  const waitForReply = useCallback((id) => {
+    stopWaiting()
+    let left = POLL_TRIES
+
+    streamRef.current = window.setInterval(async () => {
+      left -= 1
+
+      try {
+        const body = await fetchConversationMessages(id)
+        const rows = body?.results ?? []
+        setMessages(rows)
+
+        const last = rows[rows.length - 1]
+        if (last && last.role?.toLowerCase() !== 'user') {
+          stopWaiting()
+          setWaiting(false)
+          setNotice('')
+          return
+        }
+      } catch {
+        // 한 번 실패해도 답 자체가 없어진 것은 아니다. 남은 횟수로 계속 본다.
+      }
+
+      if (left <= 0) {
+        stopWaiting()
+        setWaiting(false)
+        // 실패가 아니다. 아직 안 왔을 뿐이라는 것을 그대로 말한다.
+        setNotice('대리인이 아직 답하지 않았습니다. 잠시 뒤 다시 열어 보십시오.')
+      }
+    }, POLL_MS)
+  }, [stopWaiting])
+
+  const send = async () => {
+    const body = draft.trim()
+    if (!body || sending) {
+      return
+    }
+
+    setSending(true)
+    setError('')
+    setNotice('')
+
+    try {
+      let id = conversationId
+      if (!id) {
+        // 첫 질문이면 대화부터 만든다. 제목은 서버가 첫 메시지로 잡아 준다.
+        const conversation = await createConversation()
+        id = conversation.id
+        setConversationId(id)
+        setConversations((current) => [conversation, ...current])
+      }
+
+      const saved = await sendAgentMessage(id, body)
+      setDraft('')
+      // 서버가 돌려준 것을 그대로 붙인다. 화면이 만든 임시 메시지를 붙이면
+      // 다시 읽을 때 같은 말이 두 번 보인다.
+      setMessages((current) => [...current, saved])
+      setWaiting(true)
+      waitForReply(id)
+    } catch (err) {
+      setError(err?.message || '보내지 못했습니다.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const startNew = () => {
+    stopWaiting()
+    setConversationId(null)
+    setMessages([])
+    setWaiting(false)
+    setNotice('')
+    setError('')
+    setShowList(false)
+  }
+
+  const pick = (id) => {
+    stopWaiting()
+    // 새 대화의 메시지가 도착하기 전까지 이전 대화가 남아 있으면, 잠깐이지만
+    // **다른 대화 내용이 이 대화인 것처럼** 보인다.
+    setMessages([])
+    setConversationId(id)
+    setWaiting(false)
+    setNotice('')
+    setShowList(false)
+  }
+
+  return (
+    <div className={open ? 'chat-dock is-open' : 'chat-dock'} role="group" aria-label="Bordo 채팅">
+      {open ? (
+        <div className="dock-panel">
+          <div className="dock-panel-head">
+            <strong>{showList ? '대화 목록' : 'Bordo 에게 물어보기'}</strong>
+            <button type="button" aria-label="접기" onClick={() => setOpen(false)}>×</button>
+          </div>
+
+          {showList ? (
+            <div className="dock-list">
+              {conversations.length === 0 ? (
+                <p className="dock-empty">아직 나눈 대화가 없습니다.</p>
+              ) : conversations.map((conversation) => (
+                <button
+                  className={conversation.id === conversationId ? 'dock-list-row on' : 'dock-list-row'}
+                  key={conversation.id}
+                  type="button"
+                  onClick={() => pick(conversation.id)}
+                >
+                  <strong>{conversation.title}</strong>
+                  <span>{conversation.last_message_preview || '아직 주고받은 말이 없습니다.'}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="dock-thread">
+              {messages.length === 0 && !waiting ? (
+                <p className="dock-empty">
+                  자리를 비운 사이에 무슨 일이 있었는지 물어보십시오.
+                </p>
+              ) : null}
+
+              {messages.map((message) => (
+                <p
+                  className={message.role?.toLowerCase() === 'user' ? 'dock-line mine' : 'dock-line'}
+                  key={message.id}
+                >
+                  {message.body}
+                </p>
+              ))}
+
+              {/* 큐에 들어갔다는 것을 자리로 보여준다. 답이 늦는 이유가
+                  화면 밖에 있으면 사용자는 자기 메시지를 의심한다. */}
+              {waiting ? (
+                <p className="dock-line dock-waiting" role="status" aria-live="polite">
+                  대리인이 답을 준비하고 있습니다…
+                </p>
+              ) : null}
+
+              {notice ? <p className="dock-notice">{notice}</p> : null}
+              {error ? <p className="dock-error" role="alert">{error}</p> : null}
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      <div className="dock-bar">
+        <div className="chat-tools">
+          <button type="button" aria-label="새 대화" title="새 대화" onClick={startNew}>
+            <img src={icons.add} alt="" />
+          </button>
+          <button
+            type="button"
+            aria-label="대화 목록"
+            title="대화 목록"
+            aria-expanded={open && showList}
+            onClick={() => {
+              setOpen(true)
+              setShowList((current) => !(open && current))
+            }}
+          >
+            <img src={icons.list} alt="" />
+          </button>
+        </div>
+
+        <input
+          className="chat-input"
+          type="text"
+          value={draft}
+          aria-label="Bordo에게 물어보기"
+          placeholder="Bordo에게 물어보세요..."
+          disabled={sending}
+          onFocus={() => { setOpen(true); setShowList(false) }}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            // 줄바꿈이 필요한 입력이 아니다. Enter 로 보내고 조합 중인
+            // 한글은 건드리지 않는다 — `isComposing` 을 안 보면 받침을
+            // 치는 도중에 메시지가 나간다.
+            if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+              event.preventDefault()
+              send()
+            }
+          }}
+        />
+
+        <button
+          className="chat-send"
+          type="button"
+          aria-label="전송"
+          disabled={sending || !draft.trim()}
+          onClick={send}
+        >
+          <img src={icons.send} alt="" />
+        </button>
+      </div>
+    </div>
+  )
+}

@@ -58,3 +58,35 @@ a {
   outline: 2px solid #1683ff;
   outline-offset: 2px;
 }
+/*
+ * 브라우저 확대·축소에 따라오기
+ *
+ * 사이드바가 `flex: 0 0 <px>` 라 **절대 안 줄어든다.** 확대하면 CSS 픽셀 기준
+ * 창이 좁아지는데 좌우 사이드바가 그대로라, 가운데 판이 0 으로 찌그러지고
+ * 내용이 겹친다.
+ *
+ * `flex-shrink` 를 풀되 `min-width` 로 바닥을 준다. 아이콘 레일은 아이콘이
+ * 안 보일 만큼 줄면 뜻이 없으므로 바닥을 두고, 그 아래로는 스크롤에 맡긴다.
+ */
+.global-sidebar {
+  flex-shrink: 1;
+  min-width: 56px;
+}
+
+.flow-sidebar:not(.is-collapsed) {
+  flex-shrink: 1;
+  min-width: 180px;
+}
+
+.chat-list-panel {
+  flex-shrink: 1;
+  min-width: 240px;
+}
+
+/* 좁아지면 가로 스크롤로 넘긴다. 겹쳐 보이는 것보다 낫다 —
+   겹치면 무엇이 가려졌는지 알 수 없지만, 스크롤은 있다는 것이 보인다. */
+.flow-board-page,
+.chat-page,
+.home-layout {
+  overflow-x: auto;
+}

@@ -1,10 +1,23 @@
 <!doctype html>
-<html lang="en">
+<!--
+  `lang` 은 장식이 아니다. 화면 글이 전부 한국어인데 `en` 으로 두면 스크린
+  리더가 영어 발음 규칙으로 읽어 알아들을 수 없고, 브라우저가 번역을 권한다.
+-->
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>my-app</title>
+    <!--
+      Vite 기본값 `my-app` 이 그대로 남아 있었다. 제목은 탭·북마크·창 전환기·
+      브라우저 기록에 전부 쓰이므로, 탭 여럿 띄워 놓고 쓰는 화면에서는
+      어느 탭이 우리인지 구별할 유일한 단서다.
+    -->
+    <title>Bordo</title>
+    <meta
+      name="description"
+      content="참석하지 못한 회의를 AI 대리인이 대신 참여하고, 그동안 무슨 일이 있었는지 한눈에 보여 줍니다."
+    />
   </head>
   <body>
     <div id="root"></div>

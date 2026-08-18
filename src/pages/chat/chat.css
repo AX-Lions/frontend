@@ -3,7 +3,27 @@
   box-sizing: border-box;
 }
 
+/*
+  글자 크기는 넷이 아니라 셋이다.
+  ─────────────────────────────
+  고치기 전에는 본문이 12 · 13 · 14 · 16px 네 종류였다. 가장 나빴던 것은
+  **내 말풍선 12px, 상대 말풍선 16px** 이라 같은 대화의 두 줄이 서로 다른
+  크기로 보인 것이다. 상대 말풍선은 아무도 크기를 정해 준 적이 없어서 브라우저
+  기본값 16px 을 그대로 받고 있었다.
+
+  그래서 `.chat-page` 자체에 본문 크기를 못 박는다. 규칙을 빠뜨린 요소가
+  브라우저 기본값으로 튀지 않게 하는 것이 이 한 줄의 목적이다.
+
+    제목 16 · 본문 14 · 보조 12
+
+  화면 이름(h1)만 24 로 하나 더 둔다. 그 외에 이 셋을 벗어나는 값은 글이 아니라
+  **표시**인 것뿐이고, 각 자리에 왜 예외인지 적어 뒀다.
+*/
 .chat-page {
+  --chat-fs-page: 24px;
+  --chat-fs-title: 16px;
+  --chat-fs-body: 14px;
+  --chat-fs-meta: 12px;
   --chat-ink: #1f1f1f;
   --chat-muted: #60646c;
   --chat-subtle: #92969d;
@@ -20,29 +40,27 @@
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  grid-template-columns: 64px 485px minmax(0, 1fr);
+  /* 목록 칸을 `485px` 로 못 박으면 창이 좁아지거나 확대해도 안 줄어든다.
+     그 안의 팀 머리글이 밀려 **접기 화살표가 패널 밖으로 나가** 팀을 접을 수
+     없었다. 최대는 지키되 줄어들 수 있게 둔다. */
+  grid-template-columns: 64px minmax(280px, 485px) minmax(0, 1fr);
   overflow: hidden;
   background: #ffffff;
   color: var(--chat-ink);
+  font-size: var(--chat-fs-body);
+}
+
+/* 전체 화면. 목록과 전역 메뉴를 아예 안 그리므로 칸도 하나만 남긴다. */
+.chat-page.fullscreen {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .chat-page button,
-.chat-page input {
+.chat-page input,
+.chat-page textarea {
   font: inherit;
 }
 
-.chat-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 32px;
-  padding: 32px 0;
-  background: var(--chat-soft);
-  border-right: 1px solid var(--chat-line);
-}
-
-.chat-rail-link,
-.chat-rail-user,
 .chat-icon-button {
   display: inline-flex;
   align-items: center;
@@ -56,40 +74,17 @@
     transform 120ms ease;
 }
 
-.chat-rail-link,
-.chat-rail-user {
-  width: 40px;
-  height: 40px;
-}
-
-.chat-rail-link:hover,
 .chat-icon-button:hover,
 .chat-composer button:hover,
 .back-button:hover {
   background: var(--chat-white-hover);
 }
 
-.chat-rail-link:active,
-.chat-rail-link.active,
 .chat-icon-button:active,
 .chat-icon-button.active,
 .chat-composer button:active,
 .back-button:active {
   background: var(--chat-white-active);
-}
-
-.chat-rail-link.active {
-  background: var(--chat-sidebar-selected);
-}
-
-.chat-rail-link img {
-  width: 24px;
-  height: 24px;
-}
-
-.chat-rail-user {
-  margin-top: auto;
-  background: #ffffff;
 }
 
 .chat-list-panel {
@@ -114,7 +109,7 @@
 
 .chat-list-header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--chat-fs-page);
   font-weight: 700;
   line-height: 1;
 }
@@ -164,18 +159,6 @@
   object-fit: contain;
 }
 
-.spark-icon {
-  color: #ff8b1f;
-  font-size: 20px;
-  line-height: 1;
-}
-
-.gear-icon {
-  color: var(--chat-muted);
-  font-size: 21px;
-  line-height: 1;
-}
-
 .chat-tip {
   position: absolute;
   top: 71px;
@@ -192,7 +175,7 @@
   border: 1px dashed var(--chat-line);
   border-radius: 999px;
   background: #ffffff;
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   line-height: 1.2;
   text-align: center;
   white-space: nowrap;
@@ -202,7 +185,7 @@
   width: 14px;
   height: 14px;
   color: var(--chat-subtle);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   line-height: 1;
   border-radius: 999px;
 }
@@ -239,14 +222,14 @@
 
 .my-bordo-card:hover,
 .chat-preview:hover,
-.team-chat-header:hover,
+.team-name:hover,
 .project-title:hover {
   background: var(--chat-sidebar-hover);
 }
 
 .my-bordo-card:active,
 .chat-preview:active,
-.team-chat-header:active,
+.team-name:active,
 .project-title:active {
   background: var(--chat-sidebar-selected);
 }
@@ -259,14 +242,12 @@
 }
 
 .my-bordo-card.selected,
-.chat-preview.selected,
-.chat-preview.active {
+.chat-preview.selected {
   background: var(--chat-sidebar-selected);
 }
 
 .my-bordo-card.selected:hover,
-.chat-preview.selected:hover,
-.chat-preview.active:hover {
+.chat-preview.selected:hover {
   background: var(--chat-sidebar-selected);
 }
 
@@ -275,21 +256,21 @@
   align-items: center;
   gap: 4px;
   margin: 0 0 12px;
-  font-size: 20px;
+  font-size: var(--chat-fs-title);
   font-weight: 700;
 }
 
 .my-bordo-card p,
 .chat-preview p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--chat-fs-body);
   line-height: 1.2;
 }
 
 .my-bordo-card time,
 .chat-preview time {
   color: var(--chat-subtle);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
 }
 
 .chat-list-section,
@@ -330,16 +311,30 @@
 .section-heading h2,
 .team-chat-header strong {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--chat-fs-title);
   font-weight: 700;
   line-height: 1;
 }
 
 .section-heading h2,
-.team-name {
+.team-name,
+.project-name {
   display: inline-flex;
+  min-width: 0;
   align-items: center;
   gap: 4px;
+}
+
+.team-name strong,
+.project-name strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* `overflow: hidden` 은 세로도 자른다. 줄 높이가 글꼴보다 낮으면 한글의
+     받침과 윗선이 잘려 나간다 — 실측 19px 글자가 16px 상자에 들어가 있었다.
+     한 줄이므로 줄 높이를 넉넉히 잡고 세로로는 자르지 않는다. */
+  line-height: 1.4;
+  padding-block: 1px;
 }
 
 .section-heading img,
@@ -417,6 +412,22 @@
   object-fit: cover;
 }
 
+/* 아무도 아바타를 안 올린 방. 깨진 이미지 아이콘 대신 빈 원 하나를 둔다. */
+.avatar-stack.empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--chat-white-hover);
+}
+
+.avatar-stack.empty img {
+  width: 24px;
+  height: 24px;
+  border-radius: 0;
+  opacity: 0.5;
+}
+
 .chat-preview-copy {
   min-width: 0;
   flex: 1 1 auto;
@@ -433,7 +444,7 @@
 
 .chat-preview-title strong {
   overflow: hidden;
-  font-size: 14px;
+  font-size: var(--chat-fs-body);
   flex: 0 1 auto;
   font-weight: 700;
   min-width: 0;
@@ -444,7 +455,7 @@
 .chat-preview-title span {
   overflow: hidden;
   color: var(--chat-muted);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -466,62 +477,111 @@
   justify-content: space-between;
 }
 
-.chat-preview-meta span {
-  display: inline-flex;
-  width: 20px;
-  height: 20px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: #ff6450;
-  color: #ffffff;
-  font-size: 12px;
-}
 
 .team-chat-group {
   display: grid;
+  /* 트랙을 `auto` 로 두면 **내용 크기로 커진다.** 안쪽 머리글이
+     `width: 100%` 라 서로를 키워, 실측 465px 짜리 줄이 383px 칸에서 넘쳤고
+     `overflow-x: hidden` 이라 접기 화살표에 닿을 수 없었다.
+     `minmax(0, 1fr)` 은 칸을 넘지 않게 못 박는다. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
-.team-chat-header,
-.project-title {
+/* 줄 자체는 더 이상 버튼이 아니다. 접기 버튼과 `모두 채팅 바로가기` 버튼이
+   나란히 들어가야 하는데, 버튼 안에 버튼을 넣을 수 없다. */
+.team-chat-header {
   width: 100%;
+  min-height: 44px;
+  gap: 8px;
+}
+
+.team-name,
+.project-title {
+  min-width: 0;
   height: 44px;
   padding: 10px 12px;
   border-radius: 8px;
   text-align: left;
 }
 
-.team-chat-header.nested,
+.team-name {
+  flex: 1 1 auto;
+}
+
 .project-title {
-  height: 44px;
+  width: 100%;
 }
 
 .team-actions {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+}
+
+.chevron-button {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.chevron-button:hover {
+  background: var(--chat-white-hover);
 }
 
 .team-shortcut {
   display: inline-flex;
-  width: 137px;
   height: 24px;
   align-items: center;
   justify-content: center;
   padding: 5px 12px;
   border-radius: 999px;
   background: #eeeef0;
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   font-weight: 400;
   line-height: 1;
   white-space: nowrap;
 }
 
-.team-chat-header:hover .team-shortcut,
-.project-title:hover + .project-chat-list .team-shortcut {
+button.team-shortcut:hover {
   background: #e7e7ea;
+}
+
+button.team-shortcut:active {
+  background: var(--chat-sidebar-selected);
+}
+
+/* 단체방이 없는 팀. 자리를 비우면 왜 바로가기가 없는지 알 수 없다. */
+.team-shortcut.disabled {
+  background: transparent;
+  color: var(--chat-subtle);
+}
+
+/*
+  미읽음 뱃지.
+
+  팀·프로젝트 합계는 세 자리가 쉽게 나와서 폭을 고정하지 않는다. 대신 최소
+  폭을 원 크기로 잡아 한 자리도 동그랗게 보이게 한다.
+*/
+.unread-badge {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #ff6450;
+  color: #ffffff;
+  font-size: var(--chat-fs-meta);
+  font-weight: 400;
+  line-height: 1;
 }
 
 .chevron {
@@ -532,32 +592,34 @@
   transform: rotate(180deg);
 }
 
+/* 트랙이 `auto` 면 **내용 크기로 커진다.** 안쪽 줄이 `width: 100%` 라 서로를
+   키워, 목록이 패널 밖으로 나가도 `overflow-x: hidden` 이라 닿을 수 없다.
+   `minmax(0, 1fr)` 로 칸을 넘지 않게 못 박는다. */
 .nested-team {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   padding-left: 8px;
 }
 
 .project-team {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
+/* 프로젝트는 팀 아래 한 단계 안이지만 같은 `제목` 이다. 층마다 크기를 한
+   단계씩 줄이면 세 번째 층에서 본문보다 작아진다. 층은 들여쓰기로 나타낸다. */
 .project-title strong {
-  font-size: 16px;
+  font-size: var(--chat-fs-title);
   font-weight: 700;
 }
 
 .project-chat-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   padding-left: 8px;
-}
-
-.other-team-list {
-  display: grid;
-  gap: 24px;
-  padding-top: 20px;
 }
 
 .chat-room {
@@ -598,13 +660,13 @@
 }
 
 .chat-room-title strong {
-  font-size: 20px;
+  font-size: var(--chat-fs-title);
   font-weight: 700;
 }
 
 .chat-room-title span {
   color: var(--chat-muted);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
 }
 
 .chat-room-actions {
@@ -624,8 +686,20 @@
   scrollbar-width: none;
 }
 
+/*
+  말풍선 폭은 고정이 아니라 내용이 정한다.
+  ──────────────────────────────────────
+  고치기 전에는 `width: 214px` 이 박혀 있었다. 한 글자를 보내도 214px 짜리
+  상자가 나오고, 두 문장을 보내면 그 상자 안에서 다섯 줄로 접혔다. 게다가
+  `padding` 이 0 이라 **글자가 모서리에 붙었다.**
+
+  폭을 창 기준 비율로 두는 이유는, 채팅 영역이 목록 패널 유무·전체 화면에 따라
+  넓이가 크게 달라지기 때문이다. px 로 두면 넓은 화면에서는 한가운데 가느다란
+  띠가 되고 좁은 화면에서는 넘친다.
+*/
 .message-row {
   display: flex;
+  max-width: 76%;
   gap: 8px;
 }
 
@@ -635,57 +709,57 @@
 
 .message-row.bot > div {
   display: grid;
-  gap: 8px;
-  width: 320px;
+  min-width: 0;
+  gap: 4px;
 }
 
 .message-row.bot strong {
-  font-size: 14px;
+  font-size: var(--chat-fs-body);
   font-weight: 400;
 }
 
 .message-row.bot span {
   display: flex;
+  min-width: 0;
   align-items: flex-end;
   gap: 8px;
 }
 
 .message-row.me {
+  align-self: flex-end;
   align-items: flex-end;
   justify-content: flex-end;
 }
 
 .message-row time {
   color: var(--chat-subtle);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
 }
 
 .message-bubble {
   display: block;
-  width: 214px;
-  min-height: 63px;
+  width: fit-content;
+  max-width: 100%;
   margin: 0;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  line-height: 1.5;
+  /* 보낸 사람이 넣은 줄바꿈을 지우지 않는다. 서버는 본문을 그대로 저장하는데
+     화면이 `pre-wrap` 을 안 주면 여러 줄이 한 줄로 뭉쳐 보인다. */
+  white-space: pre-wrap;
+  /* 띄어쓰기 없는 긴 URL 한 줄이 말풍선을 뚫고 나가는 것을 막는다. */
+  overflow-wrap: anywhere;
 }
 
 .message-bubble.gray {
   background: var(--chat-white-hover);
 }
 
+/* 여기가 가장 나빴다. 내 말풍선만 12px 이라 상대 말풍선(크기 지정이 없어
+   브라우저 기본값 16px)과 나란히 놓이면 같은 대화의 두 줄이 다른 글이었다.
+   말풍선은 색만 다르고 글은 같은 본문이다. */
 .message-bubble.orange {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background: var(--chat-orange);
-  font-size: 12px;
-  text-align: center;
-}
-
-.message-bubble.large {
-  width: 324px;
-  min-height: 146px;
-  align-items: flex-start;
-  padding-top: 25px;
 }
 
 .date-divider {
@@ -699,7 +773,7 @@
   padding: 4px 24px;
   border-radius: 999px;
   background: var(--chat-white-hover);
-  font-size: 12px;
+  font-size: var(--chat-fs-meta);
   transition:
     background 120ms ease,
     transform 120ms ease;
@@ -714,10 +788,6 @@
 }
 
 .chat-composer {
-  position: absolute;
-  right: 32px;
-  bottom: 30px;
-  left: 36px;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -761,7 +831,7 @@
   border: 0;
   outline: 0;
   color: var(--chat-ink);
-  font-size: 13px;
+  font-size: var(--chat-fs-body);
 }
 
 .chat-composer input::placeholder {
@@ -792,14 +862,6 @@
   background: #001b47;
 }
 
-.chat-composer .ai-call {
-  color: var(--chat-muted);
-}
-
-.chat-composer .ai-call:hover {
-  color: var(--chat-point);
-}
-
 .chat-composer:focus-within {
   border-color: var(--chat-point);
   box-shadow: 0 0 0 1px var(--chat-point);
@@ -810,13 +872,18 @@
   box-sizing: border-box;
 }
 
+/* 채팅과 같은 위계를 쓴다. 두 화면이 톱니 하나로 이어져 있어서, 크기 규칙이
+   갈리면 넘어가는 순간 글이 커졌다 작아졌다 한다. */
 .settings-page {
+  --settings-fs-page: 24px;
+  --settings-fs-title: 16px;
+  --settings-fs-body: 14px;
+  --settings-fs-meta: 12px;
   --settings-ink: #1f1f1f;
   --settings-muted: #60646c;
   --settings-disabled: #b8bbc0;
   --settings-line: #e5e7eb;
   --settings-panel: #f7f7f8;
-  --settings-rail: #f0f1f3;
   --settings-soft: #fafafb;
   --settings-point: #ff9d42;
   --settings-active: #002662;
@@ -825,13 +892,18 @@
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  grid-template-columns: 64px 485px minmax(0, 1fr);
+  /* 목록 칸을 `485px` 로 못 박으면 창이 좁아지거나 확대해도 안 줄어든다.
+     그 안의 팀 머리글이 밀려 **접기 화살표가 패널 밖으로 나가** 팀을 접을 수
+     없었다. 최대는 지키되 줄어들 수 있게 둔다. */
+  grid-template-columns: 64px minmax(280px, 485px) minmax(0, 1fr);
   overflow: hidden;
   background: #ffffff;
   color: var(--settings-ink);
+  font-size: var(--settings-fs-body);
 }
 
 .settings-page button,
+.settings-page input,
 .settings-page textarea {
   font: inherit;
 }
@@ -841,33 +913,6 @@
   background: transparent;
   color: inherit;
   cursor: pointer;
-}
-
-.settings-rail {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 27px 0 16px;
-  background: var(--settings-rail);
-}
-
-.settings-rail-links {
-  display: flex;
-  width: 100%;
-  flex-direction: column;
-  gap: 32px;
-  align-items: flex-end;
-}
-
-.settings-rail .chat-rail-link {
-  width: 52px;
-  height: 40px;
-  border-radius: 8px 0 0 8px;
-}
-
-.settings-rail .chat-rail-link.active {
-  background: var(--settings-panel);
 }
 
 .settings-panel {
@@ -902,7 +947,7 @@
   border: 1px solid var(--settings-line);
   border-radius: 8px;
   background: #ffffff;
-  font-size: 12px;
+  font-size: var(--settings-fs-meta);
   line-height: 1;
   box-shadow: 0 8px 24px rgb(0 0 0 / 6%);
 }
@@ -922,7 +967,7 @@
 
 .settings-header h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: var(--settings-fs-page);
   font-weight: 700;
   line-height: 1;
 }
@@ -951,7 +996,7 @@
 
 .settings-section h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--settings-fs-title);
   font-weight: 700;
   line-height: 1;
 }
@@ -972,7 +1017,7 @@
 .settings-row strong {
   display: block;
   margin-bottom: 4px;
-  font-size: 16px;
+  font-size: var(--settings-fs-title);
   font-weight: 700;
   line-height: 1;
 }
@@ -980,8 +1025,8 @@
 .settings-row p {
   margin: 0;
   color: var(--settings-muted);
-  font-size: 13px;
-  line-height: 1.2;
+  font-size: var(--settings-fs-meta);
+  line-height: 1.35;
 }
 
 .settings-switch {
@@ -1040,6 +1085,9 @@
   background: #00c79a;
 }
 
+/* 위계에서 벗어난 유일한 자리다. 24px 짜리 스위치 안에 `OFF` 세 글자가
+   들어가야 해서 보조(12px)로는 손잡이를 밀어낸다. 이건 읽는 글이 아니라
+   스위치 상태 표시라, 본문 위계에 넣지 않고 여기서만 정한다. */
 .settings-switch-label {
   position: absolute;
   top: 50%;
@@ -1091,7 +1139,7 @@
   background: transparent;
   color: var(--settings-ink);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--settings-fs-body);
   line-height: 1.35;
 }
 
@@ -1106,6 +1154,8 @@
   border-radius: 999px;
   background: var(--settings-soft);
   color: var(--settings-disabled);
+  /* `↳` 는 글이 아니라 아이콘 대용이다. 다른 아이콘 버튼(24px 박스 안 16~18px)
+     과 크기를 맞추는 값이지 본문 위계가 아니다. */
   font-size: 16px;
   line-height: 1;
   transition:
@@ -1173,15 +1223,55 @@
   box-shadow: inset 0 0 0 1px #ff9d42;
 }
 
-.prompt-card.tall {
-  min-height: 190px;
+/* 수정 중인 카드. 읽을 때와 자리가 크게 달라지면 어느 카드를 고치는 중인지
+   놓친다. 테두리 색만 바꾼다. */
+.prompt-card.editing {
+  border-color: var(--settings-active);
+  grid-template-columns: minmax(0, 1fr);
+  padding: 12px;
+  cursor: default;
+}
+
+.prompt-card.editing textarea {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--settings-line);
+  border-radius: 8px;
+  outline: 0;
+  background: #ffffff;
+  color: var(--settings-ink);
+  font-size: var(--settings-fs-body);
+  line-height: 1.35;
+}
+
+.prompt-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.prompt-card-actions button {
+  width: auto;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--settings-muted);
+  font-size: var(--settings-fs-meta);
+}
+
+.prompt-card-actions button[type='submit'] {
+  background: var(--settings-point);
+  color: #ffffff;
 }
 
 .prompt-card p {
   margin: 0;
   padding-top: 5px;
   color: var(--settings-ink);
-  font-size: 12px;
+  font-size: var(--settings-fs-body);
   line-height: 1.35;
 }
 
@@ -1191,6 +1281,7 @@
   border-radius: 999px;
   background: transparent;
   color: var(--settings-muted);
+  /* `⋮` 도 아이콘 대용이다. 위 `↳` 와 같은 이유로 위계 밖에 둔다. */
   font-size: 18px;
   line-height: 1;
 }
@@ -1218,7 +1309,7 @@
   height: 32px;
   border-radius: 0;
   color: var(--settings-ink);
-  font-size: 12px;
+  font-size: var(--settings-fs-body);
   text-align: center;
 }
 
@@ -1239,6 +1330,7 @@
   margin: 0;
   color: rgba(0, 38, 98, 0.1);
   font-family: Georgia, 'Times New Roman', serif;
+  /* 배경에 깔리는 워드마크. 읽는 글이 아니라 그림이라 위계 밖이다. */
   font-size: 64px;
   font-style: italic;
   font-weight: 700;
@@ -1258,5 +1350,998 @@
 
   .chat-room {
     padding-right: 20px;
+  }
+}
+
+/* 방이 없는 프로젝트, 중요 표시가 하나도 없는 경우. 자리를 비우면 목록이
+   덜 불러와진 것처럼 보인다. */
+.chat-list-empty {
+  margin: 0;
+  padding: 8px 16px;
+  color: #626262;
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-send-error {
+  margin: 0;
+  padding: 6px 16px;
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+/* ─────────────────────────────── 이전 대화 · 날짜 이동 */
+
+.chat-older {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.chat-older button {
+  height: 28px;
+  padding: 0 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-older button:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.chat-older p {
+  margin: 0;
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+/* "더 없음" 도 상태다. 아무것도 안 그리면 덜 불러온 것과 구분되지 않는다. */
+.chat-older-end {
+  margin: 0;
+  padding-bottom: 8px;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  text-align: center;
+}
+
+.chat-jump-banner {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: var(--chat-soft);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-jump-banner button {
+  color: var(--chat-point);
+  font-weight: 700;
+}
+
+/* ─────────────────────────────── 메시지에서 할 수 있는 일 */
+
+.message-side {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  white-space: nowrap;
+}
+
+.message-body {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.message-mark {
+  display: inline-flex;
+}
+
+.message-mark.confirmed {
+  opacity: 0.5;
+}
+
+.message-edited,
+.message-read {
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.message-error {
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+/*
+  동작 메뉴는 `⋮` 하나에 모은다. 중요 표시 · 확인 · 수정 · 삭제를 버튼으로
+  늘어놓으면 도구가 말풍선보다 커진다.
+
+  줄에 마우스를 올렸을 때만 보인다. 늘 보이면 대화가 아니라 표가 된다.
+*/
+.message-tools {
+  position: relative;
+  align-self: center;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.message-row:hover .message-tools,
+.message-tools:focus-within {
+  opacity: 1;
+}
+
+.message-tools-toggle {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  color: var(--chat-subtle);
+  line-height: 1;
+}
+
+.message-tools-toggle:hover {
+  background: var(--chat-white-hover);
+}
+
+.message-menu {
+  position: absolute;
+  top: 26px;
+  right: 0;
+  z-index: 4;
+  display: grid;
+  min-width: 88px;
+  overflow: hidden;
+  border: 1px solid var(--chat-line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+}
+
+.message-menu button {
+  height: 32px;
+  padding: 0 12px;
+  color: var(--chat-ink);
+  font-size: var(--chat-fs-meta);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.message-menu button:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.message-menu button.danger {
+  color: #ff2a2a;
+}
+
+.message-bubble.deleted {
+  background: transparent;
+  border: 1px dashed var(--chat-line);
+  color: var(--chat-subtle);
+}
+
+.message-edit {
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.message-edit textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--chat-point);
+  border-radius: 12px;
+  outline: 0;
+  color: var(--chat-ink);
+  line-height: 1.5;
+}
+
+.message-edit div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.message-edit button {
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--chat-soft);
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+}
+
+.message-edit button[type='submit'] {
+  background: var(--chat-point);
+  color: #ffffff;
+}
+
+/* 중요 채팅 줄. 미리보기 자체가 버튼이라 `확인` 을 그 안에 못 넣는다. */
+.important-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.important-confirm {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.important-confirm button {
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+  white-space: nowrap;
+}
+
+.important-confirm button:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.important-confirm span {
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+/* ─────────────────────────────── 첨부 · 입력창 */
+
+.message-files {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.message-files li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px dashed var(--chat-line);
+  border-radius: 12px;
+  font-size: var(--chat-fs-meta);
+}
+
+.message-files em {
+  color: var(--chat-subtle);
+  font-style: normal;
+}
+
+.chat-composer-wrap {
+  position: absolute;
+  right: 32px;
+  bottom: 30px;
+  left: 36px;
+  display: grid;
+  gap: 6px;
+}
+
+.composer-attachments {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 아직 안 보낸 첨부. 서버가 24시간 뒤 만료시키므로, 안 보이면 사용자는
+   파일이 사라진 줄 안다. */
+.composer-attachments li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: var(--chat-fs-meta);
+}
+
+.composer-attachments em {
+  color: var(--chat-subtle);
+  font-style: normal;
+}
+
+.composer-attachments button {
+  margin-left: auto;
+  color: var(--chat-subtle);
+}
+
+.composer-file {
+  display: none;
+}
+
+.composer-important.on {
+  background: var(--chat-orange);
+}
+
+.composer-important.on img {
+  filter: brightness(0) invert(1);
+}
+
+/* ─────────────────────────────── 그 날 요약 */
+
+.daily-summary {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 12px;
+  background: var(--chat-soft);
+}
+
+.daily-summary strong {
+  font-size: var(--chat-fs-meta);
+  color: var(--chat-subtle);
+  font-weight: 400;
+}
+
+.daily-summary p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* `요약 준비 중` 과 `요약할 게 없음` 을 같은 회색으로 두되 문구로 가른다.
+   둘 다 빈 화면이면 기능이 고장 난 것으로 읽힌다. */
+.daily-summary p.pending {
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.daily-summary ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: var(--chat-fs-meta);
+}
+
+/* ─────────────────────────────── 찾기 */
+
+.chat-list-search {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 0 24px 8px;
+}
+
+.chat-list-search input {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: #ffffff;
+  outline: 0;
+  color: var(--chat-ink);
+}
+
+.chat-list-search input:focus {
+  border-color: var(--chat-point);
+}
+
+.chat-list-search button {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--chat-subtle);
+}
+
+.chat-list-search button:hover {
+  background: var(--chat-white-hover);
+}
+
+/* 이게 서버 검색이 아니라는 것을 화면에 적는다. 안 적으면 "찾았는데 없다"가
+   "이 방은 없다"로 읽힌다. */
+.chat-list-search p {
+  width: 100%;
+  margin: 0;
+  padding-left: 12px;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-search-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-search-bar input {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  outline: 0;
+  color: var(--chat-ink);
+}
+
+.chat-search-bar input:focus {
+  border-color: var(--chat-point);
+}
+
+.chat-search-bar button {
+  height: 32px;
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--chat-soft);
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search-bar button:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.chat-search-bar button:disabled {
+  color: var(--chat-disabled);
+  cursor: default;
+}
+
+.chat-search-results {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  gap: 4px;
+  overflow-y: auto;
+  padding-bottom: 72px;
+  scrollbar-width: none;
+}
+
+.chat-search-count {
+  margin: 0;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search-hit {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.chat-search-hit:hover {
+  background: var(--chat-white-hover);
+}
+
+.chat-search-hit-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search-hit-meta strong {
+  color: var(--chat-ink);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-search-hit-body {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.4;
+}
+
+/* 검색 결과에서 찾아온 줄. 자리로 옮기기만 하면 어느 줄을 찾아온 것인지
+   알 수 없다. */
+.message-row.focused .message-bubble {
+  box-shadow: 0 0 0 2px var(--chat-point);
+}
+
+/* ─────────────────────────────── 겹쳐 뜨는 것 (달력 등) */
+
+.chat-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+}
+
+.chat-overlay-backdrop {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  background: rgb(0 0 0 / 24%);
+}
+
+.chat-calendar {
+  position: relative;
+  width: 300px;
+  padding: 16px;
+  border: 1px solid var(--chat-line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 12%);
+}
+
+.chat-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.chat-calendar-header strong {
+  font-size: var(--chat-fs-title);
+}
+
+.chat-calendar-header button {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--chat-muted);
+}
+
+.chat-calendar-header button:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.chat-calendar-header button:disabled {
+  color: var(--chat-disabled);
+  cursor: default;
+}
+
+.chat-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.chat-calendar-weekday {
+  padding: 4px 0;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  text-align: center;
+}
+
+/*
+  대화가 없는 날도 자리를 지킨다. 지우면 달력이 아니라 목록이 되어, 그 날이
+  몇 번째 주 무슨 요일인지 알 수 없다.
+*/
+.chat-calendar-day {
+  height: 32px;
+  border-radius: 8px;
+  color: var(--chat-disabled);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-calendar-day.has-chat {
+  color: var(--chat-ink);
+  font-weight: 700;
+}
+
+.chat-calendar-day.has-chat:hover {
+  background: var(--chat-white-hover);
+}
+
+.chat-calendar-day.selected {
+  background: var(--chat-point);
+  color: #ffffff;
+}
+
+.chat-calendar-day:disabled {
+  cursor: default;
+}
+
+.chat-calendar-note,
+.chat-calendar-footer {
+  margin: 12px 0 0;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  text-align: center;
+}
+
+.chat-calendar-footer button {
+  color: var(--chat-muted);
+}
+
+/* ─────────────────────────────── 방 메뉴 · 알림 · 채팅 설정 */
+
+.room-menu-wrap {
+  position: relative;
+}
+
+.room-menu {
+  position: absolute;
+  top: 36px;
+  right: 0;
+  z-index: 6;
+  display: grid;
+  min-width: 120px;
+  overflow: hidden;
+  border: 1px solid var(--chat-line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+}
+
+.room-menu button {
+  height: 34px;
+  padding: 0 12px;
+  color: var(--chat-ink);
+  font-size: var(--chat-fs-meta);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.room-menu button:hover {
+  background: var(--chat-white-hover);
+}
+
+/* 화면이 사라진 뒤에야 알 수 있는 것(나가기 결과 등)을 알린다. */
+.chat-page-notice {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 16px;
+  transform: translateX(-50%);
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: var(--chat-fs-meta);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 10%);
+}
+
+.chat-page-notice button {
+  color: var(--chat-subtle);
+}
+
+.chat-settings {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 32px 32px 30px;
+  background: #ffffff;
+}
+
+.chat-settings-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+}
+
+.chat-settings-header h1 {
+  margin: 0;
+  font-size: var(--chat-fs-page);
+}
+
+.chat-settings-header button {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--chat-soft);
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-header button:hover {
+  background: var(--chat-white-hover);
+}
+
+.chat-settings-scroll {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+}
+
+.chat-settings-section {
+  display: grid;
+  gap: 12px;
+  padding: 24px 0;
+  max-width: 560px;
+}
+
+.chat-settings-section + .chat-settings-section {
+  border-top: 1px solid var(--chat-line);
+}
+
+.chat-settings-section h2 {
+  margin: 0;
+  font-size: var(--chat-fs-title);
+}
+
+.chat-settings-info {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.chat-settings-info dt {
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-info dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-settings-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-settings-form input {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  outline: 0;
+  color: var(--chat-ink);
+}
+
+.chat-settings-form input:focus {
+  border-color: var(--chat-point);
+}
+
+.chat-settings-form button {
+  height: 34px;
+  flex: 0 0 auto;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--chat-point);
+  color: #ffffff;
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-form button:disabled {
+  background: var(--chat-soft);
+  color: var(--chat-disabled);
+  cursor: default;
+}
+
+.chat-settings-form button.danger {
+  background: #ff2a2a;
+  color: #ffffff;
+}
+
+/* 서버에 없는 것은 자리를 비우지 않고 없다고 적는다. 스위치를 그려 놓고 아무
+   데도 안 보내면 사용자는 껐다고 믿고 알림을 계속 받는다. */
+.chat-settings-note {
+  margin: 0;
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+  line-height: 1.5;
+}
+
+.chat-settings-error {
+  margin: 0;
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-danger {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 16px;
+  border: 1px solid #ffd0cb;
+  border-radius: 999px;
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+.chat-settings-danger:hover {
+  background: #fff5f4;
+}
+
+/* ─────────────────────────────── 새 채팅 */
+
+.new-chat {
+  position: relative;
+  display: grid;
+  width: 360px;
+  max-height: 80%;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--chat-line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 12%);
+}
+
+.new-chat header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.new-chat h2 {
+  margin: 0;
+  font-size: var(--chat-fs-title);
+}
+
+.new-chat header button {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  color: var(--chat-muted);
+}
+
+.new-chat-types {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.new-chat-type {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--chat-line);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.new-chat-type strong {
+  font-size: var(--chat-fs-body);
+}
+
+.new-chat-type span {
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  line-height: 1.35;
+}
+
+.new-chat-type.selected {
+  border-color: var(--chat-point);
+  box-shadow: inset 0 0 0 1px var(--chat-point);
+}
+
+.new-chat > input {
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--chat-line);
+  border-radius: 999px;
+  outline: 0;
+  color: var(--chat-ink);
+}
+
+.new-chat > input:focus {
+  border-color: var(--chat-point);
+}
+
+.new-chat-error {
+  margin: 0;
+  color: #ff2a2a;
+  font-size: var(--chat-fs-meta);
+}
+
+.new-chat-list {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 120px;
+}
+
+.new-chat-list h3 {
+  margin: 8px 0 2px;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  font-weight: 400;
+}
+
+.new-chat-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.new-chat-member:hover:not(:disabled) {
+  background: var(--chat-white-hover);
+}
+
+.new-chat-member img,
+.new-chat-initial {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--chat-white-hover);
+  color: var(--chat-muted);
+  font-size: var(--chat-fs-meta);
+  object-fit: cover;
+}
+
+.new-chat-member em {
+  margin-left: auto;
+  color: var(--chat-subtle);
+  font-size: var(--chat-fs-meta);
+  font-style: normal;
+}
+
+/*
+ * 좁은 폭에서 팀 머리글이 잘리던 것
+ *
+ * `모두 채팅 바로가기` 알약(146px)이 안 줄어들어, 접기 화살표를 **패널 밖으로
+ * 밀어냈다.** 실측 465px 내용이 419px 상자에 들어갔고 `overflow-x: hidden`
+ * 이라 화살표에 닿을 방법이 없었다 — 팀을 접을 수가 없다.
+ *
+ * 좁으면 바로가기 문구를 숨긴다. 팀을 접는 것이 더 자주 쓰는 동작이고,
+ * 바로가기는 팀 이름을 눌러도 갈 수 있다.
+ */
+.team-chat-header,
+.project-title {
+  min-width: 0;
+  gap: 8px;
+}
+
+.team-chat-header .team-name,
+.project-title strong {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.team-actions {
+  min-width: 0;
+}
+
+@media (max-width: 1180px) {
+  .team-shortcut {
+    display: none;
   }
 }
