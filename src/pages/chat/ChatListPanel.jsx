@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { icons } from './chat.icons.js'
 import { NewChatDialog } from './NewChatDialog.jsx'
-import { toDirectRows, toTeamRows } from './chat.data.js'
+import { toTeamRows } from './chat.data.js'
 import { formatTime } from './chat.format.js'
 import { AvatarStack, BordoAvatar, Icon, IconButton, RequestIcon, UnreadBadge } from './chat.ui.jsx'
 
@@ -184,11 +184,6 @@ export function ChatListPanel({
     .filter((team) => !needle
       || team.projects.length > 0
       || team.name.toLowerCase().includes(needle))
-  // 어느 프로젝트에도 안 매달린 1:1 · 동료 대리인 방. 서버는 `direct_rooms` 로
-  // 따로 내려주는데 화면이 이 칸을 아예 안 그려서, 프로젝트 밖에서 건 대화는
-  // **목록에서 통째로 사라져 있었다.** 방을 못 찾으니 다시 걸고, 그러면 서버가
-  // 같은 방을 되살려 주는데도 사용자는 새 방이 생긴 줄 안다.
-  const directRooms = toDirectRows(sidebar).filter((room) => matchesRoom(room, needle))
   const visibleImportant = importantRooms.filter((room) => matchesRoom(room, needle))
 
   const toggleTool = (nextTool) => {
@@ -304,23 +299,11 @@ export function ChatListPanel({
           서버가 `팀 → 프로젝트 → 방` 3층으로 준다. 목에서는 이 층이 고정된
           이름으로 박혀 있었다(`AX Lions` · `멋사 아이디어톤`). 몇 개가 올지
           서버가 정하므로 접힘 상태도 id 로 기억한다.
-        */}
-        {directRooms.length > 0 ? (
-          <section className="chat-list-section">
-            <div className="section-heading">
-              <h2>개인 채팅</h2>
-            </div>
-            {directRooms.map((chat) => (
-              <ChatPreview
-                chat={chat}
-                key={chat.id}
-                selected={selectedChatId === chat.id}
-                onSelect={() => onSelectChat(chat.id)}
-              />
-            ))}
-          </section>
-        ) : null}
 
+          어느 프로젝트에도 안 매달린 1:1 · 동료 대리인 방(`개인 채팅`)은
+          시안(`576:6096`)에 없어서 여기서는 그리지 않는다 — 팀 밑에 못
+          들어가는 방은 이 목록에서 안 보인다.
+        */}
         {teams.map((team) => (
           <section className="team-chat-group" key={team.id}>
             <TeamHeader
