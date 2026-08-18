@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 
+import { AppLink } from '../../app/AppLink.jsx'
 import { FlowMetricBadge } from './FlowMetricBadge'
 
 /**
@@ -58,9 +59,12 @@ export function FlowNavigationSidebar({
   return (
     <aside className={isCollapsed ? 'flow-sidebar is-collapsed' : 'flow-sidebar'} aria-label="회의 탐색">
       <header className={isScrolled ? 'team-header is-scrolled' : 'team-header'}>
-        <a className="team-name" href="/">
+        {/* 앱 안 이동이라 `AppLink` 다. 그냥 `<a href>` 로 두면 브라우저가
+            문서를 통째로 다시 받아, 플로우에서 홈으로 갈 때마다 번들 재파싱과
+            전체 재조회가 일어난다. */}
+        <AppLink className="team-name" href="/">
           {teamName ?? '　'}
-        </a>
+        </AppLink>
         <button className="team-refresh" type="button" aria-label="새로고침">
           <img src={icons.refresh} alt="" />
         </button>
