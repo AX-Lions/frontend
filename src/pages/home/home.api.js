@@ -196,3 +196,21 @@ export function createTeam(name, { description, timezone } = {}) {
 export function joinTeam(code) {
   return api.post('/teams/join', { code })
 }
+
+// ─────────────────────────────────────────── 확정된 일정 확인 팝업
+//
+// 팝업(시안 `697:9393`)은 두 곳에서 값을 모은다.
+//
+//     header   GET /meetings/{id}/prep   team_name · project_name · when · badge
+//     참여자    GET /meetings/{id}       participants[].name
+//
+// `when` · `badge` 는 홈의 대리 참석 버튼 · 준비 화면과 같은 문구를 서버가
+// 조립해 준다 — 여기서 다시 만들면 화면마다 "대리 참석 예정" 이 갈린다.
+
+export function fetchMeetingPrepHeader(meetingId, signal) {
+  return api.get(`/meetings/${meetingId}/prep`, undefined, { signal }).then((body) => body?.header ?? null)
+}
+
+export function fetchMeetingParticipants(meetingId, signal) {
+  return api.get(`/meetings/${meetingId}`, undefined, { signal }).then((body) => body?.participants ?? [])
+}

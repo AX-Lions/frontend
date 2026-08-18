@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './Sidebar.jsx'
 import { AgentDock } from './AgentDock.jsx'
 import { BriefingPrompt } from './BriefingPrompt.jsx'
+import { ConfirmedScheduleDialog } from './ConfirmedScheduleDialog.jsx'
 import { NewMeetingDialog } from './NewMeetingDialog.jsx'
 import { NewProjectDialog } from './NewProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
@@ -52,6 +53,8 @@ export function HomePage() {
   const [pendingFavorites, setPendingFavorites] = useState([])
   const [addingProject, setAddingProject] = useState(false)
   const [addingMeeting, setAddingMeeting] = useState(false)
+  // 「오늘 일정」 한 줄을 눌렀을 때 뜨는 확정된 일정 확인 팝업의 대상 회의.
+  const [confirmingMeetingId, setConfirmingMeetingId] = useState(null)
   /*
     사이드바 접힘은 **레일과 프로젝트 목록이 함께 본다.** 접었을 때 레일만
     남으면 왼쪽이 여전히 두 칸이라 접힌 것으로 보이지 않는다. 값을 둘의 공통
@@ -439,7 +442,14 @@ export function HomePage() {
                       <button
                         className={selectedScheduleKey === scheduleKey ? 'schedule-info selected' : 'schedule-info'}
                         type="button"
-                        onClick={() => setSelectedScheduleKey(scheduleKey)}
+                        onClick={() => {
+                          setSelectedScheduleKey(scheduleKey)
+                          // 상세가 있는 회의만 확인 팝업을 연다 — 회의 없이 시각만
+                          // 잡힌 일정(`meeting_id: null`)은 보여 줄 회의가 없다.
+                          if (schedule.meeting_id) {
+                            setConfirmingMeetingId(schedule.meeting_id)
+                          }
+                        }}
                       >
                         {/* `time_range` 는 참여자 시간대로 서버가 계산해 준다.
                             브라우저 시간대로 다시 찍으면 같은 회의를 사람마다
@@ -591,6 +601,13 @@ export function HomePage() {
           // 새로 만든 회의가 오늘 일정·최근 회의 어디에 걸리는지는 서버
           // 집계 규칙이다(시간대별 "오늘" 판정 등). 흉내 내지 않고 다시 읽는다.
           onCreated={() => reload()}
+        />
+      ) : null}
+
+      {confirmingMeetingId ? (
+        <ConfirmedScheduleDialog
+          meetingId={confirmingMeetingId}
+          onClose={() => setConfirmingMeetingId(null)}
         />
       ) : null}
 

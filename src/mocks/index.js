@@ -28,7 +28,7 @@ import { appendTo, patch, patchedOf, withAppended } from './store.js'
 
 import {
   viewerAgentPrompts, viewerAgentSettings, viewerBriefing, viewerConversationMessages,
-  viewerConversations, viewerHome, viewerMe, viewerSidebar, viewerTeams,
+  viewerConversations, viewerHome, viewerMe, viewerMeetingPrepHeader, viewerSidebar, viewerTeams,
 } from './perspective.js'
 import {
   meetingIndexes, meetings, projectMeetings, summaryTables, workIndexes,
@@ -218,6 +218,8 @@ function resolve(path, method, body) {
     }
 
     if (a === 'meetings' && b && !c) return meetings[b] ?? null
+    // 지금은 헤더만 채운다 — 예상 논쟁점 · Bordo 활동 설정은 이 팝업이 안 쓴다.
+    if (a === 'meetings' && c === 'prep') return { header: viewerMeetingPrepHeader(b) }
     if (a === 'meetings' && c === 'flow') return meetingFlows[b] ?? null
     if (a === 'meetings' && c === 'summary-table') return summaryTables[b] ?? null
     if (a === 'meetings' && c === 'ai-briefing') return viewerBriefing(b)

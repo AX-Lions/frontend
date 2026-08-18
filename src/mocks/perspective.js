@@ -1,4 +1,4 @@
-import { agentName } from './data/people.js'
+import { TEAM, agentName } from './data/people.js'
 import { home as baseHome, teams } from './data/home.js'
 import { briefings as baseBriefings, meetings } from './data/meetings.js'
 import { chatSidebar as baseSidebar } from './data/chat.js'
@@ -123,6 +123,52 @@ export function viewerHome() {
 /** `GET /teams` — 팀은 모두 같다. */
 export function viewerTeams() {
   return teams
+}
+
+function pad(n) {
+  return String(n).padStart(2, '0')
+}
+
+/** `8월 18일 14:00 - 15:00` — 서버 `meeting_when()` 과 같은 모양이다. */
+function meetingWhen(scheduledAt, durationMin) {
+  const start = new Date(scheduledAt)
+  const end = new Date(start.getTime() + durationMin * 60000)
+  const hhmm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return `${start.getMonth() + 1}월 ${start.getDate()}일 ${hhmm(start)} - ${hhmm(end)}`
+}
+
+/**
+ * `GET /meetings/{id}/prep` 의 `header` — 확정된 일정 확인 팝업(시안 `697:9393`)이 쓴다.
+ *
+ * `when` · `badge` 는 클라이언트가 다시 조합하지 않는다. 화면마다 "대리 참석
+ * 예정" 문구가 갈리는 것을 막으려고 서버가 완성해 내려주는 값이라, 목도 같은
+ * 모양으로 미리 완성해 둔다.
+ *
+ * 목 세계는 팀이 하나뿐이라(`TEAM`) `team_name` 은 고정값이다. 실제 서버는
+ * `meeting.project.team.name` 을 읽는다.
+ */
+export function viewerMeetingPrepHeader(meetingId) {
+  const meeting = meetings[meetingId]
+  if (!meeting) {
+    return null
+  }
+  const v = currentViewer()
+  const row = attendanceOf(meetingId, v.id)
+  const delegated = row?.delegated ?? false
+  return {
+    meeting_id: meeting.id,
+    title: meeting.title,
+    project_name: meeting.project_name,
+    team_name: TEAM.name,
+    scheduled_at: meeting.scheduled_at,
+    when: meetingWhen(meeting.scheduled_at, meeting.duration_min),
+    location: meeting.discord_channel_id ? 'Discord' : '서비스',
+    status: meeting.status,
+    delegated,
+    badge: delegated
+      ? `${agentName(v.name)} 대리 참석 ${meeting.status === 'ACTIVE' ? '중' : '예정'}`
+      : '참석 예정',
+  }
 }
 
 /**
