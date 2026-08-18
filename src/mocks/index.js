@@ -25,18 +25,18 @@ import { isMockMode } from './enabled.js'
  * 오래 붙잡아 두면 진짜처럼 믿게 된다.**
  */
 
-import { home, me, teams } from './data/home.js'
 import {
-  briefings, meetingIndexes, meetings, projectMeetings, summaryTables, workIndexes,
+  viewerAgentPrompts, viewerAgentSettings, viewerBriefing, viewerConversationMessages,
+  viewerConversations, viewerHome, viewerMe, viewerSidebar, viewerTeams,
+} from './perspective.js'
+import {
+  meetingIndexes, meetings, projectMeetings, summaryTables, workIndexes,
 } from './data/meetings.js'
 import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
 import {
-  activeDates, chatCandidates, chatImportant, chatRooms, chatSidebar,
+  activeDates, chatCandidates, chatImportant, chatRooms,
   dailySummaries, roomDetails, roomMessages,
 } from './data/chat.js'
-import {
-  agentConversations, agentPrompts, agentSettings, conversationMessages,
-} from './data/agent.js'
 
 /** 서버 왕복처럼 보이게 아주 잠깐 기다린다. */
 const DELAY = 120
@@ -69,14 +69,14 @@ function resolve(path, method, body) {
   const [a, b, c] = s
 
   if (method === 'GET') {
-    if (path === '/home') return home
-    if (path === '/auth/me' || path === '/users/me') return me
-    if (path === '/teams') return teams
+    if (path === '/home') return viewerHome()
+    if (path === '/auth/me' || path === '/users/me') return viewerMe()
+    if (path === '/teams') return viewerTeams()
 
     if (a === 'meetings' && b && !c) return meetings[b] ?? null
     if (a === 'meetings' && c === 'flow') return meetingFlows[b] ?? null
     if (a === 'meetings' && c === 'summary-table') return summaryTables[b] ?? null
-    if (a === 'meetings' && c === 'ai-briefing') return briefings[b] ?? null
+    if (a === 'meetings' && c === 'ai-briefing') return viewerBriefing(b)
     if (a === 'meetings' && c === 'indexes') {
       // 회의 안건과 작업 문서는 같은 주소에 `category` 로 갈린다.
       const work = /category=WORK/.test(path)
@@ -91,7 +91,7 @@ function resolve(path, method, body) {
 
     if (a === 'flow-edges' && b) return flowEdges[b] ?? null
 
-    if (path === '/chat/sidebar') return chatSidebar
+    if (path === '/chat/sidebar') return viewerSidebar()
     if (path.startsWith('/chat/important')) return chatImportant
     if (path.startsWith('/chat/candidates')) return chatCandidates
     if (a === 'chat' && b === 'rooms' && !c) return chatRooms
@@ -104,11 +104,11 @@ function resolve(path, method, body) {
     }
     if (a === 'chat' && b === 'rooms' && s[3] === 'search') return { count: 0, results: [] }
 
-    if (path === '/me/agent/settings') return agentSettings
-    if (path === '/me/agent/prompts') return agentPrompts
-    if (path === '/me/agent/conversations') return agentConversations
+    if (path === '/me/agent/settings') return viewerAgentSettings()
+    if (path === '/me/agent/prompts') return viewerAgentPrompts()
+    if (path === '/me/agent/conversations') return viewerConversations()
     if (a === 'me' && s[2] === 'conversations' && s[4] === 'messages') {
-      return conversationMessages[s[3]] ?? { results: [], next_before: null }
+      return viewerConversationMessages(s[3]) ?? { results: [], next_before: null }
     }
   }
 
@@ -134,7 +134,7 @@ function resolve(path, method, body) {
         refresh_token: 'mock.refresh.token',
         token_type: 'Bearer',
         expires_in: 3600,
-        user: me,
+        user: viewerMe(),
       }
     }
     if (path === '/auth/logout') return null

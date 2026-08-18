@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { clearTokens } from '../lib/auth.js'
 import { isMockMode, onMockChange, setMockMode } from './enabled.js'
+import { currentViewer } from './session.js'
 import './mockBanner.css'
 
 /**
@@ -31,11 +32,16 @@ export function MockBanner() {
     return null
   }
 
+  // 누구로 보고 있는지 같이 적는다. 계정을 갈아 가며 보게 되는데, 지금 누구
+  // 눈으로 보고 있는지 모르면 **브리핑이 없는 것이 계정 탓인지 화면 탓인지**
+  // 구별할 수 없다. 그 구별이 이 모드를 쓰는 이유의 절반이다.
+  const viewer = currentViewer()
+
   return (
     <div className="mock-banner" role="status">
       <span className="mock-banner-dot" aria-hidden="true" />
       <span>
-        <strong>가상 데이터</strong>로 보고 있습니다. 서버의 진짜 기록이 아닙니다.
+        <strong>가상 데이터</strong> · <strong>{viewer.name}</strong>님 눈으로 보고 있습니다.
       </span>
       <button
         type="button"
