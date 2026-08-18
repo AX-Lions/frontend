@@ -9,8 +9,12 @@ import {
   TONES,
   fetchAgentSettings,
   fetchMe,
+  issueMcpToken,
+  linkDiscord,
   patchAgentSettings,
   patchMe,
+  revokeMcpToken,
+  unlinkDiscord,
 } from './account.data.js'
 import './account.css'
 
@@ -67,6 +71,27 @@ const SETTING_ROWS = [
   },
 ]
 
+/** 복사 버튼. "복사됨" 표시는 이 버튼만의 일시적인 상태라 페이지 상태로 안 올린다. */
+function CopyButton({ value, label }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // 클립보드 권한이 없는 브라우저도 있다. 복사 실패로 전체 흐름을 막지 않는다.
+    }
+  }
+
+  return (
+    <button className="account-copy" type="button" onClick={copy} aria-label={label}>
+      {copied ? '복사됨' : '복사'}
+    </button>
+  )
+}
+
 function Switch({ checked, disabled, onChange, label }) {
   return (
     <button
@@ -91,6 +116,10 @@ export function AccountPage() {
   const [draftAgentName, setDraftAgentName] = useState(null)
   const [notice, setNotice] = useState(null)
   const [busy, setBusy] = useState([])
+  const [discordCode, setDiscordCode] = useState('')
+  // 발급 응답의 원문 토큰은 여기서만 잠깐 들고 있는다 — 새로고침하면 사라진다.
+  // 서버도 해시만 남기고 원문을 두 번 안 준다.
+  const [mcpToken, setMcpToken] = useState(null)
 
   const loading = (me.loading && !me.data) || (agent.loading && !agent.data)
   const failure = (me.error && !me.data) || (agent.error && !agent.data)
@@ -201,6 +230,52 @@ export function AccountPage() {
       say('error', err?.message || '설정을 바꾸지 못했습니다.')
     }
   })()
+
+  const linkDiscordAccount = lock('discord', async () => {
+    const code = discordCode.trim()
+    if (!code) {
+      return
+    }
+    try {
+      const saved = await linkDiscord(code)
+      me.setData((c) => ({ ...(c ?? {}), discord_linked: Boolean(saved?.linked) }))
+      setDiscordCode('')
+      say('success', 'Discord 계정을 이었습니다.')
+    } catch (err) {
+      say('error', err?.message || 'Discord 계정을 잇지 못했습니다.')
+    }
+  })
+
+  const unlinkDiscordAccount = lock('discord', async () => {
+    try {
+      await unlinkDiscord()
+      me.setData((c) => ({ ...(c ?? {}), discord_linked: false }))
+      say('success', 'Discord 연결을 해제했습니다.')
+    } catch (err) {
+      say('error', err?.message || 'Discord 연결을 해제하지 못했습니다.')
+    }
+  })
+
+  const issueOrReissueMcpToken = lock('mcp', async () => {
+    try {
+      const issued = await issueMcpToken()
+      setMcpToken(issued)
+      me.setData((c) => ({ ...(c ?? {}), mcp_token_issued_at: issued?.issued_at }))
+    } catch (err) {
+      say('error', err?.message || 'MCP 토큰을 발급하지 못했습니다.')
+    }
+  })
+
+  const revokeCurrentMcpToken = lock('mcp', async () => {
+    try {
+      await revokeMcpToken()
+      setMcpToken(null)
+      me.setData((c) => ({ ...(c ?? {}), mcp_token_issued_at: null }))
+      say('success', 'MCP 토큰을 폐기했습니다.')
+    } catch (err) {
+      say('error', err?.message || 'MCP 토큰을 폐기하지 못했습니다.')
+    }
+  })
 
   const signOut = async () => {
     await logout()
@@ -376,6 +451,125 @@ export function AccountPage() {
           <p className="account-hint account-hint-after">
             채팅 화면 왼쪽 레일의 <strong>AI 대리인 설정</strong> 아이콘을 누르면 열립니다.
           </p>
+        </section>
+
+        <section className="account-section">
+          <h2>Discord 연결</h2>
+          <p className="account-hint">
+            회의는 Discord 에서 열립니다. 계정을 이어야 대리 참석 결과와 알림이
+            본인 것으로 전달됩니다.
+          </p>
+          {me.data?.discord_linked ? (
+            <>
+              <p className="account-meta">연결됨</p>
+              <button
+                type="button"
+                className="account-outline-button"
+                disabled={busy.includes('discord')}
+                onClick={unlinkDiscordAccount}
+              >
+                연결 해제
+              </button>
+            </>
+          ) : (
+            <form
+              className="account-name-row"
+              onSubmit={(event) => { event.preventDefault(); linkDiscordAccount() }}
+            >
+              <input
+                aria-label="Discord 연결 코드"
+                placeholder="6자리 코드"
+                maxLength={6}
+                value={discordCode}
+                disabled={busy.includes('discord')}
+                onChange={(event) => setDiscordCode(event.target.value.toUpperCase())}
+              />
+              <button type="submit" disabled={!discordCode.trim() || busy.includes('discord')}>
+                연결
+              </button>
+            </form>
+          )}
+          <p className="account-hint account-hint-after">
+            Discord 에서 <strong>/bordo-connect</strong> 를 치면 6자리 코드가 DM 으로 옵니다.
+          </p>
+        </section>
+
+        <section className="account-section">
+          <h2>개인 AI 연결 (MCP)</h2>
+          <p className="account-hint">
+            Claude Code · Cursor 같은 개인 AI 가 내 작업과 문서를 Bordo 에 대신
+            기록하게 합니다. 자리를 비운 동안 대리인이 이 기록을 근거로 답합니다.
+          </p>
+
+          {mcpToken ? (
+            <>
+              <div className="account-token-row">
+                <code>{mcpToken.token}</code>
+                <CopyButton value={mcpToken.token} label="토큰 복사" />
+              </div>
+              <p className="account-warn">
+                <strong>이 토큰은 지금만 보입니다. 다시 볼 수 없습니다.</strong>
+                <br />
+                <code>.mcp.json</code> 은 저장소에 커밋되는 파일입니다 — 토큰을
+                거기 적지 마십시오.
+              </p>
+              <p className="account-label">Claude Code 연결 명령</p>
+              <div className="account-cmd-row">
+                <code>{mcpToken.setup_command}</code>
+                <CopyButton value={mcpToken.setup_command} label="명령어 복사" />
+              </div>
+              <p className="account-hint account-hint-after">
+                붙여 넣은 뒤 Claude Code 에서 <strong>/mcp</strong> →{' '}
+                <strong>bordo · connected</strong> 가 보이면 끝입니다.
+              </p>
+            </>
+          ) : me.data?.mcp_token_issued_at ? (
+            <>
+              <p className="account-meta">
+                {new Intl.DateTimeFormat('ko-KR', {
+                  year: 'numeric', month: 'long', day: 'numeric',
+                }).format(new Date(me.data.mcp_token_issued_at))}에 발급됨
+                <span>연결됨</span>
+              </p>
+              <div className="account-button-row">
+                <button
+                  type="button"
+                  className="account-outline-button"
+                  disabled={busy.includes('mcp')}
+                  onClick={issueOrReissueMcpToken}
+                >
+                  재발급
+                </button>
+                <button
+                  type="button"
+                  className="account-danger-button"
+                  disabled={busy.includes('mcp')}
+                  onClick={revokeCurrentMcpToken}
+                >
+                  폐기
+                </button>
+              </div>
+              <p className="account-note">
+                <strong>재발급</strong>하면 이전 토큰은 그 자리에서 즉시 무효가
+                됩니다. <strong>폐기</strong>는 카드를 미발급 상태로 되돌립니다.
+              </p>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="account-primary-button"
+                disabled={busy.includes('mcp')}
+                onClick={issueOrReissueMcpToken}
+              >
+                토큰 발급
+              </button>
+              <p className="account-note">
+                토큰은 <strong>발급 직후 한 번만</strong> 보여줍니다. 잃어버리면
+                재발급하십시오 — 재발급하면 이전 토큰은 즉시 못 쓰게 됩니다.
+              </p>
+            </>
+          )}
         </section>
 
         <section className="account-section account-danger">
