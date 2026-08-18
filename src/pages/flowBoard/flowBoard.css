@@ -685,6 +685,17 @@
   flex-direction: column;
 }
 
+/*
+  자기 대리인과 오간 것. 노드에 붙는다.
+
+  선이 없으니 주황도 없다 — 다른 뱃지와 똑같이 두면 **AI 가 한 일인지 알 수
+  없다.** 선 색이 하던 말을 테두리가 대신한다.
+*/
+.flow-badge-group.is-self {
+  border: 1.5px solid var(--link-ai);
+  background: #ffffff;
+}
+
 .flow-badge-group.is-dimmed {
   opacity: 0.2;
 }
