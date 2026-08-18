@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './Sidebar.jsx'
-import { DelegateDialog } from './DelegateDialog.jsx'
 import { AgentDock } from './AgentDock.jsx'
 import { BriefingPrompt } from './BriefingPrompt.jsx'
 import { CreateProjectDialog } from './CreateProjectDialog.jsx'
@@ -50,7 +49,6 @@ export function HomePage() {
   const [selectedMeetingId, setSelectedMeetingId] = useState(null)
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
   const [pendingFavorites, setPendingFavorites] = useState([])
-  const [delegateFor, setDelegateFor] = useState(null)
   const [addingProject, setAddingProject] = useState(false)
   /*
     사이드바 접힘은 **레일과 프로젝트 목록이 함께 본다.** 접었을 때 레일만
@@ -65,16 +63,6 @@ export function HomePage() {
   // 자동 열기는 상태가 아니라 ref 다. 상태로 두면 effect 안에서 setState 를
   // 부르게 되고 렌더가 한 번 더 돈다 — 어차피 화면에 아무것도 안 그리는 값이다.
   const autoOpenedRef = useRef(false)
-
-  /** 저장한 결과를 목록에 반영한다. 전체를 다시 읽으면 스크롤이 튄다. */
-  const applyDelegation = (meetingId, saved) => setData((current) => (current ? {
-    ...current,
-    today_schedule: current.today_schedule.map((s) => (
-      s.meeting_id === meetingId
-        ? { ...s, delegation: { delegated: saved.delegated, prompt: saved.prompt, sources: saved.sources } }
-        : s
-    )),
-  } : current))
 
   useEffect(() => {
     if (!favoriteMessage) {
@@ -453,7 +441,16 @@ export function HomePage() {
                         <button
                           className={schedule.delegation.delegated ? 'is-delegated' : ''}
                           type="button"
-                          onClick={() => setDelegateFor(schedule)}
+                          /*
+                            팝업이 아니라 화면으로 보낸다.
+
+                            회의 전에 해야 하는 준비가 자료 범위 네 칸에서
+                            **예상 논쟁점 · 내 입장 · Bordo 활동 설정**까지
+                            늘었다. 회의를 주소에 실어 보내므로 새로고침하거나
+                            링크를 복사해도 같은 회의가 열린다.
+                          */
+                          onClick={() => navigate(
+                            `/delegate-prep?meeting=${schedule.meeting_id}`)}
                         >
                           {schedule.delegation.delegated ? '대리 참석 중' : '회의에 참여하지 않아요'}
                         </button>
@@ -544,14 +541,6 @@ export function HomePage() {
 
         <AgentDock />
       </main>
-
-      {delegateFor ? (
-        <DelegateDialog
-          schedule={delegateFor}
-          onClose={() => setDelegateFor(null)}
-          onSaved={applyDelegation}
-        />
-      ) : null}
 
       {addingProject ? (
         <CreateProjectDialog

@@ -32,6 +32,7 @@ const loadPage = {
   flowBoard: () => import('../pages/flowBoard/FlowBoardPage.jsx'),
   chat: () => import('../pages/chat/ChatPage.jsx'),
   account: () => import('../pages/account/AccountPage.jsx'),
+  delegatePrep: () => import('../pages/delegatePrep/DelegatePrepPage.jsx'),
 }
 
 /*
@@ -43,6 +44,8 @@ const SignupPage = lazy(() => loadPage.signup().then((m) => ({ default: m.Signup
 const FlowBoardPage = lazy(() => loadPage.flowBoard().then((m) => ({ default: m.FlowBoardPage })))
 const ChatPage = lazy(() => loadPage.chat().then((m) => ({ default: m.ChatPage })))
 const AccountPage = lazy(() => loadPage.account().then((m) => ({ default: m.AccountPage })))
+const DelegatePrepPage = lazy(
+  () => loadPage.delegatePrep().then((m) => ({ default: m.DelegatePrepPage })))
 
 /**
  * 첫 화면이 뜨고 손이 빈 틈에 나머지를 미리 받아 둔다.
@@ -150,6 +153,17 @@ export function AppRouter() {
 
   if (path === '/account') {
     return <Screen><AccountPage /></Screen>
+  }
+
+  /*
+    회의 대리 참석 준비.
+
+    회의가 주소에 실린다(`?meeting=<id>`). 플로우 화면과 같은 규칙이라, 링크를
+    복사해 두거나 새 탭으로 열어도 같은 회의가 열린다 — 화면 상태로만 들고
+    있으면 새로고침 한 번에 어느 회의였는지가 사라진다.
+  */
+  if (path === '/delegate-prep') {
+    return <Screen><DelegatePrepPage /></Screen>
   }
 
   return <HomePage />
