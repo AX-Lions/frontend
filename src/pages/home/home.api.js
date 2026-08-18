@@ -197,6 +197,33 @@ export function joinTeam(code) {
   return api.post('/teams/join', { code })
 }
 
+// ─────────────────────────────────────────── 팀 Discord 관리자 설정
+//
+// 팝업(시안 `768:5926`)이 쓴다. `팀 전환하기` 목록에서 내 역할이
+// OWNER·ADMIN 인 팀에만 여는 톱니바퀴가 붙는다 — 시안 부제("팀 관리자일
+// 경우에만 보이는 설정이에요")가 그대로 조건이다.
+
+export function fetchDiscordStatus(teamId, signal) {
+  return api.get(`/teams/${teamId}/discord/status`, undefined, { signal })
+}
+
+/**
+ * `connect_code` 는 Discord 봇에서 `/deputy-connect` 를 실행해야 받는
+ * 1회용 코드다 — 화면에서 만들어 줄 수 없다. `guild_id` 를 함께 보내야
+ * 서버까지 연결된다(코드만 보내면 계정 연결만 되고 `403` 이 난다,
+ * OWNER·ADMIN 이 아니면 애초에 이 화면을 못 연다).
+ */
+export function linkTeamDiscord(teamId, { connectCode, guildId }) {
+  return api.post(`/teams/${teamId}/discord/link`, {
+    connect_code: connectCode,
+    ...(guildId ? { guild_id: guildId } : {}),
+  })
+}
+
+export function unlinkTeamDiscord(teamId) {
+  return api.delete(`/teams/${teamId}/discord/link`)
+}
+
 // ─────────────────────────────────────────── 확정된 일정 확인 팝업
 //
 // 팝업(시안 `697:9393`)은 두 곳에서 값을 모은다.

@@ -230,6 +230,33 @@ function liveImportant() {
   return { count: results.length, results }
 }
 
+/**
+ * 팀 Discord 연결 상태(시안 `768:5926`).
+ *
+ * 실제 `GET .../discord/status` 에는 `guild_name` · `channels` 가 없다
+ * (그 둘은 `POST .../discord/link` 응답에만 있다 — 봇이 스스로 채널을
+ * 만들어서다). 여기서는 방금 연결한 것을 다시 읽었을 때도 화면이 서버
+ * 이름을 잃지 않도록 함께 들고 있는다. 실서버로 가면 이 둘은 다시
+ * `null` 로 보일 자리라, `TeamDiscordDialog` 는 없어도 되게 짜여 있다.
+ */
+function discordStatus(teamId) {
+  const saved = patchedOf(`discord:${teamId}`)
+  if (!saved?.connected) {
+    return {
+      connected: false, guild_id: null, guild_name: null, channels: null,
+      bot_status: 'DISCONNECTED', warnings: [],
+    }
+  }
+  return {
+    connected: true,
+    guild_id: saved.guild_id,
+    guild_name: saved.guild_name,
+    channels: saved.channels,
+    bot_status: 'READY',
+    warnings: [],
+  }
+}
+
 function resolve(path, method, body) {
   const s = segments(path)
   const [a, b, c] = s
@@ -248,6 +275,8 @@ function resolve(path, method, body) {
       const results = (viewerHome().project_progress ?? []).filter((p) => p.team_id === b)
       return { count: results.length, results }
     }
+
+    if (a === 'teams' && c === 'discord' && s[3] === 'status') return discordStatus(b)
 
     if (a === 'meetings' && b && !c) return meetings[b] ?? null
     // 지금은 헤더만 채운다 — 예상 논쟁점 · Bordo 활동 설정은 이 팝업이 안 쓴다.
@@ -486,6 +515,49 @@ function resolve(path, method, body) {
         rejected_by: viewerMe().id,
         reason: body.reason.trim(),
         rejected_at: new Date().toISOString(),
+      }
+    }
+
+    /*
+      팀 Discord 연결 · 해제(시안 `768:5926`).
+
+      `connect_code` 는 실제로는 Discord 봇의 `/deputy-connect` 로만 받을 수
+      있는 1회용 코드라 여기서는 값만 있으면 통과시킨다 — 화면이 어떤
+      코드를 받고 서버를 연결하는지 보여 주는 자리이지, 진짜 봇과 잇는
+      자리가 아니다.
+    */
+    if (a === 'teams' && c === 'discord' && s[3] === 'link') {
+      if (method === 'DELETE') {
+        patch(`discord:${b}`, {
+          connected: false, guild_id: null, guild_name: null, channels: null,
+        })
+        return { team_id: b, unlinked_at: new Date().toISOString(), dropped_outbox_count: 0 }
+      }
+      if (!body?.connect_code?.trim()) {
+        throw mockError({
+          code: 'VALIDATION_ERROR',
+          message: '연결 코드를 입력해 주십시오.',
+          details: { connect_code: ['연결 코드를 입력해 주십시오.'] },
+        })
+      }
+      const saved = patch(`discord:${b}`, {
+        connected: true,
+        guild_id: body.guild_id?.trim() || null,
+        guild_name: body.guild_id?.trim() ? '가상 데이터 서버' : null,
+        channels: body.guild_id?.trim()
+          ? { meeting: { id: 'mock-channel-meeting', name: 'general' } }
+          : null,
+      })
+      return {
+        linked: true,
+        team_id: b,
+        user_id: viewerMe().id,
+        discord_user_id: `mock-discord-${viewerMe().id}`,
+        guild_id: saved.guild_id,
+        guild_name: saved.guild_name,
+        channels: saved.channels,
+        permissions_ok: true,
+        linked_at: new Date().toISOString(),
       }
     }
 

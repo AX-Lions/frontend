@@ -3,8 +3,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { getCurrentTeamId, setCurrentTeamId } from '../../lib/currentTeam.js'
 import { useEscapeToClose } from '../../shared/hooks/useEscapeToClose.js'
 import { fetchTeamProjects, fetchTeams } from './home.api.js'
+import { TeamDiscordDialog } from './TeamDiscordDialog.jsx'
 import './newProject.css'
 import './teamSwitch.css'
+
+/** 이 역할이면 팀 관리자 설정(Discord 연결)을 볼 수 있다. */
+const ADMIN_ROLES = new Set(['OWNER', 'ADMIN'])
 
 /**
  * 팀 전환하기(시안 `692:8230`, 여는 자리는 `576:4862`).
@@ -27,6 +31,9 @@ export function TeamSwitchDialog({ onClose }) {
   const [projectsByTeam, setProjectsByTeam] = useState({})
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
+  // 관리자 설정(Discord 연결) 팝업의 대상 팀. 이 팝업 위에 겹쳐 연다 — 팀
+  // 전환하기로 돌아왔을 때 목록을 다시 부르지 않아도 되게 하기 위해서다.
+  const [managingTeam, setManagingTeam] = useState(null)
   const current = getCurrentTeamId()
   const closeRef = useRef(null)
 
@@ -127,15 +134,23 @@ export function TeamSwitchDialog({ onClose }) {
             <p className="team-switch-empty">{needle ? '찾는 팀이 없습니다.' : '속한 팀이 없습니다.'}</p>
           ) : null}
           {shown.map((team) => (
-            <button
-              key={team.id}
-              type="button"
-              className={team.id === current ? 'team-switch-row is-current' : 'team-switch-row'}
-              onClick={() => choose(team.id)}
-            >
-              <span className="team-switch-name">{team.name}</span>
-              <span className="team-switch-meta">{projectPreview(team.id)}</span>
-            </button>
+            <div key={team.id} className={team.id === current ? 'team-switch-row is-current' : 'team-switch-row'}>
+              <button type="button" className="team-switch-row-main" onClick={() => choose(team.id)}>
+                <span className="team-switch-name">{team.name}</span>
+                <span className="team-switch-meta">{projectPreview(team.id)}</span>
+              </button>
+              {/* 팀 관리자만 본다(시안 `768:5926` 부제) — 팀 목록 응답의
+                  `my_role` 이 그대로 그 조건이다. */}
+              {ADMIN_ROLES.has(team.my_role) ? (
+                <button
+                  type="button"
+                  className="team-switch-admin"
+                  onClick={() => setManagingTeam(team)}
+                >
+                  Discord 설정
+                </button>
+              ) : null}
+            </div>
           ))}
           {!error && current ? (
             <button type="button" className="team-switch-row team-switch-clear" onClick={() => choose(null)}>
@@ -149,6 +164,14 @@ export function TeamSwitchDialog({ onClose }) {
           닫기
         </button>
       </div>
+
+      {managingTeam ? (
+        <TeamDiscordDialog
+          teamId={managingTeam.id}
+          teamName={managingTeam.name}
+          onClose={() => setManagingTeam(null)}
+        />
+      ) : null}
     </div>
   )
 }

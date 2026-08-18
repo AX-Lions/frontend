@@ -63,12 +63,10 @@
 
 .team-switch-row {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
   padding: 8px 0;
   border-bottom: 1px solid #e5e7eb;
-  text-align: left;
 }
 
 .team-switch-row:last-child {
@@ -77,6 +75,34 @@
 
 .team-switch-row:hover {
   background: #fafafa;
+}
+
+/* `전체 보기` 줄(`team-switch-clear`)은 관리자 단추가 없는 단일
+   `<button className="team-switch-row team-switch-clear">` 라, 안쪽
+   자리 배치를 `team-switch-row-main` 과 함께 받는다. */
+.team-switch-row-main,
+.team-switch-clear {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+}
+
+/* 팀 관리자에게만 보이는 `Discord 설정` 링크. */
+.team-switch-admin {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #002662;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.team-switch-admin:hover {
+  background: rgb(0 38 98 / 8%);
 }
 
 .team-switch-name {

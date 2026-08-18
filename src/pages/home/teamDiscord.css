@@ -1,0 +1,155 @@
+/*
+ * 팀 Discord 관리자 설정 (Figma `768:5926`).
+ *
+ * `np-dialog`/`np-backdrop`/`np-field`/`np-box`/`np-actions` 를 그대로
+ * 빌려 쓴다. 시안 자체엔 팝업 테두리가 없지만(437px 짜리 내용 블록),
+ * `팀 전환하기` 에서 여는 팝업이라 다른 팝업과 같은 틀을 쓴다.
+ */
+
+.td-dialog {
+  width: 437px;
+}
+
+.td-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.td-lead {
+  margin: 0;
+  color: #60646c;
+  font-size: 13px;
+}
+
+.td-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.td-team {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.td-team strong {
+  color: #1f1f1f;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.td-team span {
+  color: #60646c;
+  font-size: 13px;
+}
+
+.td-loading {
+  margin: 0;
+  color: #60646c;
+  font-size: 13px;
+}
+
+.td-connected-label {
+  display: block;
+  margin-bottom: 4px;
+  color: #002662;
+  font-size: 13px;
+}
+
+.td-server-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.td-server {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.td-server img {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.td-server div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.td-server strong {
+  overflow: hidden;
+  color: #1f1f1f;
+  font-size: 14px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.td-server span {
+  color: #1f1f1f;
+  font-size: 14px;
+}
+
+.td-warn {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  opacity: 0.8;
+  color: #ff6450;
+  font-size: 13px;
+}
+
+.td-link,
+.td-unlink {
+  height: 38px;
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.td-link {
+  background: #002662;
+  color: #ffffff;
+}
+
+.td-link:hover {
+  background: #001c4a;
+}
+
+.td-unlink {
+  background: rgb(0 38 98 / 5%);
+  color: #002662;
+}
+
+.td-unlink:hover:not(:disabled) {
+  background: rgb(0 38 98 / 10%);
+}
+
+.td-unlink:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.td-link-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
