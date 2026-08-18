@@ -69,8 +69,11 @@ export function Sidebar({
     favorite: true,
   })
   const [meetingMenuOpen, setMeetingMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const searchInputRef = useRef(null)
   const meetingMenuRef = useRef(null)
+  const searchButtonRef = useRef(null)
+  const searchBoxRef = useRef(null)
 
   const inboxBadge = useInboxBadge()
   const chatBadge = useChatBadge()
@@ -106,6 +109,38 @@ export function Sidebar({
       window.removeEventListener('keydown', onKey)
     }
   }, [meetingMenuOpen])
+
+  /*
+    프로젝트 검색 칸도 같은 이유로 바깥을 누르면 닫는다.
+
+    닫을 때 검색어도 지운다 — 칸만 감추고 검색어를 남기면, 다시 열었을 때
+    아래 프로젝트 목록이 왜 걸러져 있는지 칸이 닫힌 동안은 알 길이 없다.
+  */
+  useEffect(() => {
+    if (!searchOpen) {
+      return undefined
+    }
+    const close = (event) => {
+      if (!searchBoxRef.current?.contains(event.target)
+        && !searchButtonRef.current?.contains(event.target)) {
+        setSearchOpen(false)
+        setQuery('')
+      }
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        setSearchOpen(false)
+        setQuery('')
+        searchButtonRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [searchOpen])
 
   const toggleSection = (section) => {
     setOpenSections((current) => ({
@@ -207,9 +242,9 @@ export function Sidebar({
             실시간 아이콘으로 바뀐다 — `GlobalSidebar` 와 같은 훅을 쓰므로
             판정도 팝업도 똑같다.
 
-            검색 아이콘은 새 입력칸을 띄우지 않는다. 바로 아래에 이미
-            `프로젝트 검색` 칸이 있어서, 또 하나를 띄우면 같은 240px 안에
-            검색칸이 둘이 된다. 대신 그 칸으로 포커스만 옮긴다.
+            검색 칸은 눌러야 뜬다 — 늘 펼쳐 두면 최근 항목·즐겨찾기보다
+            위에 항상 자리를 차지해, 프로젝트를 찾을 일이 없는 대부분의
+            방문에서 화면만 차지한다.
           */}
           <div className="sidebar-icon-row" aria-label="주요 화면">
             <div className="sidebar-icon-group">
@@ -316,27 +351,39 @@ export function Sidebar({
             </div>
 
             <button
+              ref={searchButtonRef}
               type="button"
-              className="sidebar-icon-btn"
+              className={searchOpen ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
               aria-label="검색"
+              aria-expanded={searchOpen}
               title="검색"
-              onClick={() => searchInputRef.current?.focus()}
+              onClick={() => setSearchOpen((open) => {
+                const next = !open
+                if (next) {
+                  window.requestAnimationFrame(() => searchInputRef.current?.focus())
+                } else {
+                  setQuery('')
+                }
+                return next
+              })}
             >
               <img src={icons.search} alt="" />
             </button>
           </div>
 
-          <label className="search-box">
-            <img src={icons.search} alt="" aria-hidden="true" />
-            <input
-              ref={searchInputRef}
-              aria-label="프로젝트 검색"
-              type="search"
-              placeholder="프로젝트 검색"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+          {searchOpen ? (
+            <label className="search-box" ref={searchBoxRef}>
+              <img src={icons.search} alt="" aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                aria-label="프로젝트 검색"
+                type="search"
+                placeholder="프로젝트 검색"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+          ) : null}
 
           <nav className="project-nav" aria-label="프로젝트">
             <div className="section-title">
