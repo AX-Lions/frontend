@@ -17,8 +17,8 @@ export const icons = {
   expandLeftDouble: '/icons/Expand_left_double.svg',
   expandRight: '/icons/Expandright.svg',
   home: '/icons/HomeIcon.svg',
-  refresh: '/icons/Refresh.svg',
   search: '/icons/Search.svg',
+  teamSwitch: '/icons/TeamSwitch.svg',
   unchecked: '/icons/unchecked.svg',
 }
 
