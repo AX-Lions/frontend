@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react'
+
 import { AppLink } from '../../app/AppLink.jsx'
 import { api } from '../../lib/api.js'
 import { useResource } from '../../lib/useResource.js'
@@ -81,6 +83,47 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
     (signal) => api.get('/me/inbox', undefined, { signal }), [], { cacheKey: 'inbox' })
   const inboxBadge = pendingTotal(inbox)
 
+  /*
+    검색 아이콘(시안 `576:4796`).
+
+    누르면 옆으로 검색창이 펼쳐지고, **바깥을 누르거나 Esc 를 누르면 접힌다.**
+    아직 가로지를 검색 대상(전체 검색 API)이 없어 입력만 받는다 — 제출은
+    아무 데도 보내지 않는다. 그 뒤는 검색 대상이 정해지면 붙인다.
+  */
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchRef = useRef(null)
+  const searchInputRef = useRef(null)
+
+  useEffect(() => {
+    if (!searchOpen) {
+      return undefined
+    }
+
+    const closeIfOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setSearchOpen(false)
+      }
+    }
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') {
+        setSearchOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', closeIfOutside)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('mousedown', closeIfOutside)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [searchOpen])
+
+  useEffect(() => {
+    if (searchOpen) {
+      searchInputRef.current?.focus()
+    }
+  }, [searchOpen])
+
   // 레일에는 아이콘만 보인다. 여러 계정을 오가는 사람이 지금 누구로 로그인해
   // 있는지 확인할 자리가 여기뿐이라, 이름을 받으면 라벨에 함께 적는다.
   const accountLabel = user?.name ? `개인 설정 · ${user.name}` : '개인 설정'
@@ -108,6 +151,33 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
             ) : null}
           </AppLink>
         ))}
+
+        <div className="global-sidebar-search" ref={searchRef}>
+          <button
+            type="button"
+            className={
+              searchOpen ? 'global-sidebar-link global-sidebar-search-btn active' : 'global-sidebar-link global-sidebar-search-btn'
+            }
+            aria-label="검색"
+            aria-expanded={searchOpen}
+            title="검색"
+            onClick={() => setSearchOpen((open) => !open)}
+          >
+            <img src="/icons/Search.svg" alt="" />
+          </button>
+
+          {searchOpen ? (
+            <form className="global-sidebar-search-panel" onSubmit={(event) => event.preventDefault()}>
+              <img src="/icons/Search.svg" alt="" aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                type="search"
+                placeholder="검색어를 입력하세요..."
+                aria-label="검색어 입력"
+              />
+            </form>
+          ) : null}
+        </div>
       </nav>
 
       <AppLink
