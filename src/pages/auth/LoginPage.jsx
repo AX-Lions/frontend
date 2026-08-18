@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 import { login } from '../../lib/api.js'
 import { navigate } from '../../app/navigation.js'
+import { isMockMode, setMockMode } from '../../mocks/enabled.js'
 import { bannerMessage, fieldErrors } from './authErrors.js'
 import './auth.css'
 
@@ -29,6 +30,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [mock, setMock] = useState(isMockMode)
 
   const fields = fieldErrors(error)
   const banner = bannerMessage(error, fields)
@@ -42,7 +44,9 @@ export function LoginPage() {
     setBusy(true)
     setError(null)
     try {
-      await login(email.trim(), password)
+      // 가상 데이터 모드에서는 확인할 상대가 없다. 빈 값으로 부른다 —
+      // 입력칸을 감춰 뒀으므로 남은 값이 있어도 쓰지 않는다.
+      await login(mock ? '' : email.trim(), mock ? '' : password)
       // 통째로 다시 읽는다. 화면들이 아직 목 데이터를 보고 있어 상태를 이어받을
       // 자리가 없고, 새로 그리는 편이 토큰이 반영된 상태를 확실히 만든다.
       window.location.assign('/')
@@ -68,8 +72,37 @@ export function LoginPage() {
 
         {banner ? <p className="auth-banner" role="alert">{banner}</p> : null}
 
+        {/*
+          서버 없이 화면을 보는 길.
+
+          백엔드가 안 떠 있거나, 내 계정에 아직 팀·프로젝트가 없거나, 시드를
+          다시 올리는 중이면 **화면이 통째로 비어 보인다.** 그 상태로는 UI 를
+          다듬을 수도 남에게 보여 줄 수도 없다.
+
+          켜면 이메일·비밀번호 칸을 감춘다. **확인할 상대가 없는데 비밀번호를
+          받는 척하면 안 된다** — 아무거나 넣어도 통과하는 칸은 사용자에게
+          거짓말이다.
+        */}
+        <label className="auth-mock">
+          <input
+            type="checkbox"
+            checked={mock}
+            disabled={busy}
+            onChange={(event) => {
+              const on = event.target.checked
+              setMock(on)
+              setMockMode(on)
+              setError(null)
+            }}
+          />
+          <span>
+            <strong>가상 백엔드 데이터 사용</strong>
+            <em>서버 없이 채워진 화면을 봅니다. 저장은 남지 않습니다.</em>
+          </span>
+        </label>
+
         <form className="auth-form" onSubmit={submit} noValidate>
-          <div className="auth-field" data-invalid={Boolean(fields.email)}>
+          <div className="auth-field" data-invalid={Boolean(fields.email)} hidden={mock}>
             <label htmlFor="login-email">이메일</label>
             <input
               id="login-email"
@@ -85,7 +118,7 @@ export function LoginPage() {
             ) : null}
           </div>
 
-          <div className="auth-field" data-invalid={Boolean(fields.password)}>
+          <div className="auth-field" data-invalid={Boolean(fields.password)} hidden={mock}>
             <label htmlFor="login-password">비밀번호</label>
             <input
               id="login-password"
@@ -101,12 +134,16 @@ export function LoginPage() {
             ) : null}
           </div>
 
-          <button className="auth-submit" type="submit" disabled={busy || !email || !password}>
-            {busy ? '들어가는 중…' : '로그인'}
+          <button
+            className="auth-submit"
+            type="submit"
+            disabled={busy || (!mock && (!email || !password))}
+          >
+            {busy ? '들어가는 중…' : mock ? '가상 데이터로 둘러보기' : '로그인'}
           </button>
         </form>
 
-        <p className="auth-switch">
+        <p className="auth-switch" hidden={mock}>
           계정이 없으십니까?{' '}
           <button type="button" onClick={() => navigate('/signup')}>회원가입</button>
         </p>
@@ -115,7 +152,7 @@ export function LoginPage() {
           시연·개발용입니다. 계정을 외워 두지 않아도 화면을 볼 수 있어야 합니다.
           실서비스 화면이 되면 이 블록은 지웁니다.
         */}
-        <div className="auth-demo">
+        <div className="auth-demo" hidden={mock}>
           <h2>데모 계정</h2>
           <div className="auth-demo-list">
             {DEMO_ACCOUNTS.map((account) => (
