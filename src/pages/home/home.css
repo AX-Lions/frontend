@@ -481,11 +481,52 @@ h1 {
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 2px;
-  scrollbar-width: thin;
+}
+
+/*
+  가로 스크롤바 — **화살표 없이 막대만.**
+
+  Chromium 계열은 `scrollbar-width` · `scrollbar-color` 를 적어 두면 그쪽을
+  쓰고 `::-webkit-` 규칙을 통째로 무시한다. 그런데 **양 끝 화살표를 없애는
+  표준 속성이 없다** — 그래서 표준 속성은 그쪽을 모르는 브라우저(Firefox)에만
+  주고, Chromium 에는 아래 규칙이 닿게 둔다.
+*/
+.project-strip::-webkit-scrollbar {
+  height: 8px;
+}
+
+/* 양 끝 화살표. `display: none` 만으로는 자리가 남는 판이 있어 크기도 0 으로 둔다. */
+.project-strip::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.project-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.project-strip::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #25272b;
+}
+
+/* `::-webkit-scrollbar` 를 모르는 브라우저(Firefox)만 여기로 온다. 그쪽은
+   화살표를 애초에 안 그리므로 색과 굵기만 주면 된다. */
+@supports not selector(::-webkit-scrollbar) {
+  .project-strip {
+    scrollbar-width: thin;
+    scrollbar-color: #25272b transparent;
+  }
 }
 
 .project-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
   position: relative;
+  /* 폭을 넘기지 않는다. 그리드 자식의 `min-width` 기본값이 `auto` 라, 이것이
+     없으면 이름이 긴 카드 한 장이 제 칸을 넘겨 줄 전체를 늘린다. */
+  min-width: 0;
   width: 180px;
   height: 169px;
   border: 1px solid #e5e7eb;
@@ -522,14 +563,6 @@ h1 {
 }
 
 /* 시각과 뱃지가 카드 바닥에 함께 앉는다. */
-.card-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin-top: auto;
-}
-
 /*
   `불참한 회의` 뱃지.
 
@@ -537,7 +570,18 @@ h1 {
   중 어느 것이 그 회의인지가 카드에서 가장 먼저 읽혀야 한다. 요약 카드의
   같은 뱃지와 색을 맞춘다.
 */
+/* 뱃지가 앉는 줄. 비어 있어도 높이를 지킨다. */
+.missed-slot {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  margin-top: 8px;
+}
+
 .missed-badge {
+  /* **제목 바로 밑**이다. 아래(날짜 옆)에 두면 다섯 장을 훑을 때 눈이 카드
+     바닥까지 내려가야 이 회의가 그 회의인지 알 수 있다. 제목을 읽는 자리에서
+     바로 보여야 한다. */
   flex: 0 0 auto;
   border-radius: 8px;
   background: #ffe6e6;
@@ -557,9 +601,54 @@ h1 {
  * 블록 흐름도 세로로 쌓는 것은 같다. 대신 안쪽 인라인 요소를 블록으로
  * 만들어 줘야 줄이 갈린다.
  */
+/*
+  카드 안은 **자리가 정해진 표**다.
+
+      회사 이름
+      제목        (두 줄 자리 고정)
+      뱃지 자리   (비어도 남겨 둔다)
+      날짜        (카드 아래)
+
+  남는 공간을 `margin-top: auto` 로 나눠 갖게 했더니, 뱃지 한 줄이 생기는 것만으로
+  **위쪽 요소까지 전부 움직였다.** 회사 이름이 불참 카드에서는 27px, 아닌 카드에서는
+  42px 에서 시작해 다섯 장이 어긋나 보였다 — `auto` 여백이 둘이라 늘어난 높이의
+  절반씩을 서로 물어냈기 때문이다.
+
+  줄을 정해 두면 뱃지가 있든 없든 같은 자리다. 뱃지 자리를 비어도 남기는 이유도
+  같다 — 그 줄이 사라지면 위가 다시 밀린다.
+*/
 .project-card-link {
-  display: block;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
   height: 100%;
+}
+
+/*
+  링크는 제목 아래만 감싸지만 **누르는 자리는 카드 전체**다.
+
+  덮개를 깔아 카드를 덮되, 별은 그 위로 올려 둔다(`z-index`). 이렇게 해야
+  카드 아무 데나 눌러 회의로 가면서도 별은 별대로 눌린다.
+*/
+.project-card-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+/* 회사 이름과 별이 서는 줄. 이름이 남는 폭을 갖고, 별은 제 크기만 갖는다 —
+   이름이 아무리 길어도 별 자리를 침범할 수 없다.
+
+   `min-width: 0` 이 없으면 안 된다. 그리드·플렉스 자식의 기본값은 `auto` 라
+   **내용보다 좁아지지 않는다** — 긴 프로젝트 이름이 줄을 밀어 카드를 통째로
+   넓히고, 말줄임은 걸릴 자리를 잃는다. 예전에 이름 쪽에 `max-width: 108px` 를
+   박아 둔 것도 그 증상을 숫자로 눌러 둔 것이었다. */
+.project-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 18px;
 }
 
 .project-card .meeting-company,
@@ -567,9 +656,15 @@ h1 {
   display: block;
 }
 
+/* 마지막 줄(`1fr`) 안에서 아래에 붙는다. 다섯 장을 나란히 놓았을 때 눈이 한 줄을
+   훑을 수 있어야 해서, 제목이 한 줄이든 두 줄이든 같은 높이에 온다. */
+.project-card time {
+  align-self: end;
+}
+
 .project-card .meeting-company {
-  max-width: 108px;
-  margin-bottom: 18px;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   color: #1f1f1f;
   font-size: 13px;
@@ -578,12 +673,21 @@ h1 {
   white-space: nowrap;
 }
 
-/* 두 줄까지만 보이고 나머지는 `…` 로. 부모가 블록 흐름이라야 동작한다
-   (`.project-card-link` 주석 참고). */
+/*
+  제목은 **필요한 만큼만 차지하고 두 줄에서 끊는다.**
+
+  `min-height: 40px` 로 두 줄 자리를 늘 비워 두면, 한 줄짜리 제목 아래에 빈
+  줄이 남아 뱃지가 제목에서 멀찍이 떨어진 것처럼 보인다. 높이는 `auto` 로 두고
+  `max-height` 로만 막는다 — 넘치는 글자는 `…` 로 끊긴다.
+
+  폭도 124px 로 묶여 있었다. 즐겨찾기 별은 카드 맨 위 줄에만 걸치므로 제목은
+  카드 폭을 다 써도 된다. 24px 이 늘면 그만큼 덜 접힌다.
+*/
 .project-card strong {
   display: -webkit-box;
-  width: min(100%, 124px);
-  min-height: 40px;
+  max-width: 100%;
+  /* 두 줄. `line-height: 1.2` 와 짝이라 한쪽만 고치면 세 번째 줄이 반쯤 보인다. */
+  max-height: 2.4em;
   overflow: hidden;
   font-size: 16px;
   font-weight: 600;
@@ -594,9 +698,9 @@ h1 {
 }
 
 .favorite-mark {
-  position: absolute;
-  top: 16px;
-  right: 16px;
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
   width: 24px;
   height: 24px;
   border-radius: 4px;
@@ -637,6 +741,18 @@ h1 {
   min-height: 279px;
 }
 
+/*
+  줄 배치를 **창이 아니라 이 패널의 폭**으로 정한다.
+
+  이 패널은 대시보드 칸 안에 있어서 창 너비와 폭이 같이 움직이지 않는다 —
+  칸이 둘이 되느냐 하나가 되느냐에 따라 창은 그대로인데 폭만 절반이 된다.
+  미디어 쿼리로 잡으면 그 순간을 못 맞춘다.
+*/
+.schedule-panel {
+  container-type: inline-size;
+  container-name: schedule;
+}
+
 .schedule-panel .section-heading,
 .summary-panel .section-heading {
   margin-bottom: 0;
@@ -659,33 +775,84 @@ h1 {
   padding: 16px 9px;
 }
 
+/*
+  한 줄에 셋 — 시각 · 회의 · 버튼.
+
+  좁아지면 아래 컨테이너 쿼리가 이 배치를 두 번 바꾼다. 자리 이름을 붙여 두면
+  칸 수만 다시 적으면 되고, 요소 순서를 건드리지 않아도 된다.
+*/
 .schedule-item {
   display: grid;
   width: 100%;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'time info action';
+  grid-template-columns: max-content minmax(0, 1fr) auto;
   /* 48px 고정이면 좁아질 때 그만큼이 그대로 회의 제목에서 빠진다.
      제목이 잘리는 것보다 사이가 좁아지는 편이 낫다. */
-  gap: clamp(12px, 4vw, 48px);
+  column-gap: clamp(12px, 2vw, 20px);
   align-items: center;
   padding-right: 16px;
 }
 
+.schedule-time {
+  grid-area: time;
+}
+
 .schedule-info {
-  display: grid;
+  grid-area: info;
+}
+
+.schedule-item > button:last-child {
+  grid-area: action;
+}
+
+/*
+  좁을 때 — 시각이 제 줄로 빠지고, 회의와 버튼이 그 아래 나란히 (시안 `754:5742`).
+
+  버튼 라벨이 `회의에 참여하지 않아요` 라 168px 을 늘 차지한다. 셋이 한 줄에
+  서면 회의 이름에 남는 폭이 100px 아래로 떨어져 제목이 접히기 시작한다.
+*/
+@container schedule (max-width: 440px) {
+  .schedule-item {
+    grid-template-areas:
+      'time time'
+      'info action';
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 4px;
+  }
+}
+
+/* 아주 좁을 때 — 셋이 차례로 (시안 `754:5723`). 버튼까지 내려야 회의 이름이
+   한 줄을 온전히 쓴다. */
+@container schedule (max-width: 260px) {
+  .schedule-item {
+    grid-template-areas:
+      'time'
+      'info'
+      'action';
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+    justify-items: start;
+  }
+}
+
+.schedule-info {
+  display: block;
   min-width: 0;
-  /* 폭을 고정하면 좁은 창에서 안쪽이 **표시 없이 잘린다.** 실측 142px 내용이
-     128px 상자에 들어가 회의 제목 끝이 사라졌다. 최대만 잡고 줄어들게 둔다. */
   width: 100%;
-  max-width: 274px;
-  /* 간격도 고정 32px 이면 좁아질 때 그만큼이 내용에서 빠진다. */
-  grid-template-columns: minmax(60px, 74px) minmax(0, 1fr);
-  gap: clamp(12px, 3vw, 32px);
-  align-items: center;
   overflow: hidden;
   border-radius: 8px;
-  padding: 8px 16px;
+  padding: 8px 12px;
   color: #1f1f1f;
   text-align: left;
+  /*
+    한국어를 **단어 중간에서 자르지 않는다.**
+
+    기본값이면 `정기 팀 회의` 가 `정기 팀 회` / `의` 로 갈린다 — 한글은 글자마다
+    줄바꿈이 허용되기 때문이다. `keep-all` 은 띄어쓰기에서만 넘긴다. 대신 한
+    낱말이 칸보다 길면 넘칠 수 있어 `break-word` 를 함께 둔다(그때만 쪼갠다).
+  */
+  word-break: keep-all;
+  overflow-wrap: break-word;
   transition: background 120ms ease;
 }
 
@@ -698,7 +865,7 @@ h1 {
   background: #e5e7eb;
 }
 
-.schedule-info time,
+.schedule-time,
 .schedule-info span,
 .summary-title-stack span,
 .summary-state time {
@@ -707,8 +874,18 @@ h1 {
   line-height: 1.35;
 }
 
+/* 시각은 접지 않는다. 칸이 `max-content` 라 이 한 줄이 칸 너비를 정한다. */
+.schedule-time {
+  white-space: nowrap;
+}
+
 .schedule-info strong {
-  display: block;
+  /* 두 줄까지만 보이고 넘치면 말줄임. 제목이 긴 회의가 들어와도 줄이
+     세로로 늘어나 옆 버튼과 어긋나지 않는다. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   margin-bottom: 7px;
   font-size: 16px;
   font-weight: 600;
@@ -720,7 +897,7 @@ h1 {
   height: 36px;
   border-radius: 999px;
   background: #f3f4f6;
-  padding: 0 20px;
+  padding: 0 16px;
   font-size: 14px;
   font-weight: 600;
   transition: background 160ms ease;
@@ -1186,18 +1363,13 @@ h1 {
     padding: 14px;
   }
 
-  .project-card .meeting-company {
+  /* 줄 간격은 이제 머리줄이 갖는다(`.project-card-head`). */
+  .project-card-head {
     margin-bottom: 12px;
   }
 
   .project-card strong {
-    min-height: 34px;
     font-size: 14px;
-  }
-
-  .favorite-mark {
-    top: 12px;
-    right: 12px;
   }
 
   .dashboard-grid {
@@ -1234,7 +1406,7 @@ h1 {
     font-size: 14px;
   }
 
-  .schedule-info time,
+  .schedule-time,
   .schedule-info span,
   .summary-title-stack span,
   .summary-state time {
@@ -1315,23 +1487,20 @@ h1 {
     padding: 10px 12px;
   }
 
-  .project-card .meeting-company {
+  .project-card-head {
     margin-bottom: 8px;
+  }
+
+  .project-card .meeting-company {
     font-size: 11px;
   }
 
   .project-card strong {
-    min-height: 30px;
     font-size: 13px;
   }
 
   .project-card time {
     font-size: 10px;
-  }
-
-  .favorite-mark {
-    top: 8px;
-    right: 8px;
   }
 
   .dashboard-grid {
