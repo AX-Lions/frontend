@@ -62,7 +62,7 @@ export function FlowCanvas({
   className = '',
   highlightedEdgeIds,
   layout,
-  myAgentNodeId,
+  myNodeId,
   onBadgeSelect,
   onNodeSelect,
   selectedNodeId,
@@ -127,7 +127,7 @@ export function FlowCanvas({
         <FlowNode
           key={node.id}
           node={node}
-          isMine={node.id === myAgentNodeId}
+          isMine={node.id === myNodeId}
           isSelected={node.id === selectedNodeId}
           onSelect={onNodeSelect}
         />
@@ -137,7 +137,7 @@ export function FlowCanvas({
         const lit = isHighlighted(badge.arrow)
         return (
           <div
-            className={`flow-badge-group is-${badge.axis}${lit ? '' : ' is-dimmed'}`}
+            className={`flow-badge-group is-${badge.axis}${badge.isSelf ? ' is-self' : ''}${lit ? '' : ' is-dimmed'}`}
             key={badge.id}
             style={{ left: badge.x, top: badge.y }}
             onPointerDown={(event) => event.stopPropagation()}
