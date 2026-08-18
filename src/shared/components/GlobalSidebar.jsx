@@ -36,6 +36,12 @@ const globalNavItems = [
     label: '채팅',
     icon: '/icons/Chat.svg',
   },
+  {
+    id: 'inbox',
+    href: '/inbox',
+    label: '요청함',
+    icon: '/icons/InboxIcon.svg',
+  },
 ]
 
 /*

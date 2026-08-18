@@ -33,6 +33,7 @@ const loadPage = {
   chat: () => import('../pages/chat/ChatPage.jsx'),
   account: () => import('../pages/account/AccountPage.jsx'),
   delegatePrep: () => import('../pages/delegatePrep/DelegatePrepPage.jsx'),
+  inbox: () => import('../pages/inbox/InboxPage.jsx'),
 }
 
 /*
@@ -46,6 +47,7 @@ const ChatPage = lazy(() => loadPage.chat().then((m) => ({ default: m.ChatPage }
 const AccountPage = lazy(() => loadPage.account().then((m) => ({ default: m.AccountPage })))
 const DelegatePrepPage = lazy(
   () => loadPage.delegatePrep().then((m) => ({ default: m.DelegatePrepPage })))
+const InboxPage = lazy(() => loadPage.inbox().then((m) => ({ default: m.InboxPage })))
 
 /**
  * 첫 화면이 뜨고 손이 빈 틈에 나머지를 미리 받아 둔다.
@@ -153,6 +155,10 @@ export function AppRouter() {
 
   if (path === '/account') {
     return <Screen><AccountPage /></Screen>
+  }
+
+  if (path === '/inbox') {
+    return <Screen><InboxPage /></Screen>
   }
 
   /*

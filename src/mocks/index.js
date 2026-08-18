@@ -35,6 +35,7 @@ import {
 } from './data/meetings.js'
 import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
 import { teamMembers } from './data/home.js'
+import { inbox } from './data/inbox.js'
 import {
   activeDates, chatCandidates, chatImportant, chatRooms,
   dailySummaries, roomDetails, roomMessages,
@@ -163,6 +164,7 @@ function resolve(path, method, body) {
       // 읽는 순간 원래대로 돌아간다.
       return { ...viewerAgentSettings(), ...(patchedOf('agent-settings') ?? {}) }
     }
+    if (path === '/me/inbox') return inbox
     if (path === '/me/agent/prompts') return viewerAgentPrompts()
     if (path === '/me/agent/conversations') return viewerConversations()
     if (a === 'me' && s[2] === 'conversations' && s[4] === 'messages') {
