@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { getCurrentTeamId, setCurrentTeamId } from '../../lib/currentTeam.js'
-import { useEscapeToClose } from './useEscapeToClose.js'
+import { useEscapeToClose } from '../../shared/hooks/useEscapeToClose.js'
 import { fetchTeamProjects, fetchTeams } from './home.api.js'
 import './newProject.css'
 import './teamSwitch.css'

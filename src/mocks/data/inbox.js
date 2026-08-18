@@ -25,17 +25,20 @@ function label(project) {
   return `${TEAM.name} · ${project.name}`
 }
 
-function item({ id, meetingId, title, project, needsAnswer = 0, needsConfirm = 0, needsApproval = 0 }) {
+function item({ id, meetingId, title, project, needsAnswer = 0, needsConfirm = 0, pendingApprovalTaskIds = [] }) {
   return {
     id,
     meeting_id: meetingId,
     title,
     project_label: label(project),
     // 셋 중 하나라도 남아 있으면 눈에 띄어야 하니 점을 켠다.
-    urgent: needsAnswer + needsConfirm + needsApproval > 0,
+    urgent: needsAnswer + needsConfirm + pendingApprovalTaskIds.length > 0,
     needs_answer: needsAnswer,
     needs_confirm: needsConfirm,
-    needs_approval: needsApproval,
+    // `needs_approval` 은 이 목록의 길이다 — 태스크 하나가 승인·반려되면
+    // `index.js` 의 GET 처리가 다시 셀 수 있도록 id 를 들고 있는다.
+    needs_approval: pendingApprovalTaskIds.length,
+    pending_approval_task_ids: pendingApprovalTaskIds,
   }
 }
 
@@ -52,7 +55,6 @@ export const inbox = {
           project: PROJECTS.bordo,
           needsAnswer: 3,
           needsConfirm: 1,
-          needsApproval: 0,
         }),
         item({
           id: 'req-2',
@@ -61,7 +63,7 @@ export const inbox = {
           project: PROJECTS.bordo,
           needsAnswer: 1,
           needsConfirm: 0,
-          needsApproval: 2,
+          pendingApprovalTaskIds: ['task-req2-a', 'task-req2-b'],
         }),
         item({
           id: 'req-3',
@@ -70,7 +72,6 @@ export const inbox = {
           project: PROJECTS.bordo,
           needsAnswer: 0,
           needsConfirm: 2,
-          needsApproval: 0,
         }),
         item({
           id: 'req-4',
@@ -79,7 +80,7 @@ export const inbox = {
           project: PROJECTS.academy,
           needsAnswer: 2,
           needsConfirm: 0,
-          needsApproval: 1,
+          pendingApprovalTaskIds: ['task-req4-a'],
         }),
       ],
     },
@@ -94,7 +95,6 @@ export const inbox = {
           project: PROJECTS.bordo,
           needsAnswer: 1,
           needsConfirm: 0,
-          needsApproval: 0,
         }),
         item({
           id: 'req-6',
@@ -103,7 +103,7 @@ export const inbox = {
           project: PROJECTS.academy,
           needsAnswer: 0,
           needsConfirm: 1,
-          needsApproval: 1,
+          pendingApprovalTaskIds: ['task-req6-a'],
         }),
       ],
     },
@@ -118,7 +118,6 @@ export const inbox = {
           project: PROJECTS.academy,
           needsAnswer: 0,
           needsConfirm: 0,
-          needsApproval: 0,
         }),
       ],
     },

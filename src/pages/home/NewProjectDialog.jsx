@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createProject, fetchTeamMembers, fetchTeams } from './home.api.js'
 import { NewTeamDialog } from './NewTeamDialog.jsx'
 import { NumberBox, TextBox, TimeBox } from './newProjectBits.jsx'
-import { useEscapeToClose } from './useEscapeToClose.js'
+import { useEscapeToClose } from '../../shared/hooks/useEscapeToClose.js'
 import './newProject.css'
 
 /**

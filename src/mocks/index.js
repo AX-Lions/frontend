@@ -37,6 +37,7 @@ import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
 import { teamMembers } from './data/home.js'
 import { inbox } from './data/inbox.js'
 import { TEAM } from './data/people.js'
+import { tasks } from './data/tasks.js'
 import {
   activeDates, chatCandidates, chatRooms,
   dailySummaries, roomDetails, roomMessages,
@@ -124,6 +125,37 @@ function applyDelegations(home) {
 /** `/meetings/{id}/flow` 처럼 id 가 낀 주소를 가른다. */
 function segments(path) {
   return path.split('?')[0].split('/').filter(Boolean)
+}
+
+/** 이번에 승인·반려한 태스크면 그 상태를 덮어 얹는다. */
+function effectiveTask(id) {
+  const base = tasks[id]
+  return base ? { ...base, ...patchedOf(`task:${id}`) } : null
+}
+
+/**
+ * 이번에 승인·반려한 것을 요청함 응답에 비춘다.
+ *
+ * `승인 필요` 줄의 숫자와 그 뒤에 붙은 태스크 id 목록은 정적 목이라, 승인
+ * 팝업에서 하나를 처리해도 다시 읽으면 그대로다 — 처리한 태스크를
+ * 걸러내야 뱃지 숫자가 줄고, 다음에 열었을 때 이미 끝난 태스크가 또 뜨지
+ * 않는다.
+ */
+function applyTaskPatches(base) {
+  const groups = base.groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => {
+      const pending = (item.pending_approval_task_ids ?? [])
+        .filter((id) => effectiveTask(id)?.status === 'PENDING_APPROVAL')
+      return {
+        ...item,
+        pending_approval_task_ids: pending,
+        needs_approval: pending.length,
+        urgent: item.needs_answer + item.needs_confirm + pending.length > 0,
+      }
+    }),
+  }))
+  return { ...base, groups }
 }
 
 /**
@@ -262,7 +294,8 @@ function resolve(path, method, body) {
       // 읽는 순간 원래대로 돌아간다.
       return { ...viewerAgentSettings(), ...(patchedOf('agent-settings') ?? {}) }
     }
-    if (path === '/me/inbox') return inbox
+    if (path === '/me/inbox') return applyTaskPatches(inbox)
+    if (a === 'tasks' && b && !c) return effectiveTask(b)
     if (path === '/me/agent/prompts') return viewerAgentPrompts()
     if (path === '/me/agent/conversations') return viewerConversations()
     if (a === 'me' && s[2] === 'conversations' && s[4] === 'messages') {
@@ -411,6 +444,49 @@ function resolve(path, method, body) {
     // 안 보낸 스위치가 전부 꺼지고 대리인 이름이 지워진다.
     if (path === '/me/agent/settings') {
       return { ...viewerAgentSettings(), ...patch('agent-settings', body ?? {}) }
+    }
+
+    /*
+      태스크 승인 · 반려(승인 필요 상세 내용 팝업, 시안 `701:5558`).
+
+      `POST /tasks/{id}/approve|reject` 는 실제로 붙어 있는 주소다(백엔드
+      `apps/tasks/views.py`). 요청함의 `승인 필요` 줄이 여기로 이어진다.
+    */
+    if (a === 'tasks' && c === 'approve') {
+      const before = effectiveTask(b)
+      if (!before) {
+        throw notMocked(path)
+      }
+      const saved = patch(`task:${b}`, { status: 'TODO' })
+      return {
+        ...before,
+        ...saved,
+        previous_status: 'PENDING_APPROVAL',
+        approved_by: viewerMe().id,
+        approved_at: new Date().toISOString(),
+      }
+    }
+    if (a === 'tasks' && c === 'reject') {
+      const before = effectiveTask(b)
+      if (!before) {
+        throw notMocked(path)
+      }
+      if (!body?.reason?.trim()) {
+        throw mockError({
+          code: 'VALIDATION_ERROR',
+          message: '반려 사유를 입력해 주십시오.',
+          details: { reason: ['반려 사유를 입력해 주십시오.'] },
+        })
+      }
+      patch(`task:${b}`, { status: 'REJECTED' })
+      return {
+        id: b,
+        status: 'REJECTED',
+        previous_status: 'PENDING_APPROVAL',
+        rejected_by: viewerMe().id,
+        reason: body.reason.trim(),
+        rejected_at: new Date().toISOString(),
+      }
     }
 
     // 불참 등록. 홈이 이것을 읽어 버튼을 `대리 참석 중` 으로 바꾼다.

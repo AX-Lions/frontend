@@ -4,8 +4,10 @@ import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 import { useResource } from '../../lib/useResource.js'
 import { navigate } from '../../app/navigation.js'
+import { ApprovalDialog } from './ApprovalDialog.jsx'
 import { fetchInbox } from './inbox.data.js'
 import './inbox.css'
+import './approval.css'
 
 /**
  * 내 요청함.
@@ -23,6 +25,9 @@ export function InboxPage() {
   const { data, error, loading, reload } = useResource(fetchInbox, [], { cacheKey: 'inbox' })
   const [query, setQuery] = useState('')
   const [openDates, setOpenDates] = useState(null)
+  // 「승인 필요」 줄이 여는 팝업의 대상 태스크. 항목마다 태스크가 여럿일 수
+  // 있어(`pending_approval_task_ids`) 맨 앞 것부터 하나씩 처리한다.
+  const [approvingTaskId, setApprovingTaskId] = useState(null)
 
   const groups = useMemo(() => data?.groups ?? [], [data])
 
@@ -131,6 +136,7 @@ export function InboxPage() {
                             key={item.id}
                             item={item}
                             onOpen={() => navigate(`/flow-board?meeting=${item.meeting_id}`)}
+                            onApprove={() => setApprovingTaskId(item.pending_approval_task_ids?.[0] ?? null)}
                           />
                         ))}
                       </div>
@@ -142,15 +148,25 @@ export function InboxPage() {
           </div>
         )}
       </main>
+
+      {approvingTaskId ? (
+        <ApprovalDialog
+          taskId={approvingTaskId}
+          onClose={() => setApprovingTaskId(null)}
+          // 승인·반려 뒤 다시 읽는다. 처리한 태스크는 `applyTaskPatches` 가
+          // 걸러내므로 뱃지 숫자가 그만큼 줄어든 채로 돌아온다.
+          onResolved={() => reload()}
+        />
+      ) : null}
     </div>
   )
 }
 
-function InboxCard({ item, onOpen }) {
+function InboxCard({ item, onOpen, onApprove }) {
   const rows = [
-    { label: '답변 필요', count: item.needs_answer },
-    { label: '확인 필요', count: item.needs_confirm },
-    { label: '승인 필요', count: item.needs_approval },
+    { label: '답변 필요', count: item.needs_answer, onClick: onOpen },
+    { label: '확인 필요', count: item.needs_confirm, onClick: onOpen },
+    { label: '승인 필요', count: item.needs_approval, onClick: onApprove },
   ]
 
   return (
@@ -170,7 +186,7 @@ function InboxCard({ item, onOpen }) {
             type="button"
             className="inbox-card-row"
             disabled={row.count === 0}
-            onClick={onOpen}
+            onClick={row.onClick}
           >
             <span>{row.label}</span>
             <span className="inbox-card-count">{row.count}</span>

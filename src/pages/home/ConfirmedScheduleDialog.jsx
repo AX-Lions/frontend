@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { navigate } from '../../app/navigation.js'
 import { fetchMeetingParticipants, fetchMeetingPrepHeader } from './home.api.js'
-import { useEscapeToClose } from './useEscapeToClose.js'
+import { useEscapeToClose } from '../../shared/hooks/useEscapeToClose.js'
 import './confirmedSchedule.css'
 
 /**
