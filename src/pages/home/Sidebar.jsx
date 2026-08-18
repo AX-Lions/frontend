@@ -38,7 +38,14 @@ function goInApp(event, href) {
   navigate(href)
 }
 
+/*
+  접힘 상태는 **위(`HomePage`)가 들고 있다.** 전역 레일도 같이 접혀야 하는데,
+  레일은 이 컴포넌트 밖에 있는 형제라 여기서 손이 닿지 않는다. 두 곳이 같은
+  값을 봐야 하므로 값은 공통 부모에 둔다.
+*/
 export function Sidebar({
+  isCollapsed = false,
+  onToggleCollapse,
   recentProjects = [],
   favoriteProjects = [],
   shortcuts,
@@ -47,7 +54,6 @@ export function Sidebar({
   meetingIdByProject = {},
   onAddProject,
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
   const [query, setQuery] = useState('')
   const [openSections, setOpenSections] = useState({
     recent: true,
@@ -136,7 +142,7 @@ export function Sidebar({
           type="button"
           aria-label={isCollapsed ? '사이드바 열기' : '사이드바 접기'}
           aria-expanded={!isCollapsed}
-          onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+          onClick={onToggleCollapse}
         >
           <img src={icons.menu} alt="" />
         </button>

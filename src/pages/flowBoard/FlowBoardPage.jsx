@@ -343,7 +343,7 @@ export function FlowBoardPage() {
 
   return (
     <div className="flow-board-page">
-      <FlowRail />
+      <FlowRail collapsed={ui.isFlowSidebarCollapsed} />
 
       <FlowNavigationSidebar
         activeCategory={mode}

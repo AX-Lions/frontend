@@ -7,6 +7,11 @@ import './GlobalSidebar.css'
  * 링크는 전부 `AppLink` 다 — 문서를 다시 받지 않으면서 새 탭 열기·주소 복사는
  * 그대로 되는 이유는 그쪽에 적어 뒀다.
  *
+ * `collapsed` 를 주면 폭 0 으로 접힌다. 옆에 붙는 화면 사이드바(홈의 프로젝트
+ * 목록, 플로우의 회의 탐색)가 접힐 때 레일만 남아 있으면 **접었는데 왼쪽이
+ * 그대로 두 칸인 것처럼** 보인다. 그래서 같이 접는다 — 다시 펴는 버튼은 접힌
+ * 사이드바 쪽에 떠 있으므로 레일이 사라져도 돌아올 길은 남는다.
+ *
  * `onNavigate` 를 주면 이동 직전에 불린다. 화면이 자기 사정으로 이동을 막을 수
  * 있다(채팅 안의 설정 화면처럼 주소는 그대로인데 패널만 닫히는 경우).
  * 그쪽에서 `preventDefault()` 하면 주소는 바뀌지 않는다.
@@ -40,7 +45,7 @@ const globalNavItems = [
 */
 const accountItem = { id: 'account', href: '/account', label: '개인 설정' }
 
-export function GlobalSidebar({ active = 'home', onNavigate, user }) {
+export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, user }) {
   const className = (id, base) => (active === id ? `${base} active` : base)
   const current = (id) => (active === id ? 'page' : undefined)
 
@@ -49,7 +54,11 @@ export function GlobalSidebar({ active = 'home', onNavigate, user }) {
   const accountLabel = user?.name ? `개인 설정 · ${user.name}` : '개인 설정'
 
   return (
-    <aside className="global-sidebar" aria-label="주요 메뉴">
+    <aside
+      className={collapsed ? 'global-sidebar is-collapsed' : 'global-sidebar'}
+      aria-label="주요 메뉴"
+      inert={collapsed}
+    >
       <nav className="global-sidebar-nav" aria-label="주요 화면">
         {globalNavItems.map((item) => (
           <AppLink
