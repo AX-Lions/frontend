@@ -852,13 +852,21 @@
   --tone-ink: #d97706;
 }
 
-/* ─────────────────────────────────────────── 중앙 요약표 */
+/* ─────────────────────────────────────────── 상단 요약표 */
 
+/*
+  판 맨 위에 고정된다. 자리와 크기는 `flowLayout` 이 인라인으로 준다 —
+  높이가 곧 그래프가 시작하는 자리라 CSS 와 배치 계산이 같은 값을 봐야 한다.
+
+  `align-items: start` 였다. 열마다 줄 수가 달라 짧은 열이 위로 붙었고, 그
+  열의 점선 구분선도 같이 짧아져 **세 열이 삐뚤게 잘린 것처럼 보였다.**
+  늘려 두면 구분선이 상자 아래까지 내려간다.
+*/
 .summary-board {
   position: absolute;
   z-index: 4;
   display: grid;
-  align-items: start;
+  align-items: stretch;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   padding: 24px;
@@ -872,13 +880,15 @@
   min-width: 0;
 }
 
+/* 189px 로 박혀 있었다. 요약표 높이가 266px 고정일 때 맞춰 잰 값이라, 상자가
+   줄 수를 따라 커지고 작아지게 된 지금은 남거나 모자란다. 위아래로 걸어 둔다. */
 .summary-column:not(:last-child)::after {
   content: '';
   position: absolute;
   top: 28px;
   right: -8px;
+  bottom: 0;
   width: 1px;
-  height: 189px;
   background: repeating-linear-gradient(
     to bottom,
     #e5e7eb 0,

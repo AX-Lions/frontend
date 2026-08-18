@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useSearchParam } from '../../app/navigation.js'
 import './flowBoard.css'
@@ -8,7 +8,7 @@ import { FlowEdgePanel, FlowNodePanel } from './FlowInspectorPanel'
 import { FlowNavigationSidebar } from './FlowNavigationSidebar'
 import { FlowRail } from './FlowRail'
 import { icons, toneLabels } from './flowBoard.api'
-import { toneOf } from './flowBoard.data'
+import { fetchBriefing, toneOf } from './flowBoard.data'
 import { buildFlowLayout } from './flowLayout'
 import {
   MEETING_MODE,
@@ -93,6 +93,29 @@ export function FlowBoardPage() {
   const projectId = meeting.data?.projectId ?? null
   const projectName = meeting.data?.projectName ?? ''
 
+  /*
+    브리핑을 **실제로 열었을 때만** 읽음으로 올린다.
+
+    이 화면은 패널을 열든 말든 회의를 열 때 브리핑을 부른다. 그래서 회의 화면에
+    잠깐 들른 것만으로 홈의 `Bordo 브리핑 보러가기` 가 사라졌다 — 사용자는 읽은
+    적이 없는데 읽은 것이 된다. 자동 조회는 `markRead: false` 로 바꿨고, 올리는
+    것은 여기 한 곳이다.
+
+    회의마다 한 번만 보낸다. 패널을 닫았다 다시 열 때마다 보내면 같은 요청이
+    의미 없이 반복된다 — 이미 읽음인 것을 다시 읽음으로 만들 뿐이다.
+
+    실패는 삼킨다. 읽음 표시를 못 올렸다고 브리핑을 못 보여 줄 이유가 없다.
+  */
+  const markedMeetingRef = useRef(null)
+  const briefingOpen = panel?.kind === 'briefing'
+  useEffect(() => {
+    if (!briefingOpen || !meetingId || markedMeetingRef.current === meetingId) {
+      return
+    }
+    markedMeetingRef.current = meetingId
+    fetchBriefing(meetingId).catch(() => {})
+  }, [briefingOpen, meetingId])
+
   const ui = useFlowBoardUi()
   const indexes = useFlowIndexes(meetingId, mode)
   const options = useFlowOptions(mode, meetingId, projectId)
@@ -124,9 +147,31 @@ export function FlowBoardPage() {
     contentTypes: excludedContents.length ? pickedContents : [],
   })
 
+  const summaryColumns = useMemo(
+    () => toSummaryColumns(meeting.data?.summary),
+    [meeting.data],
+  )
+
+  /*
+    요약표에서 가장 긴 열의 줄 수.
+
+    배치보다 **먼저** 구해야 한다. 요약표가 판 맨 위에 고정되면서 상자의
+    아래 경계가 곧 그래프가 시작하는 자리가 됐다. 높이를 모르면 노드를
+    어디부터 앉힐지 정할 수 없다 — 넉넉히 잡으면 상자와 노드 사이가 허옇게
+    뜨고, 모자라게 잡으면 상자가 노드를 덮는다.
+
+    작업 모드는 요약표 자리에 "아직 서버에 없습니다" 안내문만 뜨므로 0 이다.
+  */
+  const summaryRows = useMemo(
+    () => (mode === WORK_MODE
+      ? 0
+      : summaryColumns.reduce((rows, column) => Math.max(rows, column.items.length), 0)),
+    [mode, summaryColumns],
+  )
+
   const layout = useMemo(
-    () => buildFlowLayout(flow.data?.nodes ?? [], flow.data?.arrows ?? []),
-    [flow.data],
+    () => buildFlowLayout(flow.data?.nodes ?? [], flow.data?.arrows ?? [], { summaryRows }),
+    [flow.data, summaryRows],
   )
 
   // 무대 크기를 배치에서 가져온다. 776×931 이 `BOARD_CONTENT_BOUNDS` · SVG
@@ -163,11 +208,6 @@ export function FlowBoardPage() {
       ? (flow.data?.nodes ?? []).find((n) => n.kind === 'AGENT' && n.user_id === myId)?.id ?? null
       : null
   }, [flow.data, me.data])
-
-  const summaryColumns = useMemo(
-    () => toSummaryColumns(meeting.data?.summary),
-    [meeting.data],
-  )
 
   /*
     강조할 화살표.
