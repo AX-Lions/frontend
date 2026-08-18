@@ -97,6 +97,17 @@ export function fetchTeamMembers(teamId, signal) {
 }
 
 /**
+ * 팀 하나의 프로젝트 목록.
+ *
+ * 명세가 이 주소를 짚어 둔 두 자리 중 하나가 **팀 변경 팝오버의
+ * `팀 A → 프로젝트 1, 프로젝트 2` 미리보기**다(다른 하나는 사이드바를
+ * 펼쳤을 때). `TeamSwitchDialog` 가 이것으로 미리보기를 채운다.
+ */
+export function fetchTeamProjects(teamId, signal) {
+  return api.get(`/teams/${teamId}/projects`, undefined, { signal })
+}
+
+/**
  * 새 프로젝트.
  *
  * ## 서버가 아직 모르는 칸이 있다

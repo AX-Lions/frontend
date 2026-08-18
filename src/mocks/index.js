@@ -211,6 +211,11 @@ function resolve(path, method, body) {
     if (path === '/teams') return viewerTeams()
     // 새 프로젝트 팝업의 `참여자 선택` 후보.
     if (a === 'teams' && c === 'members') return teamMembers
+    // 팀 사이드바를 펼쳤을 때 · 팀 변경 팝오버의 미리보기가 같이 쓴다.
+    if (a === 'teams' && c === 'projects') {
+      const results = (viewerHome().project_progress ?? []).filter((p) => p.team_id === b)
+      return { count: results.length, results }
+    }
 
     if (a === 'meetings' && b && !c) return meetings[b] ?? null
     if (a === 'meetings' && c === 'flow') return meetingFlows[b] ?? null

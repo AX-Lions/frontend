@@ -93,9 +93,14 @@
 }
 
 .team-switch-meta {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   color: #60646c;
   font-size: 12px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .team-switch-empty {

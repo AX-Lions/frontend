@@ -2,20 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { getCurrentTeamId, setCurrentTeamId } from '../../lib/currentTeam.js'
 import { useEscapeToClose } from './useEscapeToClose.js'
-import { fetchTeams } from './home.api.js'
+import { fetchTeamProjects, fetchTeams } from './home.api.js'
 import './newProject.css'
 import './teamSwitch.css'
 
 /**
  * 팀 전환하기(시안 `692:8230`, 여는 자리는 `576:4862`).
  *
- * ## "프로젝트 N개" 대신 인원 수를 보여준다
+ * ## 프로젝트 미리보기
  *
- * 시안은 팀마다 "팀이 진행하는 프로젝트 N개" 를 나열하는데, `GET /teams` 는
- * 그 목록을 안 준다 — 프로젝트 개수는 오직 `GET /home` 에만 있고, 그건
- * **지금 로그인한 내 관점**의 프로젝트만 센다(다른 팀에 내가 없는 프로젝트가
- * 있으면 안 잡힌다). 그래서 여기서는 `GET /teams` 가 실제로 주는 값 —
- * 인원 수 — 를 대신 보여준다. 억지로 맞추면 숫자가 실제와 달라진다.
+ * `GET /teams/{team_id}/projects` 가 바로 이 자리를 위해 있다 — 명세 설명에
+ * "팀 변경 팝오버의 `팀 A → 프로젝트 1, 프로젝트 2` 도 이걸 씁니다" 라고
+ * 적혀 있다. 팀 목록을 받은 뒤 팀마다 이 주소로 한 번씩 더 불러 이름을
+ * 모은다 — 팀이 몇 개 안 되는 목록이라 왕복이 늘어도 눈에 띄지 않는다.
  *
  * ## 고르면 무엇이 바뀌는가
  *
@@ -25,6 +24,7 @@ import './teamSwitch.css'
  */
 export function TeamSwitchDialog({ onClose }) {
   const [teams, setTeams] = useState(null)
+  const [projectsByTeam, setProjectsByTeam] = useState({})
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const current = getCurrentTeamId()
@@ -40,9 +40,26 @@ export function TeamSwitchDialog({ onClose }) {
     let alive = true
     fetchTeams()
       .then((body) => {
-        if (alive) {
-          setTeams(body?.results ?? [])
+        const rows = body?.results ?? []
+        if (!alive) {
+          return
         }
+        setTeams(rows)
+        // 팀마다 프로젝트 미리보기를 따로 받는다. 하나가 늦거나 실패해도
+        // 나머지 팀은 뜬다 — 서로 기다리게 두지 않는다.
+        rows.forEach((team) => {
+          fetchTeamProjects(team.id)
+            .then((projects) => {
+              if (alive) {
+                setProjectsByTeam((c) => ({ ...c, [team.id]: projects?.results ?? [] }))
+              }
+            })
+            .catch(() => {
+              if (alive) {
+                setProjectsByTeam((c) => ({ ...c, [team.id]: [] }))
+              }
+            })
+        })
       })
       .catch((err) => {
         if (alive) {
@@ -66,6 +83,17 @@ export function TeamSwitchDialog({ onClose }) {
   }, [teams, needle])
 
   const currentTeam = teams?.find((team) => team.id === current)
+
+  const projectPreview = (teamId) => {
+    const projects = projectsByTeam[teamId]
+    if (projects === undefined) {
+      return '불러오는 중…'
+    }
+    if (projects.length === 0) {
+      return '진행 중인 프로젝트가 없습니다'
+    }
+    return projects.map((p) => p.name).join(', ')
+  }
 
   const choose = (teamId) => {
     setCurrentTeamId(teamId)
@@ -106,7 +134,7 @@ export function TeamSwitchDialog({ onClose }) {
               onClick={() => choose(team.id)}
             >
               <span className="team-switch-name">{team.name}</span>
-              <span className="team-switch-meta">{team.member_count}명</span>
+              <span className="team-switch-meta">{projectPreview(team.id)}</span>
             </button>
           ))}
           {!error && current ? (
