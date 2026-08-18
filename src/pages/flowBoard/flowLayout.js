@@ -100,6 +100,19 @@ const PARALLEL_SPREAD = 44
  */
 const MAX_PARALLEL_OFFSET = NODE_RADIUS * 0.72
 
+/**
+ * 평행선의 뱃지를 **선을 따라** 앞뒤로 어긋나게 놓는 거리.
+ *
+ * 직각으로 44px 벌리는 것만으로는 모자란다. 뱃지 묶음은 가로로 길고(3종이면
+ * 130px 쯤) 세로로는 30px 밖에 안 되는 알약이라, **선이 비스듬하면 44px 는
+ * 알약 길이 안에 들어와 두 묶음이 포개진다.** 곡선일 때는 선이 바깥으로
+ * 휘면서 뱃지도 따라 벌어져 티가 덜 났다.
+ *
+ * 짧은 선에서는 이만큼 밀면 뱃지가 노드에 올라타므로 선 길이에 맞춰 줄인다.
+ */
+const BADGE_SLIDE = 130
+const BADGE_SLIDE_RATIO = 0.3
+
 /** 선 끝을 원 테두리에서 얼마나 띄울지. 끝쪽은 화살촉이 앉을 자리가 더 필요하다. */
 const EDGE_START_GAP = 6
 const EDGE_END_GAP = 16
@@ -213,7 +226,7 @@ function unit(dx, dy) {
  * 끝이 원에 붙는다: 중심에서 선까지 거리가 `offset` 이므로, 반지름 `R` 인
  * 원 안에 든 절반 길이는 `√(R² − offset²)` 이다.
  */
-function lineBetween(from, to, offset) {
+function lineBetween(from, to, offset, slideRank) {
   const chord = unit(to.x - from.x, to.y - from.y)
   const normal = { x: -chord.y, y: chord.x }
   const shift = { x: normal.x * offset, y: normal.y * offset }
@@ -231,11 +244,18 @@ function lineBetween(from, to, offset) {
     y: to.y + shift.y - chord.y * endReach,
   }
 
+  const length = Math.hypot(end.x - start.x, end.y - start.y)
+  const slide = slideRank * Math.min(BADGE_SLIDE, length * BADGE_SLIDE_RATIO)
+
   return {
     start,
     end,
-    // 뱃지가 앉을 자리. 직선이라 그냥 두 끝의 한가운데다.
-    midpoint: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
+    // 뱃지가 앉을 자리. 직선이라 두 끝의 한가운데이되, 평행선끼리는 선을
+    // 따라 앞뒤로 어긋나 앉는다.
+    midpoint: {
+      x: (start.x + end.x) / 2 + chord.x * slide,
+      y: (start.y + end.y) / 2 + chord.y * slide,
+    },
     // 뱃지를 선을 따라 눕힐지 세울지 정한다.
     axis: Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'row' : 'column',
   }
@@ -329,7 +349,22 @@ export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {
     const spread = total > 1
       ? Math.min(PARALLEL_SPREAD, (MAX_PARALLEL_OFFSET * 2) / (total - 1))
       : 0
-    const offset = (slot - (total - 1) / 2) * spread
+    const rank = slot - (total - 1) / 2
+
+    /*
+      미는 방향을 **두 노드 중 누가 앞이냐로** 고정한다.
+
+      `rank` 를 그냥 쓰면 안 된다. 서로 마주 보는 두 화살표(A→B 와 B→A)는
+      진행 방향이 반대라 현의 법선도 같이 뒤집힌다. 오프셋 부호와 법선 부호가
+      한꺼번에 뒤집히면 둘이 상쇄돼 **두 선이 정확히 같은 자리에 포개진다** —
+      벌리려고 만든 장치가 마주 보는 쌍에서만 아무 일도 하지 않았다. 곡선일
+      때도 마찬가지였는데, 휘어 나가는 폭이 조금씩 달라 겹친 줄 몰랐다.
+
+      쌍을 묶을 때 쓴 정렬 기준(`pairKey`)을 여기서도 써서, 미는 방향을 화살표
+      진행 방향이 아니라 **판 위의 고정된 방향**으로 만든다.
+    */
+    const forward = String(from.id) < String(to.id) ? 1 : -1
+    const offset = rank * spread * forward
 
     return {
       id: `${arrow.id}::${to.id}`,
@@ -342,7 +377,7 @@ export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {
       // 뱃지는 화살표당 하나다. 브로드캐스트에서 팔마다 같은 숫자를 붙이면
       // 같은 일이 네 번 일어난 것처럼 읽힌다.
       isBadgeAnchor: targetIndex === 0,
-      ...lineBetween(from, to, offset),
+      ...lineBetween(from, to, offset, rank * forward),
     }
   })
 
