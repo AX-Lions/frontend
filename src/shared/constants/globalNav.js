@@ -26,10 +26,7 @@ export const globalNavItems = [
     id: 'meeting',
     href: '/flow-board',
     label: '회의',
-    // `회의아이콘` 컴포넌트(`666:4885`)는 기본 상태부터 마이크다 —
-    // `Book_check.svg` 는 플로우 사이드바의 `회의` 카테고리 필터 아이콘과
-    // 헷갈려 잘못 골랐던 것이다.
-    icon: '/icons/Microphone.svg',
+    icon: '/icons/Book_check.svg',
   },
   {
     id: 'inbox',
