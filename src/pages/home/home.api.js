@@ -135,6 +135,28 @@ export function createProject(teamId, { name, description, goal, memberIds, peri
   })
 }
 
+// ─────────────────────────────────────────── 회의 일정 추가
+
+/**
+ * 회의 일정 추가(시안 `692:8292`).
+ *
+ * `POST /projects/{project_id}/meetings` 는 **고정 시각 하나**만 받는다 —
+ * 후보를 여럿 던지고 참여자가 고르는 식이 아니다. 시안의 "가능한 시간을
+ * 모두 입력해주세요" 는 그래서 여러 후보가 아니라 **그 날짜의 시작~끝**으로
+ * 읽는다 — `duration_min` 이 그 차이다.
+ *
+ * `participant_ids` 를 안 실으면 서버가 알아서 채우는 값이 없다(프로젝트와
+ * 달리 기본값이 "전원" 이 아니다) — 최소 회의를 만든 사람은 넣어야 한다.
+ */
+export function createMeeting(projectId, { title, scheduledAt, durationMin, participantIds }) {
+  return api.post(`/projects/${projectId}/meetings`, {
+    title,
+    scheduled_at: scheduledAt,
+    duration_min: durationMin,
+    participant_ids: participantIds,
+  })
+}
+
 /**
  * 초대 코드.
  *

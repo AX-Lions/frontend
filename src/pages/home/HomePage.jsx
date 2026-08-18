@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './Sidebar.jsx'
 import { AgentDock } from './AgentDock.jsx'
 import { BriefingPrompt } from './BriefingPrompt.jsx'
+import { NewMeetingDialog } from './NewMeetingDialog.jsx'
 import { NewProjectDialog } from './NewProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { navigate } from '../../app/navigation.js'
@@ -50,6 +51,7 @@ export function HomePage() {
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
   const [pendingFavorites, setPendingFavorites] = useState([])
   const [addingProject, setAddingProject] = useState(false)
+  const [addingMeeting, setAddingMeeting] = useState(false)
   /*
     사이드바 접힘은 **레일과 프로젝트 목록이 함께 본다.** 접었을 때 레일만
     남으면 왼쪽이 여전히 두 칸이라 접힌 것으로 보이지 않는다. 값을 둘의 공통
@@ -412,10 +414,19 @@ export function HomePage() {
               <div className="section-heading">
                 <h2>오늘 일정</h2>
                 {/*
-                  전체 일정 화면이 아직 없다. `href="/"` 짜리 화살표를 두면
-                  눌렀을 때 홈이 다시 뜨는데, 그건 "없다" 가 아니라 "고장" 으로
-                  읽힌다. 갈 곳이 생기면 그때 붙인다.
+                  전체 일정 화면은 아직 없다 — 화살표는 안 둔다. `+` 는
+                  화면 하나로 안 가고 팝업을 여는 것이라 이 사정과 무관하다
+                  (시안 `692:8292`).
                 */}
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label="회의 일정 추가"
+                  title="회의 일정 추가"
+                  onClick={() => setAddingMeeting(true)}
+                >
+                  <img src="/icons/AddIcon.svg" alt="" />
+                </button>
               </div>
               <div className="schedule-content">
                 {todaySchedule.length === 0 ? (
@@ -571,6 +582,15 @@ export function HomePage() {
             recent_projects: [project, ...(current.recent_projects ?? [])],
             project_progress: [project, ...(current.project_progress ?? [])],
           } : current))}
+        />
+      ) : null}
+
+      {addingMeeting ? (
+        <NewMeetingDialog
+          onClose={() => setAddingMeeting(false)}
+          // 새로 만든 회의가 오늘 일정·최근 회의 어디에 걸리는지는 서버
+          // 집계 규칙이다(시간대별 "오늘" 판정 등). 흉내 내지 않고 다시 읽는다.
+          onCreated={() => reload()}
         />
       ) : null}
 

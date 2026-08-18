@@ -457,6 +457,19 @@ function resolve(path, method, body) {
       }
     }
 
+    if (a === 'projects' && c === 'meetings') {
+      return {
+        id: `mock-meeting-${nextId()}`,
+        project_id: b,
+        title: body?.title ?? '새 회의',
+        scheduled_at: body?.scheduled_at,
+        duration_min: body?.duration_min,
+        participant_ids: body?.participant_ids ?? [],
+        status: 'SCHEDULED',
+        created_at: new Date().toISOString(),
+      }
+    }
+
     /*
       초대 코드.
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { createProject, fetchTeamMembers, fetchTeams } from './home.api.js'
 import { NewTeamDialog } from './NewTeamDialog.jsx'
-import { NumberBox, TextBox } from './newProjectBits.jsx'
+import { NumberBox, TextBox, TimeBox } from './newProjectBits.jsx'
 import { useEscapeToClose } from './useEscapeToClose.js'
 import './newProject.css'
 
@@ -44,24 +44,6 @@ function toIso(year, month, day, time) {
   const [hour, minute] = (time || '00:00').split(':')
   const at = new Date(Number(year), Number(month) - 1, Number(day), Number(hour) || 0, Number(minute) || 0)
   return Number.isNaN(at.getTime()) ? null : at.toISOString()
-}
-
-/** `00:00`. 숫자와 `:` 만 남긴다. */
-function TimeBox({ value, onChange, ariaLabel, disabled }) {
-  return (
-    <div className="np-box np-time">
-      <input
-        type="text"
-        inputMode="numeric"
-        value={value}
-        disabled={disabled}
-        maxLength={5}
-        placeholder="00:00"
-        aria-label={ariaLabel}
-        onChange={(event) => onChange(event.target.value.replace(/[^\d:]/g, ''))}
-      />
-    </div>
-  )
 }
 
 export function NewProjectDialog({ onClose, onCreated }) {

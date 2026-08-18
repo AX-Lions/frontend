@@ -57,6 +57,24 @@ export function TextBox({
   )
 }
 
+/** `00:00`. 숫자와 `:` 만 남긴다. */
+export function TimeBox({ value, onChange, ariaLabel, disabled }) {
+  return (
+    <div className="np-box np-time">
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value}
+        disabled={disabled}
+        maxLength={5}
+        placeholder="00:00"
+        aria-label={ariaLabel}
+        onChange={(event) => onChange(event.target.value.replace(/[^\d:]/g, ''))}
+      />
+    </div>
+  )
+}
+
 /** 숫자만 받는 작은 칸(`2026` `08` `20`). 단위는 칸 안 오른쪽에 붙는다. */
 export function NumberBox({
   value,
