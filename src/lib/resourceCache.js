@@ -36,6 +36,17 @@
 //: 담아 둔 값을 쓸 수 있는 시간. 넘으면 없는 것으로 친다.
 const MAX_AGE = 30_000
 
+/**
+ * 캐시 키를 만드는 **유일한 규칙.**
+ *
+ * `useResource` 와 훅 밖에서 직접 부르는 쪽(`resolveMeetingId` 같은)이 같은
+ * 것을 가리켜야 서로의 결과를 나눠 쓴다. 양쪽이 각자 문자열을 만들면 같은
+ * `/home` 을 두 키에 담아, 캐시가 있는데도 다시 읽는다.
+ */
+export function cacheKeyFor(name, deps = []) {
+  return name ? `${name}|${JSON.stringify(deps)}` : null
+}
+
 const store = new Map()
 const inflight = new Map()
 

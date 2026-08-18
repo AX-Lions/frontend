@@ -1,4 +1,5 @@
 import { api } from '../../lib/api.js'
+import { cacheKeyFor, dedupe, readCache } from '../../lib/resourceCache.js'
 
 /**
  * 플로우 화면이 부르는 것.
@@ -123,7 +124,21 @@ export async function resolveMeetingId(signal) {
     return fromUrl
   }
 
-  const home = await api.get('/home', undefined, { signal })
+  /*
+    홈이 방금 읽어 둔 것을 나눠 쓴다.
+
+    이 한 번이 **나머지 조회 전부를 막고 있다** — 회의 id 를 알아야 회의 상세 ·
+    요약표 · 브리핑 · 플로우를 부를 수 있으니, 여기가 왕복 하나만큼 통째로
+    지연이 된다. 홈에서 넘어온 경우가 대부분인데 그때는 이미 담겨 있다.
+
+    `HomePage` 와 **같은 키**를 써야 한다. 각자 문자열을 만들면 같은 `/home`
+    이 두 키에 담겨, 캐시가 있는데도 다시 읽는다.
+  */
+  const key = cacheKeyFor('home', [])
+  const cached = readCache(key)
+  const home = cached !== undefined
+    ? cached
+    : await dedupe(key, () => api.get('/home', undefined, { signal }))
   // `recent_meeting_summary` 는 **끝난 회의**만 채워진다. 예정된 회의밖에 없는
   // 팀은 그것이 비어 있어서, 그 값만 보면 열 회의가 없다고 판단해 버린다.
   // 최근 회의 목록으로 한 번 더 내려본다.

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { dedupe, readCache, writeCache } from './resourceCache.js'
+import { cacheKeyFor, dedupe, readCache, writeCache } from './resourceCache.js'
 
 /**
  * 화면 하나가 API 하나를 읽는 흐름.
@@ -44,7 +44,7 @@ export function useResource(load, deps = [], options = {}) {
   const { cacheKey } = options
   // 같은 화면이라도 조회 조건이 다르면 다른 것이다. `deps` 를 키에 함께 넣지
   // 않으면 필터를 바꿔도 이전 결과가 그대로 나온다.
-  const fullKey = cacheKey ? `${cacheKey}|${key}` : null
+  const fullKey = cacheKey ? cacheKeyFor(cacheKey, deps) : null
 
   const [nonce, setNonce] = useState(0)
   // 담아 둔 것이 있으면 **첫 렌더부터** 그것으로 시작한다. effect 를 기다렸다
