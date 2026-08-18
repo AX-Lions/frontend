@@ -17,6 +17,7 @@ import {
   briefings, meetingIndexes, meetings, summaryTables, workIndexes,
 } from './data/meetings.js'
 import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
+import { preps } from './data/prep.js'
 import { activeDates, chatSidebar, roomDetails, roomMessages } from './data/chat.js'
 import { agentConversations, conversationMessages } from './data/agent.js'
 import { PEOPLE } from './data/people.js'
@@ -130,12 +131,83 @@ for (const c of agentConversations.results ?? []) {
   ok(conversationMessages[c.id], `대화 "${c.title}" 의 메시지가 없다`)
 }
 
+/*
+  9. 준비 화면.
+
+  **필드 이름이 서버와 어긋나면 여기서 잡는다.** 이 화면은 실서버 계약
+  (`apps/meetings/prep.py`)을 그대로 흉내 내는 것이 목적이라, 가상 데이터에서만
+  그려지고 실서버에서 빈 칸이 나오면 이 모드로 확인하는 의미가 없다.
+
+  화면이 실제로 읽는 것만 본다 — 안 읽는 필드를 검사하면 계약이 바뀔 때마다
+  화면과 무관한 곳에서 빨간불이 켜진다.
+*/
+const POINT_KEYS = ['id', 'order', 'label', 'title', 'options', 'rationale',
+  'evidence', 'status', 'status_label', 'stance']
+const SETUP_KEYS = ['mode', 'settings', 'standing_settings', 'standing_prompts',
+  'extra_note', 'sources']
+
+for (const [mid, prep] of Object.entries(preps)) {
+  const tag = `준비화면 ${mid.slice(0, 8)}`
+  ok(meetings[mid], `${tag} 이 가리키는 회의 상세가 없다`)
+
+  // 헤더 문자열은 서버가 완성해 준다. 비어 있으면 화면 윗줄이 통째로 빈다.
+  ok(prep.header?.when, `${tag} 에 회의 시각(when)이 없다`)
+  ok(prep.header?.team_name, `${tag} 에 팀 이름이 없다`)
+  ok(prep.header?.badge, `${tag} 에 뱃지 문구가 없다`)
+
+  ok(prep.debate?.notice, `${tag} 에 논쟁점 안내 문구가 없다`)
+  const points = prep.debate?.points ?? []
+  ok(prep.debate?.count === points.length, `${tag} 의 논쟁점 개수가 목록과 다르다`)
+  ok(prep.debate?.answered_count === points.filter((x) => x.stance).length,
+    `${tag} 의 답변완료 개수가 실제 입장 수와 다르다`)
+
+  points.forEach((point, i) => {
+    for (const key of POINT_KEYS) {
+      ok(point[key] !== undefined, `${tag} 논쟁점 ${i + 1} 에 ${key} 가 없다`)
+    }
+    ok(point.label === `논쟁점 ${String(point.order).padStart(2, '0')}`,
+      `${tag} 논쟁점 ${i + 1} 의 라벨이 순번과 어긋난다`)
+    ok(point.status === (point.stance ? 'ANSWERED' : 'NEEDED'),
+      `${tag} 논쟁점 ${i + 1} 의 상태가 입장 유무와 어긋난다`)
+
+    // 갈래·근거 카드의 필드 이름. 화면이 이 이름으로 읽는다.
+    for (const option of point.options ?? []) {
+      ok(option.key && option.title,
+        `${tag} 논쟁점 ${i + 1} 의 갈래에 key/title 이 없다`)
+    }
+    for (const e of point.evidence ?? []) {
+      ok(e.title && e.who && e.body,
+        `${tag} 논쟁점 ${i + 1} 의 근거에 title/who/body 가 없다`)
+      ok(!e.at || !Number.isNaN(new Date(e.at).getTime()),
+        `${tag} 논쟁점 ${i + 1} 의 근거 시각을 읽을 수 없다`)
+    }
+
+    // 고른 갈래가 목록에 있어야 한다. 없으면 화면이 고른 것을 표시할 수 없다.
+    const chosen = point.stance?.option_key
+    if (chosen) {
+      ok((point.options ?? []).some((o) => o.key === chosen),
+        `${tag} 논쟁점 ${i + 1} 의 입장이 없는 갈래(${chosen})를 가리킨다`)
+    }
+  })
+
+  for (const key of SETUP_KEYS) {
+    ok(prep.agent_setup?.[key] !== undefined, `${tag} 활동 설정에 ${key} 가 없다`)
+  }
+  // 자료 범위는 `null`(고른 적 없음)과 `[]`(전부 끔)가 다른 뜻이다.
+  const sources = prep.agent_setup?.sources
+  ok(sources === null || Array.isArray(sources),
+    `${tag} 의 자료 범위가 배열도 null 도 아니다`)
+}
+
 const msgCount = Object.values(roomMessages).reduce((s, r) => s + (r.results?.length ?? 0), 0)
 console.log('== 규모 ==')
 console.log(`  최근회의 ${(home.recent_meetings ?? []).length} · 오늘일정 ${(home.today_schedule ?? []).length} · 회의상세 ${Object.keys(meetings).length}`)
 console.log(`  플로우 ${allFlows.length} · 엣지상세 ${Object.keys(flowEdges).length} (화살표가 참조 ${edgeTotal})`)
 console.log(`  브리핑 ${Object.keys(briefings).length} · 채팅방 ${uniq.length} · 메시지 ${msgCount}`)
 console.log(`  대리인 대화 ${(agentConversations.results ?? []).length}`)
+const pointCount = Object.values(preps)
+  .reduce((s, one) => s + (one.debate?.points?.length ?? 0), 0)
+console.log(`  준비화면 ${Object.keys(preps).length} · 논쟁점 ${pointCount}`)
 console.log(`\n== 어긋남 ${bad.length} 건 ==`)
 bad.slice(0, 25).forEach((b) => console.log('  ·', b))
 if (bad.length > 25) console.log(`  ... 외 ${bad.length - 25} 건`)
