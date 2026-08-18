@@ -9,6 +9,24 @@
   justify-content: space-between;
   padding: 27px 0 16px;
   background: #f0f1f3;
+  transition:
+    flex-basis 220ms ease,
+    width 220ms ease;
+}
+
+/*
+  화면 사이드바와 같이 접힌다.
+
+  `index.css` 가 레일에 `min-width: 56px` 을 걸어 뒀다(확대했을 때 아이콘이
+  뭉개지지 말라고). 접을 때는 그 바닥을 풀어야 정말 0 이 된다.
+*/
+.global-sidebar.is-collapsed {
+  flex-basis: 0;
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding-inline: 0;
+  pointer-events: none;
 }
 
 .global-sidebar-nav {

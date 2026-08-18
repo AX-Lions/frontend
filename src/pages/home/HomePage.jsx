@@ -52,6 +52,13 @@ export function HomePage() {
   const [pendingFavorites, setPendingFavorites] = useState([])
   const [delegateFor, setDelegateFor] = useState(null)
   const [addingProject, setAddingProject] = useState(false)
+  /*
+    사이드바 접힘은 **레일과 프로젝트 목록이 함께 본다.** 접었을 때 레일만
+    남으면 왼쪽이 여전히 두 칸이라 접힌 것으로 보이지 않는다. 값을 둘의 공통
+    부모인 여기에 두고 양쪽에 내려 준다.
+  */
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const toggleSidebar = () => setIsSidebarCollapsed((collapsed) => !collapsed)
   // 브리핑 팝업은 한 번만 뜬다. `homeData` 를 다시 읽을 때마다 뜨면, 별 하나
   // 눌렀다고 팝업이 다시 올라온다.
   const [briefingSeen, setBriefingSeen] = useState(false)
@@ -206,8 +213,13 @@ export function HomePage() {
   if (loading && !homeData) {
     return (
       <div className="home-layout">
-        <GlobalSidebar active="home" />
-        <Sidebar favoriteProjects={[]} recentProjects={[]} />
+        <GlobalSidebar active="home" collapsed={isSidebarCollapsed} />
+        <Sidebar
+          favoriteProjects={[]}
+          recentProjects={[]}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
+        />
         <main className="home-main"><Loading label="홈을 불러오는 중입니다…" /></main>
       </div>
     )
@@ -216,8 +228,13 @@ export function HomePage() {
   if (error && !homeData) {
     return (
       <div className="home-layout">
-        <GlobalSidebar active="home" />
-        <Sidebar favoriteProjects={[]} recentProjects={[]} />
+        <GlobalSidebar active="home" collapsed={isSidebarCollapsed} />
+        <Sidebar
+          favoriteProjects={[]}
+          recentProjects={[]}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
+        />
         <main className="home-main"><LoadError error={error} onRetry={reload} /></main>
       </div>
     )
@@ -258,8 +275,10 @@ export function HomePage() {
 
   return (
     <div className="home-layout">
-      <GlobalSidebar active="home" user={{ name: homeData.user_name }} />
+      <GlobalSidebar active="home" collapsed={isSidebarCollapsed} user={{ name: homeData.user_name }} />
       <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
         favoriteProjects={homeData.favorite_projects ?? []}
         recentProjects={homeData.recent_projects ?? []}
         shortcuts={homeData.shortcuts}
