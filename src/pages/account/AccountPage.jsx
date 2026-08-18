@@ -492,6 +492,17 @@ export function AccountPage() {
           <p className="account-hint account-hint-after">
             Discord 에서 <strong>/bordo-connect</strong> 를 치면 6자리 코드가 DM 으로 옵니다.
           </p>
+          {/*
+            개인 계정 연결과 팀의 서버(길드) 연결은 별개다. 팀 관리자가
+            `/bordo-team-connect` 로 서버를 아직 안 이었으면, 개인 계정만 이어도
+            회의 알림이 오지 않는다 — 사용자는 "연결됐다는데 왜 아무 일도 안
+            일어나지" 를 겪는다.
+          */}
+          <p className="account-note">
+            팀에 Discord 서버가 아직 연결되지 않았다면 계정을 이어도 회의 알림이
+            오지 않습니다. 팀 관리자에게 Discord 에서 <strong>/bordo-team-connect</strong>를
+            실행했는지 확인해 주세요.
+          </p>
         </section>
 
         <section className="account-section">
