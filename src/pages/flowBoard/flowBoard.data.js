@@ -118,7 +118,7 @@ export function fetchMe(signal) {
  * 회의**로 연다. 회의를 고르라고 빈 화면을 띄우면, 이 서비스가 처음 묻는 질문이
  * "내가 없는 동안 무슨 일이 있었지" 인데 그 답을 한 단계 뒤로 미루게 된다.
  */
-export async function resolveMeetingId(signal) {
+export async function resolveMeetingId() {
   const fromUrl = new URLSearchParams(window.location.search).get('meeting')
   if (fromUrl) {
     return fromUrl
@@ -133,12 +133,19 @@ export async function resolveMeetingId(signal) {
 
     `HomePage` 와 **같은 키**를 써야 한다. 각자 문자열을 만들면 같은 `/home`
     이 두 키에 담겨, 캐시가 있는데도 다시 읽는다.
+
+    **나눠 쓰는 요청에는 `signal` 을 넘기지 않는다.** 넘기면 그 약속이 처음 부른
+    화면의 수명에 묶인다. 이 화면이 뜨자마자 다시 뜨는 경우(개발 모드의 이중
+    마운트, 빠른 뒤로가기)에 첫 번째가 취소되는데, 두 번째는 `inflight` 에 남아
+    있는 **그 취소된 약속**을 받아 든다. 그러면 취소 오류가 오고, 그것은 "내가
+    떠나서 끊긴 것" 과 구별되지 않아 조용히 삼켜진다 — 화면이 `회의를 불러오는
+    중입니다…` 에서 멈춘다. 취소는 각 화면이 자기 것만 막는다(`useResource`).
   */
   const key = cacheKeyFor('home', [])
   const cached = readCache(key)
   const home = cached !== undefined
     ? cached
-    : await dedupe(key, () => api.get('/home', undefined, { signal }))
+    : await dedupe(key, () => api.get('/home'))
   // `recent_meeting_summary` 는 **끝난 회의**만 채워진다. 예정된 회의밖에 없는
   // 팀은 그것이 비어 있어서, 그 값만 보면 열 회의가 없다고 판단해 버린다.
   // 최근 회의 목록으로 한 번 더 내려본다.

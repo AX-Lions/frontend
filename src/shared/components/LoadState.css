@@ -55,3 +55,12 @@
 .load-state-error button:hover {
   background: var(--sidebar);
 }
+
+/* 화면 하나를 통째로 기다리는 자리. 사이드바도 아직 없으므로 뷰포트
+   가운데에 세운다. */
+.load-state-page {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+}

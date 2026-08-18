@@ -24,6 +24,21 @@ export function Loading({ label = '불러오는 중입니다…' }) {
   )
 }
 
+/**
+ * 화면 하나가 통째로 아직 없을 때.
+ *
+ * 경로별로 코드를 갈라 둬서, 처음 가는 화면은 파일을 받는 아주 짧은 순간이
+ * 있다. 그 사이를 빈 화면으로 두면 **눌렀는데 아무 일도 안 일어난 것**과
+ * 구별되지 않아 사람이 한 번 더 누른다. `Loading` 을 화면 가운데 세운다.
+ */
+export function PageLoading({ label }) {
+  return (
+    <div className="load-state-page">
+      <Loading label={label} />
+    </div>
+  )
+}
+
 export function LoadError({ error, onRetry }) {
   // 네트워크 오류와 서버가 준 오류는 안내가 달라야 한다. 앞은 다시 시도하면
   // 되는 것이고, 뒤는 사용자가 무언가를 해야 하는 것일 수 있다.

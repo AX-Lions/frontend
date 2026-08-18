@@ -52,7 +52,7 @@ function flowCategory(mode) {
  */
 export function useFlowBoardMeeting(meetingIdOverride = null) {
   return useResource(async (signal) => {
-    const meetingId = meetingIdOverride ?? await resolveMeetingId(signal)
+    const meetingId = meetingIdOverride ?? await resolveMeetingId()
     if (!meetingId) {
       return { meetingId: null, detail: null, summary: null, briefing: null }
     }

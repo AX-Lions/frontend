@@ -83,7 +83,13 @@ export function useResource(load, deps = [], options = {}) {
       .catch((error) => {
         // 화면을 떠나 취소된 것은 오류가 아니다. 오류로 두면 뒤로 가기를 할
         // 때마다 "서버에 연결할 수 없습니다" 가 스친다.
-        if (alive && error?.name !== 'AbortError') {
+        //
+        // 다만 **`alive` 가 아직 참이면 그 취소는 내가 한 것이 아니다.** 내가
+        // 떠날 때는 `alive = false` 를 먼저 놓고 끊기 때문이다. 남이 끊은 것까지
+        // 여기서 삼키면 화면은 아무 말 없이 스피너로 남는다 — 실제로 그렇게
+        // 멈춘 적이 있다(나눠 쓰는 요청에 남의 `signal` 이 묶여 있었다).
+        // 오류로 드러내면 최소한 `다시 시도` 는 누를 수 있다.
+        if (alive) {
           // 담아 둔 것이 있으면 그것을 남긴다. 갱신 실패로 화면을 비우면
           // 보고 있던 내용이 사라진다 — 조금 낡은 것이 아무것도 없는 것보다 낫다.
           setResult((current) => (current.data != null && current.key === key

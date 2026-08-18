@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 
-import { Loading } from '../shared/components/LoadState.jsx'
+import { PageLoading } from '../shared/components/LoadState.jsx'
 import { currentPath, subscribeToPath } from './navigation.js'
 import { isSignedIn, onAuthChange } from '../lib/auth.js'
 
@@ -22,14 +22,57 @@ import { isSignedIn, onAuthChange } from '../lib/auth.js'
 import { HomePage } from '../pages/home/HomePage.jsx'
 import { LoginPage } from '../pages/auth/LoginPage.jsx'
 
-const SignupPage = lazy(() => import('../pages/auth/SignupPage.jsx')
-  .then((m) => ({ default: m.SignupPage })))
-const FlowBoardPage = lazy(() => import('../pages/flowBoard/FlowBoardPage.jsx')
-  .then((m) => ({ default: m.FlowBoardPage })))
-const ChatPage = lazy(() => import('../pages/chat/ChatPage.jsx')
-  .then((m) => ({ default: m.ChatPage })))
-const AccountPage = lazy(() => import('../pages/account/AccountPage.jsx')
-  .then((m) => ({ default: m.AccountPage })))
+/*
+  나눈 조각을 부르는 함수를 따로 둔다. `lazy` 에 인라인으로 적으면 미리 받기가
+  같은 것을 가리킬 방법이 없어, 미리 받아 놓고도 다시 받는다.
+*/
+const loadPage = {
+  signup: () => import('../pages/auth/SignupPage.jsx'),
+  flowBoard: () => import('../pages/flowBoard/FlowBoardPage.jsx'),
+  chat: () => import('../pages/chat/ChatPage.jsx'),
+  account: () => import('../pages/account/AccountPage.jsx'),
+}
+
+/*
+  `lazy` 는 `default` 만 본다. 화면들은 이름 붙은 export 라 여기서 한 번 감싼다.
+  화면 쪽에 `export default` 를 다는 방법도 있지만, 그러면 담당자 파일 넷과
+  그것을 부르는 자리를 전부 건드리게 된다.
+*/
+const SignupPage = lazy(() => loadPage.signup().then((m) => ({ default: m.SignupPage })))
+const FlowBoardPage = lazy(() => loadPage.flowBoard().then((m) => ({ default: m.FlowBoardPage })))
+const ChatPage = lazy(() => loadPage.chat().then((m) => ({ default: m.ChatPage })))
+const AccountPage = lazy(() => loadPage.account().then((m) => ({ default: m.AccountPage })))
+
+/**
+ * 첫 화면이 뜨고 손이 빈 틈에 나머지를 미리 받아 둔다.
+ *
+ * 가르기만 하면 화면을 옮길 때마다 **원래는 없던 기다림**이 생긴다. 처음 받는
+ * 바이트는 줄었는데 이동이 느려지면 가르기가 도리어 손해로 느껴진다.
+ * 첫 화면이 뜬 뒤에 받아 두면 둘 다 얻는다.
+ *
+ * `requestIdleCallback` 을 쓰는 이유는 이것이 급하지 않기 때문이다. **지금 보고
+ * 있는 화면의 데이터 요청과 경쟁하면 안 된다.** Safari 에 아직 없어서
+ * `setTimeout` 으로 물러선다.
+ *
+ * 실패는 삼킨다. 미리 받기가 안 된다고 알릴 것은 없다 — 그 화면으로 실제로 갈
+ * 때 다시 받고, 그때 실패하면 그때 화면이 말한다.
+ */
+function preloadOtherPages() {
+  const run = () => {
+    Object.values(loadPage).forEach((load) => { load().catch(() => {}) })
+  }
+
+  const idle = window.requestIdleCallback
+  const id = idle ? idle(run, { timeout: 3000 }) : window.setTimeout(run, 1500)
+
+  return () => {
+    if (idle) {
+      window.cancelIdleCallback?.(id)
+    } else {
+      window.clearTimeout(id)
+    }
+  }
+}
 
 /** 로그인하지 않아도 볼 수 있는 화면. */
 const PUBLIC = new Set(['/login', '/signup'])
@@ -57,7 +100,7 @@ function useSignedIn() {
  */
 function Screen({ children }) {
   return (
-    <Suspense fallback={<Loading label="화면을 여는 중입니다…" />}>
+    <Suspense fallback={<PageLoading label="화면을 여는 중입니다…" />}>
       {children}
     </Suspense>
   )
@@ -66,6 +109,9 @@ function Screen({ children }) {
 export function AppRouter() {
   const path = usePath()
   const signedIn = useSignedIn()
+
+  // 첫 화면이 뜬 뒤 나머지를 미리 받는다. 이동할 때 기다림이 없어진다.
+  useEffect(preloadOtherPages, [])
 
   if (!signedIn) {
     if (path === '/signup') {
