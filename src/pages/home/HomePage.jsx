@@ -3,7 +3,7 @@ import { Sidebar } from './Sidebar.jsx'
 import { DelegateDialog } from './DelegateDialog.jsx'
 import { AgentDock } from './AgentDock.jsx'
 import { BriefingPrompt } from './BriefingPrompt.jsx'
-import { CreateProjectDialog } from './CreateProjectDialog.jsx'
+import { NewProjectDialog } from './NewProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { navigate } from '../../app/navigation.js'
 import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
@@ -535,7 +535,7 @@ export function HomePage() {
       ) : null}
 
       {addingProject ? (
-        <CreateProjectDialog
+        <NewProjectDialog
           onClose={() => setAddingProject(false)}
           // 만든 프로젝트를 목록 맨 위에 얹는다. 홈 전체를 다시 읽으면 방금
           // 만든 것을 찾으려고 사용자가 목록을 훑어야 한다.

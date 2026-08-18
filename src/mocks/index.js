@@ -34,6 +34,7 @@ import {
   meetingIndexes, meetings, projectMeetings, summaryTables, workIndexes,
 } from './data/meetings.js'
 import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
+import { teamMembers } from './data/home.js'
 import {
   activeDates, chatCandidates, chatImportant, chatRooms,
   dailySummaries, roomDetails, roomMessages,
@@ -118,6 +119,8 @@ function resolve(path, method, body) {
     }
     if (path === '/auth/me' || path === '/users/me') return viewerMe()
     if (path === '/teams') return viewerTeams()
+    // 새 프로젝트 팝업의 `참여자 선택` 후보.
+    if (a === 'teams' && c === 'members') return teamMembers
 
     if (a === 'meetings' && b && !c) return meetings[b] ?? null
     if (a === 'meetings' && c === 'flow') return meetingFlows[b] ?? null
@@ -267,6 +270,60 @@ function resolve(path, method, body) {
         sources: body?.sources ?? null,
       })
       return { meeting_id: b, ...saved }
+    }
+
+    /*
+      새 팀 · 새 프로젝트.
+
+      기본 응답(`{...body, id}`)으로 두면 **화면이 읽는 칸이 비어 있다.** 홈은
+      만든 프로젝트를 목록 맨 위에 얹는데 `progress` 가 없으면 진행률 막대가
+      `NaN%` 로 그려지고, 팀 목록은 `name` 만 있고 `my_role` 이 없다.
+      서버가 돌려주는 모양대로 채워 준다.
+    */
+    if (path === '/teams') {
+      return {
+        id: `mock-team-${nextId()}`,
+        name: body?.name ?? '새 팀',
+        description: body?.description ?? '',
+        created_by: viewerMe().id,
+        my_role: 'OWNER',
+        categories: [],
+        member_count: 1,
+        created_at: new Date().toISOString(),
+      }
+    }
+
+    if (a === 'teams' && c === 'projects') {
+      return {
+        id: `mock-project-${nextId()}`,
+        team_id: b,
+        name: body?.name ?? '새 프로젝트',
+        description: body?.description ?? '',
+        progress: 0,
+        is_favorite: false,
+        member_count: body?.member_ids?.length ?? teamMembers.count,
+        group_chat_room_id: null,
+        created_at: new Date().toISOString(),
+        last_opened_at: null,
+      }
+    }
+
+    /*
+      초대 코드.
+
+      **모양을 서버와 맞춘다**(`BRD-A1B2-C3D4`). 화면이 이 코드를 복사해 주는데,
+      가상 데이터에서만 다른 모양이면 붙여 넣는 쪽 검사 규칙을 못 밟는다.
+    */
+    if (a === 'teams' && c === 'invite-codes') {
+      const block = () => Math.floor(1000 + Math.random() * 8999).toString(36).toUpperCase().slice(0, 4).padEnd(4, 'X')
+      return {
+        code: `BRD-${block()}-${block()}`,
+        team_id: b,
+        default_role: 'MEMBER',
+        max_uses: body?.max_uses ?? 10,
+        used_count: 0,
+        expires_at: new Date(Date.now() + 72 * 3600_000).toISOString(),
+      }
     }
 
     return { ...(body ?? {}), id: `mock-${nextId()}`, ok: true }

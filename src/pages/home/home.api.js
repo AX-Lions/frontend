@@ -92,8 +92,51 @@ export function fetchTeams(signal) {
   return api.get('/teams', undefined, { signal })
 }
 
-export function createProject(teamId, name) {
-  return api.post(`/teams/${teamId}/projects`, { name })
+export function fetchTeamMembers(teamId, signal) {
+  return api.get(`/teams/${teamId}/members`, undefined, { signal })
+}
+
+/**
+ * 새 프로젝트.
+ *
+ * ## 서버가 아직 모르는 칸이 있다
+ *
+ * 시안(`707:5617` · `707:5739`)은 **진행기간과 프로젝트 목표**를 받는데,
+ * `POST /teams/{team_id}/projects` 가 받는 것은 `name` · `description` ·
+ * `member_ids` 뿐이다.
+ *
+ * `CLAUDE.md` 의 순서(화면이 계약을 주도한다)대로 **보낼 것은 그대로 보낸다** —
+ * 지금 서버는 모르는 필드를 무시하므로 저장은 아직 안 되고, 백엔드가
+ * `goal` · `period_start` · `period_end` 를 받으면 그 순간부터 저장된다.
+ * 여기서 값을 빼 버리면 나중에 화면·API 양쪽을 다시 손봐야 한다.
+ *
+ * `member_ids` 를 안 실으면 **팀 전원**이 들어간다(서버 기본값). 참여자를
+ * 고른 경우에만 싣는다 — 빈 배열을 보내면 아무도 없는 프로젝트가 된다.
+ */
+export function createProject(teamId, { name, description, goal, memberIds, periodStart, periodEnd }) {
+  return api.post(`/teams/${teamId}/projects`, {
+    name,
+    ...(description ? { description } : {}),
+    ...(goal ? { goal } : {}),
+    ...(periodStart ? { period_start: periodStart } : {}),
+    ...(periodEnd ? { period_end: periodEnd } : {}),
+    ...(memberIds?.length ? { member_ids: memberIds } : {}),
+  })
+}
+
+/**
+ * 초대 코드.
+ *
+ * **팀을 만든 뒤에만 부를 수 있다** — 코드는 팀에 매달려 나온다. 시안은 팀을
+ * 만들기 전 화면에 코드를 그려 뒀는데, 그 자리에 그럴듯한 문자열을 띄우면
+ * 복사해서 공유한 코드가 아무 데도 안 닿는다.
+ */
+export function createInviteCode(teamId) {
+  return api.post(`/teams/${teamId}/invite-codes`, {
+    expires_in_hours: 72,
+    max_uses: 10,
+    default_role: 'MEMBER',
+  })
 }
 
 /**
@@ -103,8 +146,17 @@ export function createProject(teamId, name) {
  * 없다.** 홈이 전부 0 으로 뜨는데 팀을 만들 버튼도, 초대 코드를 넣을 칸도
  * 화면에 없었다. 서버에는 처음부터 있던 기능이다.
  */
-export function createTeam(name) {
-  return api.post('/teams', { name })
+export function createTeam(name, { description, timezone } = {}) {
+  /*
+    `timezone` 도 서버 계약에 없다. 팀의 **기준 시간대**는 이 서비스의 전제
+    (사람마다 하루를 자르는 기준이 다르다)와 직결되는 값이라, 화면에서 받은
+    것을 그대로 실어 보내고 백엔드가 받게 한다.
+  */
+  return api.post('/teams', {
+    name,
+    ...(description ? { description } : {}),
+    ...(timezone ? { timezone } : {}),
+  })
 }
 
 /** 받은 초대 코드로 팀에 들어간다. 코드 모양은 `BRD-A1B2-C3D4`. */
