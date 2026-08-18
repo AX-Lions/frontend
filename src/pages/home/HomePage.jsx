@@ -10,6 +10,7 @@ import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
 import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
+import { TeamOnboarding } from './TeamOnboarding.jsx'
 
 const starIcons = {
   active: '/icons/Staractive.svg',
@@ -225,6 +226,23 @@ export function HomePage() {
   const recentMeetings = homeData.recent_meetings ?? []
   const todaySchedule = homeData.today_schedule ?? []
   const summary = homeData.recent_meeting_summary
+
+  /*
+    아무 데도 안 붙어 있는 사람.
+
+    가입만 하고 팀이 없으면 홈이 **전부 0** 으로 뜨는데, 팀을 만들 버튼도 초대
+    코드를 넣을 칸도 화면에 없어서 빠져나갈 길이 없었다. 서버에는 처음부터 다
+    있던 기능이다.
+
+    비어 있는 것만으로 판정한다 — `/home` 은 "이 사람이 팀이 있는가" 를 직접
+    말해 주지 않는다. 팀이 있는데 프로젝트만 없는 경우와는 해야 할 일이 다르므로
+    그 구별은 아래 화면이 팀 목록을 한 번 읽어서 한다. **홈이 비어 있을 때만**
+    나가는 요청이다.
+  */
+  const nothingYet = recentMeetings.length === 0
+    && (homeData.recent_projects ?? []).length === 0
+    && (homeData.favorite_projects ?? []).length === 0
+    && todaySchedule.length === 0
   const briefingHref = briefing.exists
     ? `/flow-board?meeting=${briefing.meeting_id}&source=bordo-briefing`
     : null
@@ -243,13 +261,20 @@ export function HomePage() {
       />
 
       <main className="home-main">
+        {nothingYet ? (
+          <TeamOnboarding
+            onDone={reload}
+            onAddProject={() => setAddingProject(true)}
+          />
+        ) : null}
+
         {favoriteMessage ? (
           <div className="favorite-toast" role="status" aria-live="polite">
             {favoriteMessage}
           </div>
         ) : null}
 
-        <div className="home-content">
+        <div className="home-content" hidden={nothingYet}>
           <section className="welcome-section">
             <div className="welcome-row">
               <h1>
