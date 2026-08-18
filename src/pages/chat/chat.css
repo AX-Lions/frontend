@@ -40,7 +40,10 @@
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  grid-template-columns: 64px 485px minmax(0, 1fr);
+  /* 목록 칸을 `485px` 로 못 박으면 창이 좁아지거나 확대해도 안 줄어든다.
+     그 안의 팀 머리글이 밀려 **접기 화살표가 패널 밖으로 나가** 팀을 접을 수
+     없었다. 최대는 지키되 줄어들 수 있게 둔다. */
+  grid-template-columns: 64px minmax(280px, 485px) minmax(0, 1fr);
   overflow: hidden;
   background: #ffffff;
   color: var(--chat-ink);
@@ -327,6 +330,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* `overflow: hidden` 은 세로도 자른다. 줄 높이가 글꼴보다 낮으면 한글의
+     받침과 윗선이 잘려 나간다 — 실측 19px 글자가 16px 상자에 들어가 있었다.
+     한 줄이므로 줄 높이를 넉넉히 잡고 세로로는 자르지 않는다. */
+  line-height: 1.4;
+  padding-block: 1px;
 }
 
 .section-heading img,
@@ -472,6 +480,11 @@
 
 .team-chat-group {
   display: grid;
+  /* 트랙을 `auto` 로 두면 **내용 크기로 커진다.** 안쪽 머리글이
+     `width: 100%` 라 서로를 키워, 실측 465px 짜리 줄이 383px 칸에서 넘쳤고
+     `overflow-x: hidden` 이라 접기 화살표에 닿을 수 없었다.
+     `minmax(0, 1fr)` 은 칸을 넘지 않게 못 박는다. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -579,14 +592,19 @@ button.team-shortcut:active {
   transform: rotate(180deg);
 }
 
+/* 트랙이 `auto` 면 **내용 크기로 커진다.** 안쪽 줄이 `width: 100%` 라 서로를
+   키워, 목록이 패널 밖으로 나가도 `overflow-x: hidden` 이라 닿을 수 없다.
+   `minmax(0, 1fr)` 로 칸을 넘지 않게 못 박는다. */
 .nested-team {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   padding-left: 8px;
 }
 
 .project-team {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
 }
 
@@ -599,6 +617,7 @@ button.team-shortcut:active {
 
 .project-chat-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
   padding-left: 8px;
 }
@@ -873,7 +892,10 @@ button.team-shortcut:active {
   width: 100%;
   height: 100vh;
   height: 100dvh;
-  grid-template-columns: 64px 485px minmax(0, 1fr);
+  /* 목록 칸을 `485px` 로 못 박으면 창이 좁아지거나 확대해도 안 줄어든다.
+     그 안의 팀 머리글이 밀려 **접기 화살표가 패널 밖으로 나가** 팀을 접을 수
+     없었다. 최대는 지키되 줄어들 수 있게 둔다. */
+  grid-template-columns: 64px minmax(280px, 485px) minmax(0, 1fr);
   overflow: hidden;
   background: #ffffff;
   color: var(--settings-ink);
@@ -2290,4 +2312,36 @@ button.team-shortcut:active {
   color: var(--chat-subtle);
   font-size: var(--chat-fs-meta);
   font-style: normal;
+}
+
+/*
+ * 좁은 폭에서 팀 머리글이 잘리던 것
+ *
+ * `모두 채팅 바로가기` 알약(146px)이 안 줄어들어, 접기 화살표를 **패널 밖으로
+ * 밀어냈다.** 실측 465px 내용이 419px 상자에 들어갔고 `overflow-x: hidden`
+ * 이라 화살표에 닿을 방법이 없었다 — 팀을 접을 수가 없다.
+ *
+ * 좁으면 바로가기 문구를 숨긴다. 팀을 접는 것이 더 자주 쓰는 동작이고,
+ * 바로가기는 팀 이름을 눌러도 갈 수 있다.
+ */
+.team-chat-header,
+.project-title {
+  min-width: 0;
+  gap: 8px;
+}
+
+.team-chat-header .team-name,
+.project-title strong {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.team-actions {
+  min-width: 0;
+}
+
+@media (max-width: 1180px) {
+  .team-shortcut {
+    display: none;
+  }
 }
