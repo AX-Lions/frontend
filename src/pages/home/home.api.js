@@ -95,3 +95,19 @@ export function fetchTeams(signal) {
 export function createProject(teamId, name) {
   return api.post(`/teams/${teamId}/projects`, { name })
 }
+
+/**
+ * 팀을 새로 만든다. 만든 사람이 소유자가 되고 팀원 1명으로 시작한다.
+ *
+ * 이것이 없으면 **가입만 하고 아무 데도 속하지 않은 사람은 빠져나갈 길이
+ * 없다.** 홈이 전부 0 으로 뜨는데 팀을 만들 버튼도, 초대 코드를 넣을 칸도
+ * 화면에 없었다. 서버에는 처음부터 있던 기능이다.
+ */
+export function createTeam(name) {
+  return api.post('/teams', { name })
+}
+
+/** 받은 초대 코드로 팀에 들어간다. 코드 모양은 `BRD-A1B2-C3D4`. */
+export function joinTeam(code) {
+  return api.post('/teams/join', { code })
+}
