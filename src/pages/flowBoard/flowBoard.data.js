@@ -87,8 +87,21 @@ export function fetchSummaryTable(meetingId, signal) {
   return api.get(`/meetings/${meetingId}/summary-table`, undefined, { signal })
 }
 
-export function fetchBriefing(meetingId, signal) {
-  return api.get(`/meetings/${meetingId}/ai-briefing`, undefined, { signal })
+/**
+ * 브리핑을 읽는다.
+ *
+ * **읽음 처리를 부르는 쪽이 정한다.** 이 화면은 브리핑 패널을 열든 말든 회의를
+ * 열 때 이것을 부른다. 서버는 패널을 열었는지 알 수 없으므로, 그냥 부르면
+ * 회의 화면에 잠깐 들른 것만으로 홈의 `Bordo 브리핑 보러가기` 가 사라진다 —
+ * **사용자는 읽은 적이 없는데 읽은 것이 된다.**
+ *
+ * 그래서 자동으로 부를 때는 `markRead: false` 다. 실제로 패널을 연 순간에만
+ * 읽음으로 올린다.
+ */
+export function fetchBriefing(meetingId, { markRead = true } = {}, signal) {
+  return api.get(`/meetings/${meetingId}/ai-briefing`,
+                 markRead ? undefined : { mark_read: 'false' },
+                 { signal })
 }
 
 export function fetchEdge(edgeId, signal) {

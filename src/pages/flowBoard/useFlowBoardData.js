@@ -71,7 +71,9 @@ export function useFlowBoardMeeting(meetingIdOverride = null, urlMeetingId = nul
     const [detail, summary, briefing] = await Promise.all([
       fetchMeeting(entry.meetingId, signal),
       fetchSummaryTable(entry.meetingId, signal).catch(() => null),
-      fetchBriefing(entry.meetingId, signal).catch(() => null),
+      // 회의를 여는 것만으로 읽음이 되면 안 된다. 읽음은 패널을 실제로 연
+      // 순간에 따로 올린다(`FlowBoardPage`).
+      fetchBriefing(entry.meetingId, { markRead: false }, signal).catch(() => null),
     ])
 
     return {

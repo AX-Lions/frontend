@@ -10,6 +10,23 @@
  *
  * 렌더와 섞지 않는 이유는 이 계산이 화면 없이도 검증 가능해야 해서다.
  *
+ * ## 판의 구성 — 요약표가 위, 그래프가 아래
+ *
+ *     ┌────────── 요약표 ──────────┐   ← 판 맨 위. 세 열이 여기 쌓인다
+ *     └────────────────────────────┘
+ *              ○ ─────── ○            ← 노드는 그 아래 링 위에 앉는다
+ *              ○ ─────── ○
+ *
+ * 한때 요약표를 링 **한가운데**에 두었다. 그러면 마주 보는 두 노드를 잇는 선이
+ * 요약표를 관통해서, 선을 일부러 바깥으로 휘게 만들어야 했다 — 곡선은 취향이
+ * 아니라 가운데 상자를 피하려고 낸 우회로였다. 요약표를 위로 빼면 링 안이
+ * 비므로 **선이 직선이어도 아무것도 가리지 않는다.** 두 변경은 한 몸이다.
+ *
+ * 직선이 나은 이유는 따로 있다. 곡선은 두 노드를 잇는 선이 여럿일 때 어느
+ * 것이 어느 것인지 눈으로 따라가기 어렵고, 화살촉의 각도가 실제 방향과
+ * 어긋나 보인다. 이 화면이 답해야 하는 질문은 "누가 누구에게 무엇을
+ * 보냈나" 라서, 선은 눈으로 따라갈 수 있어야 한다.
+ *
  * ## 결정적이어야 한다
  *
  * 같은 데이터면 같은 그림이어야 한다. 서버가 주는 `nodes` 순서는 **엣지를
@@ -29,28 +46,75 @@ const STAGE_MARGIN = 32
 /** 뱃지 묶음 한 덩이의 대략적인 반지름. 무대 경계를 잴 때만 쓴다. */
 const BADGE_HALF = 46
 
-/** 한가운데 요약표가 차지하는 자리. 노드는 이 상자를 피해 앉는다. */
-export const SUMMARY_SIZE = { width: 592, height: 266 }
+/** 요약표 폭. */
+export const SUMMARY_WIDTH = 592
 
-/** 요약표와 노드 사이 최소 거리. */
-const SUMMARY_CLEARANCE = 40
+/*
+  요약표 높이는 **줄 수에서 계산한다.**
 
-/** 요약표를 가로지르는 선이 상자에서 떨어져야 하는 거리. */
-const SUMMARY_BOW_MARGIN = 28
+  높이를 266px 로 못 박아 두었더니, 열마다 두 줄뿐인 회의에서도 상자가 그대로
+  커서 아래쪽 절반이 빈 채로 남았다. 반대로 여섯 줄이 넘으면 상자가 아래로
+  삐져나와 노드를 덮었다. 요약표가 판 한가운데 있을 때는 노드가 상자를 피해
+  둘러앉아 티가 덜 났지만, **위에 고정하면 상자 아래 경계가 곧 그래프의
+  시작점**이라 높이가 틀리면 바로 겹치거나 빈다.
+
+  아래 값들은 `flowBoard.css` 의 `.summary-board` · `.summary-column` 과 짝이다.
+  한쪽만 고치면 요약표와 노드 사이 간격이 어긋난다.
+*/
+const SUMMARY_PADDING_Y = 24 // .summary-board { padding: 24px }
+const SUMMARY_HEADING = 24 // .summary-column h2 — 16px 한 줄 + margin-bottom 8px
+const SUMMARY_ROW = 33 // .summary-column button — 14px×1.15 + 상하 8px, 올림
+const SUMMARY_ROW_GAP = 6 // .summary-column div { gap: 6px }
+
+/** 요약이 통째로 비었을 때(작업 모드·요약 없는 회의) 안내문이 앉을 만한 높이. */
+const SUMMARY_MIN_HEIGHT = 132
+
+/** 요약표 아래 끝과 가장 위에 앉은 노드 사이의 빈 틈. */
+const SUMMARY_GAP = 56
 
 /**
- * 같은 두 노드를 잇는 선이 여럿일 때, **선 가운데에서** 벌어지는 간격.
+ * 노드 중심이 벌어지는 목표 폭·높이의 **절반**.
+ *
+ * 가로는 요약표 폭에 맞춘다 — 그래프가 요약표보다 좁으면 위아래가 따로 노는
+ * 그림이 되고, 넓으면 판이 옆으로 길어져 축소된다. `-NODE_RADIUS` 는 원의
+ * 바깥 테두리를 기준으로 맞추기 위한 것이다(중심 span + 지름 = 요약표 폭).
+ */
+const RING_HALF_WIDTH = SUMMARY_WIDTH / 2 - NODE_RADIUS
+const RING_HALF_HEIGHT = 200
+
+/**
+ * 같은 두 노드를 잇는 선이 여럿일 때, 선끼리 **직각으로** 벌어지는 간격.
  *
  * 뱃지가 앉는 곳이 곧 선의 가운데라 이 값이 뱃지 사이 거리이기도 하다.
  * 뱃지 하나가 36px 이므로 그보다 넉넉해야 두 뱃지가 겹쳐 읽히지 않는다.
  */
 const PARALLEL_SPREAD = 44
 
+/**
+ * 선을 옆으로 밀 수 있는 한계.
+ *
+ * 직선을 직각으로 밀면 끝점도 같이 밀린다. 반지름보다 많이 밀면 끝점이 원
+ * 바깥으로 나가 **선이 노드에서 떨어진 허공에서 시작한다.** 곡선일 때는
+ * 제어점만 밀고 끝점은 원에 붙여 두어 이 문제가 없었다. 그래서 선이 셋을
+ * 넘으면 간격을 좁혀서라도 전부 원 안에서 출발하게 한다.
+ */
+const MAX_PARALLEL_OFFSET = NODE_RADIUS * 0.72
+
 /** 선 끝을 원 테두리에서 얼마나 띄울지. 끝쪽은 화살촉이 앉을 자리가 더 필요하다. */
 const EDGE_START_GAP = 6
 const EDGE_END_GAP = 16
 
 const KIND_RANK = { USER: 0, AGENT: 1, SERVER: 2 }
+
+/** 요약표 세 열 중 가장 긴 열의 줄 수로 상자 높이를 잰다. */
+function summaryHeight(rows) {
+  if (!rows) {
+    return SUMMARY_MIN_HEIGHT
+  }
+
+  const body = rows * SUMMARY_ROW + (rows - 1) * SUMMARY_ROW_GAP
+  return Math.max(SUMMARY_MIN_HEIGHT, SUMMARY_PADDING_Y * 2 + SUMMARY_HEADING + body)
+}
 
 /**
  * 사람 → 그 사람의 Bordo 순으로, 사람은 가나다순으로 앉힌다.
@@ -87,20 +151,48 @@ function orderNodes(nodes) {
 }
 
 /**
+ * 노드가 앉을 각도.
+ *
+ * 12시에서 **반 칸 돌려** 시작한다. 정확히 12시부터 세면 짝수 명일 때 한
+ * 사람이 12시, 한 사람이 6시에 앉아 마름모가 되는데, 요약표가 바로 위에
+ * 있으므로 12시 자리는 상자 밑에 바짝 붙어 답답하다. 반 칸 돌리면 넷이
+ * 두 명씩 위아래로 갈라 앉아 **요약표와 나란한 사각형**이 된다.
+ *
+ * 홀수 명이어도 세로축 대칭은 그대로다 — 셋이면 위 둘 · 아래 하나가 된다.
+ */
+function ringAngles(count) {
+  const step = (2 * Math.PI) / Math.max(1, count)
+  return Array.from({ length: count }, (_, index) => -Math.PI / 2 + step / 2 + index * step)
+}
+
+/**
  * 링의 두 반지름.
  *
  * 두 조건 중 큰 쪽을 쓴다.
- * 1. 한가운데 요약표를 피할 것
+ * 1. 가장 바깥에 앉는 노드가 목표 폭·높이에 닿을 것
  * 2. 이웃 노드끼리 겹치지 않을 것 — 노드가 많아질수록 이쪽이 커진다
+ *
+ * 1번을 `RING_HALF_WIDTH` 를 그대로 반지름에 쓰지 않고 **가장 큰 |cos| 로
+ * 나누는** 이유는, 반 칸 돌려 앉히면 아무도 3시·9시 정각에 있지 않기
+ * 때문이다. 반지름을 그대로 쓰면 넷일 때 가로 폭이 `2·r·cos45° = 0.71·2r`
+ * 로 줄어 그래프가 요약표보다 한참 좁아진다.
  */
-function ringRadii(count) {
+function ringRadii(angles) {
+  const count = angles.length
   const spacing = count > 1
     ? (NODE_RADIUS + NODE_MIN_GAP / 2) / Math.sin(Math.PI / count)
     : 0
 
+  const widest = (values) => values.reduce((max, v) => Math.max(max, Math.abs(v)), 0)
+  const maxCos = widest(angles.map(Math.cos))
+  const maxSin = widest(angles.map(Math.sin))
+
+  // 둘이면 나란히 앉아 |sin| 이 0 이다. 0 으로 나누지 않도록 목표값을 그대로 쓴다.
+  const reach = (half, extent) => (extent > 1e-6 ? half / extent : half)
+
   return {
-    rx: Math.max(SUMMARY_SIZE.width / 2 + SUMMARY_CLEARANCE + NODE_RADIUS, spacing),
-    ry: Math.max(SUMMARY_SIZE.height / 2 + SUMMARY_CLEARANCE + NODE_RADIUS, spacing),
+    rx: Math.max(spacing, reach(RING_HALF_WIDTH, maxCos)),
+    ry: Math.max(spacing, reach(RING_HALF_HEIGHT, maxSin)),
   }
 }
 
@@ -109,78 +201,42 @@ function unit(dx, dy) {
   return length < 1e-6 ? { x: 0, y: 0, length: 0 } : { x: dx / length, y: dy / length, length }
 }
 
-/** 중심에서 방향 `u` 로 나갔을 때 축 정렬 사각형 경계까지의 거리. */
-function boxReach(u, halfWidth, halfHeight) {
-  const toRight = Math.abs(u.x) < 1e-6 ? Infinity : halfWidth / Math.abs(u.x)
-  const toBottom = Math.abs(u.y) < 1e-6 ? Infinity : halfHeight / Math.abs(u.y)
-  return Math.min(toRight, toBottom)
-}
-
 /**
- * 한 줄의 곡선을 만든다.
+ * 두 노드를 잇는 **직선** 하나를 만든다.
  *
- * ## 왜 직선이 아닌가
+ * `offset` 은 선을 현과 직각으로 통째로 미는 양이다. 두 끝을 같은 양만큼
+ * 밀기 때문에 선은 여전히 직선이고 옆 선과 나란하다 — 같은 쌍 사이에 선이
+ * 여럿일 때 겹쳐 보이지 않게 하는 유일한 장치다.
  *
- * 노드가 링 위에 있고 요약표가 한가운데 있어서, **마주 보는 두 노드를 직선으로
- * 이으면 선이 요약표를 관통한다.** 뱃지도 그 위에 얹힌다. 그래서 선의 가운데를
- * 바깥으로 밀어 상자를 비껴가게 한다.
- *
- * 2차 베지에의 가운데 점은 `(현의 중점 + 제어점) / 2` 다. 가운데를 중심에서
- * `need` 만큼 떨어뜨리고 싶으면 제어점을 `2*need - d` 에 두면 된다.
- * 이미 충분히 떨어져 있으면(`d >= need`) 제어점이 현의 중점과 같아져 직선이 된다.
+ * 끝점을 그냥 옆으로 옮기면 원 테두리에서 벗어나 **선이 노드에서 떨어진
+ * 자리에서 시작한다.** 밀린 선이 원을 자르는 지점을 피타고라스로 되찾아야
+ * 끝이 원에 붙는다: 중심에서 선까지 거리가 `offset` 이므로, 반지름 `R` 인
+ * 원 안에 든 절반 길이는 `√(R² − offset²)` 이다.
  */
-function curveBetween(from, to, center, parallelOffset) {
-  const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 }
-  const outward = unit(mid.x - center.x, mid.y - center.y)
+function lineBetween(from, to, offset) {
   const chord = unit(to.x - from.x, to.y - from.y)
+  const normal = { x: -chord.y, y: chord.x }
+  const shift = { x: normal.x * offset, y: normal.y * offset }
+  const reach = (radius) => Math.sqrt(Math.max(0, radius * radius - offset * offset))
 
-  // 정확히 중심을 지나는 현은 바깥 방향을 정할 수 없다. 그때는 현의 수직
-  // 방향으로 민다 — 어느 쪽이든 상자를 벗어나는 것은 같다.
-  const push = outward.length < 1e-6 ? { x: -chord.y, y: chord.x } : outward
-  const distance = outward.length
-  const need = boxReach(
-    push,
-    SUMMARY_SIZE.width / 2 + SUMMARY_BOW_MARGIN,
-    SUMMARY_SIZE.height / 2 + SUMMARY_BOW_MARGIN,
-  ) + NODE_RADIUS / 2
+  const startReach = reach(NODE_RADIUS + EDGE_START_GAP)
+  const endReach = reach(NODE_RADIUS + EDGE_END_GAP)
 
-  /*
-    제어점을 두 배로 민다.
-
-    곡선의 가운데는 `(현의 중점 + 제어점) / 2` 라, 제어점을 `x` 만큼 옮기면
-    가운데는 `x/2` 만 움직인다. 벌리려던 간격의 **절반만 벌어져** 뱃지가
-    겹쳤다. 끝점은 노드 중심에 그대로 두고 제어점만 두 배로 민다 — 끝점까지
-    옮기면 선이 노드에서 떨어진 자리에서 시작한다.
-  */
-  const reach = Math.max(distance, 2 * need - distance)
-  const sideways = parallelOffset * 2
-  const control = {
-    x: center.x + push.x * reach - chord.y * sideways,
-    y: center.y + push.y * reach + chord.x * sideways,
-  }
-
-  // 선 끝을 원 테두리에 맞춘다. 방향은 제어점 쪽이라 곡선이 원을 파고들지 않는다.
-  const startDir = unit(control.x - from.x, control.y - from.y)
-  const endDir = unit(control.x - to.x, control.y - to.y)
   const start = {
-    x: from.x + startDir.x * (NODE_RADIUS + EDGE_START_GAP),
-    y: from.y + startDir.y * (NODE_RADIUS + EDGE_START_GAP),
+    x: from.x + shift.x + chord.x * startReach,
+    y: from.y + shift.y + chord.y * startReach,
   }
   const end = {
-    x: to.x + endDir.x * (NODE_RADIUS + EDGE_END_GAP),
-    y: to.y + endDir.y * (NODE_RADIUS + EDGE_END_GAP),
+    x: to.x + shift.x - chord.x * endReach,
+    y: to.y + shift.y - chord.y * endReach,
   }
 
   return {
     start,
-    control,
     end,
-    // 2차 베지에의 t=0.5 지점. 뱃지가 앉을 자리다.
-    midpoint: {
-      x: (start.x + end.x) / 4 + control.x / 2,
-      y: (start.y + end.y) / 4 + control.y / 2,
-    },
-    // t=0.5 의 접선은 현과 나란하다. 뱃지를 선을 따라 눕힐지 세울지 정한다.
+    // 뱃지가 앉을 자리. 직선이라 그냥 두 끝의 한가운데다.
+    midpoint: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
+    // 뱃지를 선을 따라 눕힐지 세울지 정한다.
     axis: Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'row' : 'column',
   }
 }
@@ -195,36 +251,52 @@ function isAiLink(from, to) {
  *
  * @param nodes  `GET .../flow` 의 `nodes`
  * @param arrows `GET .../flow` 의 `arrows`
+ * @param options `summaryRows` — 요약표 세 열 중 가장 긴 열의 줄 수.
+ *                상자 높이가 곧 그래프가 시작하는 자리라 배치에 필요하다.
  * @returns `{ nodes, links, badges, stage, summary }`
  */
-export function buildFlowLayout(nodes = [], arrows = []) {
+export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {}) {
   const ordered = orderNodes(nodes.filter(Boolean))
-  const { rx, ry } = ringRadii(ordered.length)
-  // 중심을 어디에 두든 마지막에 경계에 맞춰 다시 옮긴다. 여기서는 좌표가
-  // 음수로 내려가지 않을 만큼만 띄운다.
-  const center = { x: rx + NODE_RADIUS, y: ry + NODE_RADIUS }
-  const step = (2 * Math.PI) / Math.max(1, ordered.length)
+  const angles = ringAngles(ordered.length)
+  const { rx, ry } = ringRadii(angles)
+  const summary = { width: SUMMARY_WIDTH, height: summaryHeight(summaryRows) }
 
-  const placed = ordered.map((node, index) => {
-    // 12시부터 시계 방향. 사람이 하나여도 위쪽에 앉는다.
-    const angle = -Math.PI / 2 + index * step
-    return {
-      ...node,
-      x: center.x + rx * Math.cos(angle),
-      y: center.y + ry * Math.sin(angle),
-      r: NODE_RADIUS,
-    }
-  })
+  /*
+    가로 중심은 요약표와 링이 나눠 쓴다 — 둘의 중심축이 어긋나면 그래프가
+    상자 옆으로 삐딱하게 달린 것처럼 보인다. 넓은 쪽이 판의 폭을 정한다.
+  */
+  const spanWidth = Math.max(summary.width, rx * 2 + NODE_RADIUS * 2)
+  const centerX = STAGE_MARGIN + spanWidth / 2
+  const summaryTop = STAGE_MARGIN
+
+  /*
+    링을 요약표 아래로 내린다.
+
+    `ry` 만큼 내리면 안 된다. **가장 위에 앉은 노드가 링의 꼭대기에 있다는
+    보장이 없기 때문이다** — 둘이면 둘 다 3시·9시에 앉아 링 위쪽이 통째로
+    비고, 그만큼 요약표와 노드 사이가 허옇게 뜬다. 실제로 가장 위에 오는
+    노드를 찾아 그것을 상자 바로 아래에 붙인다.
+  */
+  const highest = angles.length ? Math.min(...angles.map((angle) => Math.sin(angle) * ry)) : 0
+  const centerY = summaryTop + summary.height + SUMMARY_GAP + NODE_RADIUS - highest
+
+  const placed = ordered.map((node, index) => ({
+    ...node,
+    x: centerX + rx * Math.cos(angles[index]),
+    y: centerY + ry * Math.sin(angles[index]),
+    r: NODE_RADIUS,
+  }))
 
   const byId = new Map(placed.map((node) => [node.id, node]))
 
   /*
     같은 두 노드를 잇는 선이 몇 번째인지 세어 둔다.
 
-    작업 플로우는 사람마다 작업·수정·피드백·공유·AI조회가 다 있어서 같은 쌍
-    사이에 선이 여럿 생긴다. 오프셋을 안 주면 다섯 줄이 **한 줄로 겹쳐 보이고**
-    뱃지 다섯 개가 같은 점에 쌓인다. 방향(A→B, B→A)이 달라도 겹치는 것은
-    같으므로 정렬한 쌍을 키로 쓴다.
+    서버가 `(보낸 이, 받은 이들)` 마다 하나로 묶어 주지만, 방향이 반대인 것과
+    받는 사람 묶음이 다른 것(A→B 와 A→B·C)은 다른 화살표라 같은 쌍 사이에
+    선이 여럿 생긴다. 오프셋을 안 주면 그 선들이 **한 줄로 겹쳐 보이고**
+    뱃지가 같은 점에 쌓인다. 방향이 달라도 겹치는 것은 같으므로 정렬한 쌍을
+    키로 쓴다.
   */
   const pairSlots = new Map()
   const pending = []
@@ -253,8 +325,11 @@ export function buildFlowLayout(nodes = [], arrows = []) {
 
   const links = pending.map(({ arrow, from, to, targetIndex, pairKey, slot }) => {
     const total = pairSlots.get(pairKey) ?? 1
-    const offset = (slot - (total - 1) / 2) * PARALLEL_SPREAD
-    const curve = curveBetween(from, to, center, offset)
+    // 선이 많아지면 간격을 좁힌다. 넓게 유지하면 바깥 선이 노드에서 떨어진다.
+    const spread = total > 1
+      ? Math.min(PARALLEL_SPREAD, (MAX_PARALLEL_OFFSET * 2) / (total - 1))
+      : 0
+    const offset = (slot - (total - 1) / 2) * spread
 
     return {
       id: `${arrow.id}::${to.id}`,
@@ -267,7 +342,7 @@ export function buildFlowLayout(nodes = [], arrows = []) {
       // 뱃지는 화살표당 하나다. 브로드캐스트에서 팔마다 같은 숫자를 붙이면
       // 같은 일이 네 번 일어난 것처럼 읽힌다.
       isBadgeAnchor: targetIndex === 0,
-      ...curve,
+      ...lineBetween(from, to, offset),
     }
   })
 
@@ -288,9 +363,6 @@ export function buildFlowLayout(nodes = [], arrows = []) {
     따라 실제로 차지하는 폭이 달라진다.** 여백을 모자라게 잡으면 SVG 가 무대
     크기만큼만 그려서 벌려 놓은 선이 잘리고, 넉넉히 잡으면 아무것도 없는 여백을
     한참 스크롤하게 된다. 그래서 다 그린 뒤 경계를 재서 거기에 맞춘다.
-
-    2차 베지에는 세 점(시작·제어·끝)의 볼록 껍질 안에 있으므로 그 셋만 재면
-    곡선 전체가 담긴다.
   */
   const xs = []
   const ys = []
@@ -299,7 +371,7 @@ export function buildFlowLayout(nodes = [], arrows = []) {
     ys.push(node.y - node.r, node.y + node.r)
   })
   links.forEach((link) => {
-    [link.start, link.control, link.end].forEach((p) => {
+    [link.start, link.end].forEach((p) => {
       xs.push(p.x)
       ys.push(p.y)
     })
@@ -308,8 +380,8 @@ export function buildFlowLayout(nodes = [], arrows = []) {
     xs.push(badge.point.x - BADGE_HALF, badge.point.x + BADGE_HALF)
     ys.push(badge.point.y - BADGE_HALF, badge.point.y + BADGE_HALF)
   })
-  xs.push(center.x - SUMMARY_SIZE.width / 2, center.x + SUMMARY_SIZE.width / 2)
-  ys.push(center.y - SUMMARY_SIZE.height / 2, center.y + SUMMARY_SIZE.height / 2)
+  xs.push(centerX - summary.width / 2, centerX + summary.width / 2)
+  ys.push(summaryTop, summaryTop + summary.height)
 
   const shiftX = STAGE_MARGIN - Math.min(...xs)
   const shiftY = STAGE_MARGIN - Math.min(...ys)
@@ -318,13 +390,23 @@ export function buildFlowLayout(nodes = [], arrows = []) {
 
   return {
     nodes: placed.map((node) => ({ ...node, x: node.x + shiftX, y: node.y + shiftY })),
+    /*
+      끝점도 옮겨서 내보낸다.
+
+      예전에는 `d` 만 옮긴 좌표로 만들고 `start`·`end`·`midpoint` 는 옮기기
+      전 값을 그대로 두었다. 한 덩이 안에서 `nodes`·`badges` 는 옮긴 좌표,
+      선의 끝점은 안 옮긴 좌표라 **읽는 쪽이 둘을 같이 쓰면 조용히 어긋난다.**
+      지금은 `d` 밖에 안 쓰지만 다음 사람이 밟을 자리다.
+    */
     links: links.map((link) => {
       const start = at(link.start)
-      const control = at(link.control)
       const end = at(link.end)
       return {
         ...link,
-        d: `M${round(start.x)} ${round(start.y)} Q${round(control.x)} ${round(control.y)} ${round(end.x)} ${round(end.y)}`,
+        start,
+        end,
+        midpoint: at(link.midpoint),
+        d: `M${round(start.x)} ${round(start.y)} L${round(end.x)} ${round(end.y)}`,
       }
     }),
     badges: badges.map((badge) => ({
@@ -337,10 +419,10 @@ export function buildFlowLayout(nodes = [], arrows = []) {
       height: Math.ceil(Math.max(...ys) - Math.min(...ys) + STAGE_MARGIN * 2),
     },
     summary: {
-      left: center.x - SUMMARY_SIZE.width / 2 + shiftX,
-      top: center.y - SUMMARY_SIZE.height / 2 + shiftY,
-      width: SUMMARY_SIZE.width,
-      height: SUMMARY_SIZE.height,
+      left: centerX - summary.width / 2 + shiftX,
+      top: summaryTop + shiftY,
+      width: summary.width,
+      height: summary.height,
     },
   }
 }
