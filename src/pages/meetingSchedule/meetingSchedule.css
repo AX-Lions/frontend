@@ -1,0 +1,217 @@
+/*
+ * 회의 일정 (Figma `692:7910`). 왼쪽은 홈과 같은 사이드바(`.home-layout`,
+ * `.sidebar`)를 그대로 쓰고, 여기서는 오른쪽 본문만 정의한다.
+ */
+
+.msched-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 38px 32px 48px;
+}
+
+.msched-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  margin-bottom: 64px;
+}
+
+.msched-head h1 {
+  margin: 0;
+  color: #000000;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.msched-add {
+  height: 41px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #002662;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.msched-add:hover {
+  background: #e9eaec;
+}
+
+.msched-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  margin-bottom: 32px;
+}
+
+.msched-month-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.msched-month-nav strong {
+  color: #000000;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.msched-chevron {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.msched-chevron:hover {
+  background: #f3f4f6;
+}
+
+.msched-chevron img {
+  width: 20px;
+  height: 20px;
+}
+
+.msched-chevron.is-prev img {
+  transform: rotate(180deg);
+}
+
+.msched-confirmed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #60646c;
+  font-size: 14px;
+}
+
+.msched-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #ff6450;
+}
+
+.msched-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.msched-weekdays,
+.msched-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.msched-weekday {
+  padding: 8px 16px;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.msched-calendar > .msched-weekdays {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #002662;
+}
+
+.msched-cell {
+  display: flex;
+  min-height: 108px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 4px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.msched-cell.is-outside {
+  border-bottom-color: transparent;
+}
+
+.msched-day {
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.msched-day.is-today {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #002662;
+  color: #ffffff;
+}
+
+.msched-event {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(0 38 98 / 5%);
+  text-align: left;
+  cursor: pointer;
+}
+
+.msched-event:disabled {
+  cursor: default;
+}
+
+.msched-event:hover:not(:disabled) {
+  background: rgb(0 38 98 / 10%);
+}
+
+.msched-event strong {
+  overflow: hidden;
+  color: #1f1f1f;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msched-event span {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  overflow: hidden;
+  color: #1f1f1f;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msched-event em {
+  flex: none;
+  color: #002662;
+  font-style: normal;
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .msched-main {
+    padding: 24px 16px 32px;
+  }
+
+  .msched-head,
+  .msched-toolbar {
+    padding: 0;
+  }
+}

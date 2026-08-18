@@ -274,18 +274,13 @@ export function Sidebar({
                             회의 시작하기
                           </a>
                           <hr />
-                          {/*
-                            회의 일정을 달력으로 모아 보는 화면은 아직 없다.
-                            생기기 전까지는 그나마 가장 가까운 `/flow-board`
-                            로 보낸다.
-                          */}
                           <a
                             className="sidebar-meeting-row"
                             role="menuitem"
-                            href="/flow-board"
+                            href="/meeting-schedule"
                             onClick={(event) => {
                               setMeetingMenuOpen(false)
-                              goInApp(event, '/flow-board')
+                              goInApp(event, '/meeting-schedule')
                             }}
                           >
                             <img src="/icons/CalendarCheck.svg" alt="" />

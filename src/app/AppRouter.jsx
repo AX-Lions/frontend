@@ -34,6 +34,7 @@ const loadPage = {
   account: () => import('../pages/account/AccountPage.jsx'),
   delegatePrep: () => import('../pages/delegatePrep/DelegatePrepPage.jsx'),
   inbox: () => import('../pages/inbox/InboxPage.jsx'),
+  meetingSchedule: () => import('../pages/meetingSchedule/MeetingSchedulePage.jsx'),
 }
 
 /*
@@ -48,6 +49,8 @@ const AccountPage = lazy(() => loadPage.account().then((m) => ({ default: m.Acco
 const DelegatePrepPage = lazy(
   () => loadPage.delegatePrep().then((m) => ({ default: m.DelegatePrepPage })))
 const InboxPage = lazy(() => loadPage.inbox().then((m) => ({ default: m.InboxPage })))
+const MeetingSchedulePage = lazy(
+  () => loadPage.meetingSchedule().then((m) => ({ default: m.MeetingSchedulePage })))
 
 /**
  * 첫 화면이 뜨고 손이 빈 틈에 나머지를 미리 받아 둔다.
@@ -159,6 +162,10 @@ export function AppRouter() {
 
   if (path === '/inbox') {
     return <Screen><InboxPage /></Screen>
+  }
+
+  if (path === '/meeting-schedule') {
+    return <Screen><MeetingSchedulePage /></Screen>
   }
 
   /*

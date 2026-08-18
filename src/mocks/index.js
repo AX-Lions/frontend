@@ -38,6 +38,7 @@ import { teamMembers } from './data/home.js'
 import { inbox } from './data/inbox.js'
 import { TEAM } from './data/people.js'
 import { tasks } from './data/tasks.js'
+import { calendarEvents } from './data/calendar.js'
 import {
   activeDates, chatCandidates, chatRooms,
   dailySummaries, roomDetails, roomMessages,
@@ -257,6 +258,25 @@ function discordStatus(teamId) {
   }
 }
 
+/**
+ * 회의 일정 달력(시안 `692:7910`)의 한 프로젝트 분.
+ *
+ * `from` · `to` (YYYY-MM-DD, 둘 다 있을 때만) 로 걸러 낸다 — 안 걸러 주면
+ * 달력이 보이는 달과 무관하게 항상 같은 여섯 건만 보인다. 이번 방문에 만든
+ * 일정은 `appendTo` 로 이어 붙인다.
+ */
+function projectCalendarEvents(projectId, from, to) {
+  const all = withAppended(`calendar:${projectId}`, calendarEvents)
+    .filter((e) => e.project_id === projectId)
+  const ranged = from && to
+    ? all.filter((e) => {
+      const day = e.start_at.slice(0, 10)
+      return day >= from && day <= to
+    })
+    : all
+  return { count: ranged.length, results: ranged, range: { from: from ?? null, to: to ?? null } }
+}
+
 function resolve(path, method, body) {
   const s = segments(path)
   const [a, b, c] = s
@@ -293,6 +313,10 @@ function resolve(path, method, body) {
         : (meetingIndexes[b] ?? EMPTY)
     }
 
+    if (a === 'projects' && c === 'calendar' && s[3] === 'events') {
+      const query = new URLSearchParams(path.split('?')[1] || '')
+      return projectCalendarEvents(b, query.get('from'), query.get('to'))
+    }
     if (a === 'projects' && c === 'flow') return projectFlows[b] ?? null
     if (a === 'projects' && c === 'meetings') return projectMeetings[b] ?? EMPTY
 
@@ -605,6 +629,21 @@ function resolve(path, method, body) {
         created_at: new Date().toISOString(),
         last_opened_at: null,
       }
+    }
+
+    if (a === 'projects' && c === 'calendar' && s[3] === 'events') {
+      return appendTo(`calendar:${b}`, {
+        id: `mock-event-${nextId()}`,
+        project_id: b,
+        title: body?.title ?? '새 일정',
+        kind: 'MEETING',
+        start_at: body?.start_at,
+        end_at: body?.end_at ?? body?.start_at,
+        status: 'SCHEDULED',
+        participant_ids: body?.participant_ids ?? [],
+        related_meeting: null,
+        discord_notified: false,
+      })
     }
 
     if (a === 'projects' && c === 'meetings') {
