@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { AppLink } from '../../app/AppLink.jsx'
+import { navigate } from '../../app/navigation.js'
 import { api } from '../../lib/api.js'
 import { useResource } from '../../lib/useResource.js'
 import './GlobalSidebar.css'
@@ -64,6 +65,27 @@ function pendingTotal(inbox) {
   ), 0)
 }
 
+/**
+ * 지금 이 순간 진행 중인 회의 하나.
+ *
+ * `delegation` 이 있는 것만 본다 — 대리인을 보낼 수 있는 회의(내가 참석자인
+ * 회의)에서만 "참여할까, 대리인을 보낼까" 를 물을 수 있다. 초대만 받은 회의
+ * (`delegation: null`)는 이 팝업의 질문 자체가 성립하지 않는다.
+ */
+function findLiveMeeting(home, now) {
+  const schedule = home?.today_schedule ?? []
+  return schedule.find((item) => {
+    if (!item.meeting_id || !item.at || !item.ends_at || !item.delegation) {
+      return false
+    }
+    const start = new Date(item.at).getTime()
+    const end = new Date(item.ends_at).getTime()
+    return now >= start && now <= end
+  }) ?? null
+}
+
+const RESPONSE_SECONDS = 10
+
 export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, user }) {
   const className = (id, base) => (active === id ? `${base} active` : base)
   const current = (id) => (active === id ? 'page' : undefined)
@@ -124,33 +146,152 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
     }
   }, [searchOpen])
 
+  /*
+    실시간 회의 팝업(시안 `666:4920` · `666:5231`).
+
+    `HomePage` 와 같은 캐시 키(`home`)를 쓴다 — 이유는 요청함 뱃지와 같다.
+    `today_schedule` 은 이미 `/home` 에 있으므로 새 주소를 만들지 않는다.
+
+    지금 진행 중인 회의가 있으면 `회의` 아이콘이 실시간 아이콘으로 바뀐다.
+    30초마다 `now` 를 다시 재서, 회의가 끝나면 아이콘도 스스로 돌아온다 —
+    새로고침해야만 없어지면 회의가 끝난 뒤에도 한참 눌리게 된다.
+  */
+  const { data: home } = useResource(
+    (signal) => api.get('/home', undefined, { signal }), [], { cacheKey: 'home' })
+
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const liveMeeting = findLiveMeeting(home, now)
+
+  const [meetingPromptOpen, setMeetingPromptOpen] = useState(false)
+  const [secondsLeft, setSecondsLeft] = useState(RESPONSE_SECONDS)
+  const [responding, setResponding] = useState(false)
+  // `useCallback` 의 `responding` 을 굳이 의존성에 넣지 않으려고 판정은
+  // ref 로 한다 — 상태로 넣으면 응답 중일 때마다 아래 카운트다운 effect 가
+  // 새 함수를 받아 다시 돈다.
+  const respondingRef = useRef(false)
+
+  const openMeetingPrompt = () => {
+    setSecondsLeft(RESPONSE_SECONDS)
+    setMeetingPromptOpen(true)
+  }
+
+  /**
+   * 대리인에게 맡긴다.
+   *
+   * 10초 동안 응답이 없을 때와 `불참하기` 를 누를 때가 같은 일이다 — 둘 다
+   * "이 회의는 내가 아니라 Bordo 가 간다" 는 결정이다. 이미 손봐 둔 자료
+   * 범위·사전 지시(`liveMeeting.delegation`)가 있으면 그대로 쓴다. 없으면
+   * 빈 값으로 켠다 — 대리인은 보내되 범위는 나중에 개인 설정에서 정할 수 있다.
+   */
+  const respondDecline = useCallback(async () => {
+    if (!liveMeeting || respondingRef.current) {
+      return
+    }
+    respondingRef.current = true
+    setResponding(true)
+    try {
+      await api.post(`/meetings/${liveMeeting.meeting_id}/delegate`, {
+        enabled: true,
+        sources: liveMeeting.delegation?.sources ?? [],
+        prompt: liveMeeting.delegation?.prompt ?? '',
+      })
+    } catch {
+      // 팝업의 목적은 "지금 어떻게 할지" 를 정하는 것이지 이 요청의 성패를
+      // 다루는 것이 아니다. 실패해도 닫는다 — 대리인 설정은 개인 설정에서
+      // 다시 손볼 수 있다.
+    } finally {
+      respondingRef.current = false
+      setResponding(false)
+      setMeetingPromptOpen(false)
+    }
+  }, [liveMeeting])
+
+  const respondJoin = () => {
+    if (liveMeeting?.action?.url) {
+      window.open(liveMeeting.action.url, '_blank', 'noopener')
+    } else if (liveMeeting) {
+      navigate(`/flow-board?meeting=${liveMeeting.meeting_id}`)
+    }
+    setMeetingPromptOpen(false)
+  }
+
+  /*
+    매초 줄이고, 0 에 닿으면 `불참하기` 와 같은 일을 한다.
+
+    타이머 콜백 안에서만 `setState` 를 부른다 — effect 본문에서 곧장 부르면
+    "effect 안에서 동기적으로 상태를 바꾼다" 는 린트 규칙에 걸린다
+    (`useResource.js` 의 같은 사연 참고).
+  */
+  useEffect(() => {
+    if (!meetingPromptOpen) {
+      return undefined
+    }
+
+    let remaining = RESPONSE_SECONDS
+    const id = window.setInterval(() => {
+      remaining -= 1
+      setSecondsLeft(Math.max(0, remaining))
+      if (remaining <= 0) {
+        window.clearInterval(id)
+        respondDecline()
+      }
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [meetingPromptOpen, respondDecline])
+
   // 레일에는 아이콘만 보인다. 여러 계정을 오가는 사람이 지금 누구로 로그인해
   // 있는지 확인할 자리가 여기뿐이라, 이름을 받으면 라벨에 함께 적는다.
   const accountLabel = user?.name ? `개인 설정 · ${user.name}` : '개인 설정'
 
   return (
-    <aside
-      className={collapsed ? 'global-sidebar is-collapsed' : 'global-sidebar'}
-      aria-label="주요 메뉴"
-      inert={collapsed}
-    >
+    <>
+      <aside
+        className={collapsed ? 'global-sidebar is-collapsed' : 'global-sidebar'}
+        aria-label="주요 메뉴"
+        inert={collapsed}
+      >
       <nav className="global-sidebar-nav" aria-label="주요 화면">
-        {globalNavItems.map((item) => (
-          <AppLink
-            className={className(item.id, 'global-sidebar-link')}
-            href={item.href}
-            key={item.id}
-            aria-label={item.label}
-            aria-current={current(item.id)}
-            title={item.label}
-            onClick={(event) => onNavigate?.(event, item)}
-          >
-            <img src={item.icon} alt="" />
-            {item.id === 'inbox' && inboxBadge > 0 ? (
-              <span className="global-sidebar-badge">{inboxBadge > 99 ? '99+' : inboxBadge}</span>
-            ) : null}
-          </AppLink>
-        ))}
+        {globalNavItems.map((item) => {
+          // 지금 진행 중인 회의가 있으면 `회의` 아이콘이 실시간 아이콘으로
+          // 바뀐다. 눌러도 이동하지 않는다 — 참여할지 대리인을 보낼지부터
+          // 팝업으로 묻는다.
+          if (item.id === 'meeting' && liveMeeting) {
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className="global-sidebar-link global-sidebar-live"
+                aria-label="지금 진행 중인 회의"
+                title="지금 진행 중인 회의"
+                onClick={openMeetingPrompt}
+              >
+                <img src="/icons/LiveMeetingIcon.svg" alt="" />
+              </button>
+            )
+          }
+
+          return (
+            <AppLink
+              className={className(item.id, 'global-sidebar-link')}
+              href={item.href}
+              key={item.id}
+              aria-label={item.label}
+              aria-current={current(item.id)}
+              title={item.label}
+              onClick={(event) => onNavigate?.(event, item)}
+            >
+              <img src={item.icon} alt="" />
+              {item.id === 'inbox' && inboxBadge > 0 ? (
+                <span className="global-sidebar-badge">{inboxBadge > 99 ? '99+' : inboxBadge}</span>
+              ) : null}
+            </AppLink>
+          )
+        })}
 
         <div className="global-sidebar-search" ref={searchRef}>
           <button
@@ -191,5 +332,41 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
         <img src={user?.avatarUrl || '/figma-icons/global-profile.png'} alt="" />
       </AppLink>
     </aside>
+
+      {meetingPromptOpen && liveMeeting ? (
+        <div className="live-meeting-backdrop" role="presentation">
+          <div
+            className="live-meeting-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="live-meeting-title"
+          >
+            <div className="live-meeting-body">
+              <h2 id="live-meeting-title">
+                Discord에서 회의가 시작됐어요.
+                <br />
+                참여하시겠습니까?
+              </h2>
+              <p>응답이 없으면 {RESPONSE_SECONDS}초 후 당신의 Bordo가 대신 참여해요.</p>
+              <div className="live-meeting-countdown" aria-hidden="true">{secondsLeft}</div>
+            </div>
+
+            <div className="live-meeting-actions">
+              <button
+                type="button"
+                className="live-meeting-decline"
+                disabled={responding}
+                onClick={respondDecline}
+              >
+                불참하기
+              </button>
+              <button type="button" className="live-meeting-join" onClick={respondJoin}>
+                참여하기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   )
 }

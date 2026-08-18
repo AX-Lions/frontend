@@ -165,3 +165,111 @@
 .global-sidebar-user.active {
   box-shadow: inset 0 0 0 2px #002662;
 }
+
+/* 지금 진행 중인 회의가 있을 때 `회의` 자리에 대신 뜨는 아이콘. 옅은 색으로
+   눈에 띄게 해 둔다 — 다른 아이콘과 똑같아 보이면 놓치기 쉽다. */
+.global-sidebar-live {
+  background: rgba(255, 100, 80, 0.12);
+}
+
+.global-sidebar-live:hover {
+  background: rgba(255, 100, 80, 0.2);
+}
+
+/* 실시간 회의 팝업(시안 `666:5231`). 참여할지 대리인을 보낼지 묻는
+   자리라 배경을 눌러도 닫히지 않는다 — 답은 버튼으로만, 아니면 카운트다운이
+   끝났을 때 자동으로 정해진다. */
+.live-meeting-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.live-meeting-dialog {
+  width: 404px;
+  max-width: calc(100vw - 32px);
+  padding: 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.08);
+}
+
+.live-meeting-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.live-meeting-body h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1f1f1f;
+}
+
+.live-meeting-body p {
+  margin: 0;
+  font-size: 14px;
+  color: #60646c;
+}
+
+.live-meeting-countdown {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e5e7eb;
+  font-size: 16px;
+  color: #60646c;
+}
+
+.live-meeting-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 32px;
+}
+
+.live-meeting-actions button {
+  flex: 1;
+  padding: 14px 12px;
+  border: 0;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.live-meeting-actions button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.live-meeting-decline {
+  background: #f0f1f3;
+  color: #60646c;
+}
+
+.live-meeting-decline:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.live-meeting-join {
+  background: #002662;
+  color: #ffffff;
+}
+
+.live-meeting-join:hover {
+  background: #013080;
+}
