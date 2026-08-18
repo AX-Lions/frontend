@@ -1,8 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-
 import { AppLink } from '../../app/AppLink.jsx'
 import { globalNavItems } from '../constants/globalNav.js'
-import { useInboxBadge } from '../hooks/useInboxBadge.js'
 import { useLiveMeeting } from '../hooks/useLiveMeeting.js'
 import { LiveMeetingPrompt } from './LiveMeetingPrompt.jsx'
 import './GlobalSidebar.css'
@@ -22,14 +19,22 @@ import './GlobalSidebar.css'
  * 있다(채팅 안의 설정 화면처럼 주소는 그대로인데 패널만 닫히는 경우).
  * 그쪽에서 `preventDefault()` 하면 주소는 바뀌지 않는다.
  *
+ * ## 요청함 · 검색은 여기 없다
+ *
+ * `globalNavItems` 전체가 아니라 `요청함` 을 뺀 목록만 그린다 — 이 레일에서는
+ * 빼 달라는 요청이었다. 요청함은 지금 홈의 아이콘 줄(`Sidebar`)에만 남는다.
+ * 검색 아이콘도 같은 이유로 뺐다.
+ *
  * ## 홈에는 이 레일이 없다
  *
- * 홈 화면(시안 `666:5059`)은 로고 밑에 이 아이콘 줄을 붙여 넣은 모양이라,
- * 별도 세로 레일과 나란히 두면 로고와 아이콘이 다른 칸에 떨어져 보인다.
- * 그래서 홈은 `Sidebar` 안에 같은 훅(`useInboxBadge` · `useLiveMeeting`)으로
- * 만든 가로 줄을 직접 그리고, 이 레일은 쓰지 않는다. 나머지 화면(채팅·회의·
- * 요청함·개인 설정·대리 참석 준비)은 지금처럼 이 레일 하나로 다닌다.
+ * 홈 화면(시안 `666:5059`)은 로고 밑에 아이콘 줄을 붙여 넣은 모양이라, 별도
+ * 세로 레일과 나란히 두면 로고와 아이콘이 다른 칸에 떨어져 보인다. 그래서
+ * 홈은 `Sidebar` 안에 같은 훅(`useLiveMeeting`)으로 만든 가로 줄을 직접
+ * 그리고, 이 레일은 쓰지 않는다. 나머지 화면(채팅·회의·개인 설정·대리 참석
+ * 준비)은 지금처럼 이 레일 하나로 다닌다.
  */
+
+const railNavItems = globalNavItems.filter((item) => item.id !== 'inbox')
 
 /*
   프로필은 누르면 켜졌다 꺼지기만 하고 **아무 데도 가지 않았다.** 프로필을
@@ -42,52 +47,10 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
   const className = (id, base) => (active === id ? `${base} active` : base)
   const current = (id) => (active === id ? 'page' : undefined)
 
-  const inboxBadge = useInboxBadge()
   const {
     liveMeeting, promptOpen, secondsLeft, responding,
     openPrompt, respondDecline, respondJoin,
   } = useLiveMeeting()
-
-  /*
-    검색 아이콘(시안 `576:4796`).
-
-    누르면 옆으로 검색창이 펼쳐지고, **바깥을 누르거나 Esc 를 누르면 접힌다.**
-    아직 가로지를 검색 대상(전체 검색 API)이 없어 입력만 받는다 — 제출은
-    아무 데도 보내지 않는다. 그 뒤는 검색 대상이 정해지면 붙인다.
-  */
-  const [searchOpen, setSearchOpen] = useState(false)
-  const searchRef = useRef(null)
-  const searchInputRef = useRef(null)
-
-  useEffect(() => {
-    if (!searchOpen) {
-      return undefined
-    }
-
-    const closeIfOutside = (event) => {
-      if (searchRef.current && !searchRef.current.contains(event.target)) {
-        setSearchOpen(false)
-      }
-    }
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') {
-        setSearchOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', closeIfOutside)
-    document.addEventListener('keydown', closeOnEscape)
-    return () => {
-      document.removeEventListener('mousedown', closeIfOutside)
-      document.removeEventListener('keydown', closeOnEscape)
-    }
-  }, [searchOpen])
-
-  useEffect(() => {
-    if (searchOpen) {
-      searchInputRef.current?.focus()
-    }
-  }, [searchOpen])
 
   // 레일에는 아이콘만 보인다. 여러 계정을 오가는 사람이 지금 누구로 로그인해
   // 있는지 확인할 자리가 여기뿐이라, 이름을 받으면 라벨에 함께 적는다.
@@ -101,7 +64,7 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
         inert={collapsed}
       >
         <nav className="global-sidebar-nav" aria-label="주요 화면">
-          {globalNavItems.map((item) => {
+          {railNavItems.map((item) => {
             // 지금 진행 중인 회의가 있으면 `회의` 아이콘이 실시간 아이콘으로
             // 바뀐다. 눌러도 이동하지 않는다 — 참여할지 대리인을 보낼지부터
             // 팝업으로 묻는다.
@@ -131,39 +94,9 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
                 onClick={(event) => onNavigate?.(event, item)}
               >
                 <img src={item.icon} alt="" />
-                {item.id === 'inbox' && inboxBadge > 0 ? (
-                  <span className="global-sidebar-badge">{inboxBadge > 99 ? '99+' : inboxBadge}</span>
-                ) : null}
               </AppLink>
             )
           })}
-
-          <div className="global-sidebar-search" ref={searchRef}>
-            <button
-              type="button"
-              className={
-                searchOpen ? 'global-sidebar-link global-sidebar-search-btn active' : 'global-sidebar-link global-sidebar-search-btn'
-              }
-              aria-label="검색"
-              aria-expanded={searchOpen}
-              title="검색"
-              onClick={() => setSearchOpen((open) => !open)}
-            >
-              <img src="/icons/Search.svg" alt="" />
-            </button>
-
-            {searchOpen ? (
-              <form className="global-sidebar-search-panel" onSubmit={(event) => event.preventDefault()}>
-                <img src="/icons/Search.svg" alt="" aria-hidden="true" />
-                <input
-                  ref={searchInputRef}
-                  type="search"
-                  placeholder="검색어를 입력하세요..."
-                  aria-label="검색어 입력"
-                />
-              </form>
-            ) : null}
-          </div>
         </nav>
 
         <AppLink
