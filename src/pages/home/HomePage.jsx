@@ -238,10 +238,19 @@ export function HomePage() {
     말해 주지 않는다. 팀이 있는데 프로젝트만 없는 경우와는 해야 할 일이 다르므로
     그 구별은 아래 화면이 팀 목록을 한 번 읽어서 한다. **홈이 비어 있을 때만**
     나가는 요청이다.
+
+    프로젝트가 있는지는 **`project_progress` 로 본다.** `recent_projects` 는
+    `RecentProject.opened_at` 기준이라 *내가 열어 본* 것만 들어오고,
+    `favorite_projects` 는 즐겨찾기다. 둘 다 `project_progress` 의 부분집합이라
+    (`flowBoard.data.js` 의 `projectNameIn` 도 같은 순서로 읽는다), 이것들로
+    판정하면 **프로젝트에 소속돼 있지만 아직 한 번도 열어 보지 않은 사람**이
+    걸린다. 프로젝트를 만들면 팀 전원이 `ProjectMember` 로 들어가므로 새로
+    합류한 팀원이 곧장 이 상태다. 그 사람에게 `프로젝트 만들기` 를 권하면
+    동료들이 쓰는 판 옆에 빈 판을 하나 더 만들게 된다 — 이 화면이 막으려던
+    바로 그 사고다.
   */
   const nothingYet = recentMeetings.length === 0
-    && (homeData.recent_projects ?? []).length === 0
-    && (homeData.favorite_projects ?? []).length === 0
+    && (homeData.project_progress ?? []).length === 0
     && todaySchedule.length === 0
   const briefingHref = briefing.exists
     ? `/flow-board?meeting=${briefing.meeting_id}&source=bordo-briefing`
@@ -530,9 +539,13 @@ export function HomePage() {
           onClose={() => setAddingProject(false)}
           // 만든 프로젝트를 목록 맨 위에 얹는다. 홈 전체를 다시 읽으면 방금
           // 만든 것을 찾으려고 사용자가 목록을 훑어야 한다.
+          // `project_progress` 에도 넣는다. 온보딩 화면이 뜰지 말지를 이걸로
+          // 판정하므로, 여기 안 넣으면 프로젝트를 만들고도 화면이 `아직 참여
+          // 중인 프로젝트가 없습니다` 로 남아 사용자가 또 만들게 된다.
           onCreated={(project) => setData((current) => (current ? {
             ...current,
             recent_projects: [project, ...(current.recent_projects ?? [])],
+            project_progress: [project, ...(current.project_progress ?? [])],
           } : current))}
         />
       ) : null}
