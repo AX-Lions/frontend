@@ -7,7 +7,6 @@ import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { navigate } from '../../app/navigation.js'
 import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
-import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 import { TeamOnboarding } from './TeamOnboarding.jsx'
 
@@ -196,12 +195,13 @@ export function HomePage() {
     }
   }
 
-  // 전역 레일은 **읽는 중에도 실패해도 자리에 있어야 한다.** 홈이 안 불러와졌다고
-  // 채팅·설정으로 갈 길까지 사라지면, 사용자는 새로고침 말고 할 수 있는 것이 없다.
+  // 사이드바 상단(로고+아이콘 줄)은 **읽는 중에도 실패해도 자리에 있어야 한다.**
+  // 홈이 안 불러와졌다고 채팅·설정으로 갈 길까지 사라지면, 사용자는 새로고침
+  // 말고 할 수 있는 것이 없다. 아이콘 줄은 `homeData` 가 아니라 자기 훅으로
+  // 따로 읽으므로 여기서도 그대로 뜬다.
   if (loading && !homeData) {
     return (
       <div className="home-layout">
-        <GlobalSidebar active="home" collapsed={isSidebarCollapsed} />
         <Sidebar
           favoriteProjects={[]}
           recentProjects={[]}
@@ -216,7 +216,6 @@ export function HomePage() {
   if (error && !homeData) {
     return (
       <div className="home-layout">
-        <GlobalSidebar active="home" collapsed={isSidebarCollapsed} />
         <Sidebar
           favoriteProjects={[]}
           recentProjects={[]}
@@ -263,7 +262,6 @@ export function HomePage() {
 
   return (
     <div className="home-layout">
-      <GlobalSidebar active="home" collapsed={isSidebarCollapsed} user={{ name: homeData.user_name }} />
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={toggleSidebar}
