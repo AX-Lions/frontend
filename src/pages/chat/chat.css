@@ -1571,40 +1571,6 @@ button.team-shortcut:active {
   color: #ffffff;
 }
 
-/* 중요 채팅 줄. 미리보기 자체가 버튼이라 `확인` 을 그 안에 못 넣는다. */
-.important-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 4px;
-}
-
-.important-confirm {
-  display: grid;
-  justify-items: end;
-  gap: 2px;
-}
-
-.important-confirm button {
-  height: 26px;
-  padding: 0 12px;
-  border: 1px solid var(--chat-line);
-  border-radius: 999px;
-  background: #ffffff;
-  color: var(--chat-muted);
-  font-size: var(--chat-fs-meta);
-  white-space: nowrap;
-}
-
-.important-confirm button:hover:not(:disabled) {
-  background: var(--chat-white-hover);
-}
-
-.important-confirm span {
-  color: #ff2a2a;
-  font-size: var(--chat-fs-meta);
-}
-
 /* ─────────────────────────────── 첨부 · 입력창 */
 
 .message-files {

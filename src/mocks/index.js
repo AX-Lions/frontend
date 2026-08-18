@@ -37,7 +37,7 @@ import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
 import { teamMembers } from './data/home.js'
 import { inbox } from './data/inbox.js'
 import {
-  activeDates, chatCandidates, chatImportant, chatRooms,
+  activeDates, chatCandidates, chatRooms,
   dailySummaries, roomDetails, roomMessages,
 } from './data/chat.js'
 
@@ -109,6 +109,78 @@ function segments(path) {
   return path.split('?')[0].split('/').filter(Boolean)
 }
 
+/**
+ * 이번에 읽은 방의 미읽음을 0 으로 접는다.
+ *
+ * `POST /chat/rooms/{id}/read` 는 성공만 돌려주고 사이드바 숫자는 그대로다
+ * (`chat.js` 의 `unread_count` 가 모듈이 켜질 때 한 번 구운 값이라서). 화면이
+ * `markRead` 뒤 사이드바를 다시 읽으면 **방금 읽은 방이 다시 미읽음으로
+ * 보인다** — 방을 열었다 닫아도 안 읽힌 것처럼 남는다.
+ *
+ * 방 하나를 접으면 그 방이 속한 프로젝트·팀 합계도 다시 더해야 한다 — 안
+ * 그러면 방 뱃지는 꺼졌는데 프로젝트·팀 뱃지는 그대로다.
+ */
+function applyReadPatches(sidebar) {
+  const wasRead = (id) => Boolean(id) && Boolean(patchedOf(`room-read:${id}`))
+  const zero = (room) => (wasRead(room.id) ? { ...room, unread_count: 0 } : room)
+
+  const teams = (sidebar.teams ?? []).map((team) => {
+    const originalProjectSum = (team.projects ?? [])
+      .flatMap((p) => p.rooms ?? [])
+      .reduce((sum, r) => sum + r.unread_count, 0)
+    const projects = (team.projects ?? []).map((project) => {
+      const rooms = (project.rooms ?? []).map(zero)
+      return { ...project, rooms, unread_count: rooms.reduce((sum, r) => sum + r.unread_count, 0) }
+    })
+    const teamGroupUnread = wasRead(team.group_chat_room_id)
+      ? 0
+      : Math.max(0, team.unread_count - originalProjectSum)
+    return {
+      ...team,
+      projects,
+      unread_count: projects.reduce((sum, p) => sum + p.unread_count, 0) + teamGroupUnread,
+    }
+  })
+
+  const directRooms = (sidebar.direct_rooms ?? []).map(zero)
+  const myAgentRoom = sidebar.my_agent_room ? zero(sidebar.my_agent_room) : sidebar.my_agent_room
+
+  return {
+    ...sidebar,
+    teams,
+    direct_rooms: directRooms,
+    my_agent_room: myAgentRoom,
+    total_unread:
+      teams.reduce((sum, t) => sum + t.unread_count, 0)
+      + directRooms.reduce((sum, r) => sum + r.unread_count, 0)
+      + (myAgentRoom?.unread_count ?? 0),
+  }
+}
+
+/** 이번에 중요 표시·확인을 바꾼 메시지면 그 값을 덮어 얹는다. */
+function applyMessagePatch(message) {
+  const saved = patchedOf(`message:${message.id}`)
+  return saved ? { ...message, ...saved } : message
+}
+
+/**
+ * `GET /chat/important` 를 매번 다시 센다.
+ *
+ * 미리 구운 `chatImportant` 는 처음 상태 그대로다. `확인` 을 부르면 그
+ * 메시지가 여기서 빠져야 하는데, 고정된 목록으로는 그럴 수가 없다 —
+ * 확인을 눌러도(또는 방을 열어 자동으로 확인돼도) 목록이 그대로면
+ * 사용자는 확인이 안 된 줄 알고 계속 누른다.
+ */
+function liveImportant() {
+  const results = Object.values(roomMessages)
+    .flatMap((response) => response.results)
+    .map(applyMessagePatch)
+    .filter((m) => m.is_important && !m.important_confirmed_at)
+    .sort((a, b) => b.sent_at.localeCompare(a.sent_at))
+    .map((message) => ({ message, room: roomDetails[message.room_id] }))
+  return { count: results.length, results }
+}
+
 function resolve(path, method, body) {
   const s = segments(path)
   const [a, b, c] = s
@@ -141,16 +213,18 @@ function resolve(path, method, body) {
 
     if (a === 'flow-edges' && b) return flowEdges[b] ?? null
 
-    if (path === '/chat/sidebar') return viewerSidebar()
-    if (path.startsWith('/chat/important')) return chatImportant
+    if (path === '/chat/sidebar') return applyReadPatches(viewerSidebar())
+    if (path.startsWith('/chat/important')) return liveImportant()
     if (path.startsWith('/chat/candidates')) return chatCandidates
     if (a === 'chat' && b === 'rooms' && !c) return chatRooms
     if (a === 'chat' && b === 'rooms' && c && !s[3]) return roomDetails[c] ?? null
     if (a === 'chat' && b === 'rooms' && s[3] === 'messages') {
       const base = roomMessages[c] ?? { results: [], next_before: null, has_older: false, has_newer: false }
       // 이번 방문에 보낸 말을 뒤에 잇는다. 안 이으면 화면이 다시 읽는 순간
-      // 방금 보낸 말이 사라진다.
-      return { ...base, results: withAppended(`room:${c}`, base.results ?? []) }
+      // 방금 보낸 말이 사라진다. 중요 표시·확인을 바꾼 것도 같이 얹는다 —
+      // 안 그러면 말풍선의 `확인` 버튼이 눌러도 그대로 남는다.
+      const results = withAppended(`room:${c}`, base.results ?? []).map(applyMessagePatch)
+      return { ...base, results }
     }
     if (a === 'chat' && b === 'rooms' && s[3] === 'active-dates') return activeDates[c] ?? null
     if (a === 'chat' && b === 'rooms' && s[3] === 'daily-summary') {
@@ -205,7 +279,28 @@ function resolve(path, method, body) {
       }
     }
     if (path === '/auth/logout') return null
-    if (a === 'chat' && s[3] === 'read') return null
+    if (a === 'chat' && s[3] === 'read') {
+      patch(`room-read:${c}`, { read: true })
+      return null
+    }
+
+    /*
+      중요 표시 · 확인.
+
+      **표시를 내리면 확인 기록도 같이 지운다.** 서버 규칙이 그렇다 — 다시
+      중요로 찍히면 또 확인해야 한다. 여기서 안 지우면 껐다 켠 메시지가
+      확인도 안 했는데 `중요 채팅` 에서 빠진 채로 남는다.
+    */
+    if (a === 'chat' && b === 'messages' && s[3] === 'important' && !s[4]) {
+      return patch(`message:${c}`, {
+        is_important: body?.is_important,
+        ...(body?.is_important ? {} : { important_confirmed_at: null }),
+      })
+    }
+    if (a === 'chat' && b === 'messages' && s[3] === 'important' && s[4] === 'confirm') {
+      return patch(`message:${c}`, { important_confirmed_at: new Date().toISOString() })
+    }
+
     if (path === '/me/briefing-dismiss') return { dismissed: true }
 
     /*

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { useSearchParam } from '../../app/navigation.js'
 
@@ -130,10 +130,12 @@ export function ChatPage() {
    * 더 있으면 그 방은 목록에 남는다. 화면이 그 규칙을 흉내 내면 두 곳이 갈린다.
    * 요청 두 번은 감수한다 — 좌측 `확인` 도 원래 이 둘을 다시 읽는다.
    */
-  const refreshImportant = () => {
-    important.reload()
-    sidebar.reload()
-  }
+  const { reload: reloadImportant } = important
+  const { setData: setSidebarData, reload: reloadSidebar } = sidebar
+  const refreshImportant = useCallback(() => {
+    reloadImportant()
+    reloadSidebar()
+  }, [reloadImportant, reloadSidebar])
 
   /*
     방을 열면 읽음 워터마크를 올린다.
@@ -150,21 +152,6 @@ export function ChatPage() {
 
     실패는 삼킨다. 미읽음 숫자가 잠깐 안 맞는 것이 대화가 안 열리는 것보다 낫다.
   */
-  /**
-   * 중요 메시지 확인.
-   *
-   * 표시를 내리는 것과 다르다. `is_important` 는 남고 **내 확인 기록만** 생겨서
-   * 상단 `중요 채팅` 에서만 빠진다. 이 API 를 아무도 안 불러서, 한 번 중요로
-   * 찍힌 대화는 그 섹션에 영원히 남아 있었다.
-   *
-   * 확인하면 사이드바의 `!` 뱃지도 같이 판정이 바뀌므로 둘 다 다시 읽는다.
-   */
-  const confirmImportant = async (messageId) => {
-    await confirmMessageImportant(messageId)
-    refreshImportant()
-  }
-
-  const { setData: setSidebarData, reload: reloadSidebar } = sidebar
   useEffect(() => {
     if (!selectedChatId) {
       return undefined
@@ -185,6 +172,40 @@ export function ChatPage() {
       alive = false
     }
   }, [selectedChatId, setSidebarData, reloadSidebar])
+
+  /**
+   * 방을 열면 그 방의 중요 메시지도 같이 확인된다.
+   *
+   * `확인` 버튼을 따로 두지 않는다 — 방을 열어 읽은 것 자체가 확인이다.
+   * 표시를 내리는 것과는 다르다. `is_important` 는 남고 **내 확인 기록만**
+   * 생겨서 상단 `중요 채팅` 에서만 빠진다(같은 메시지가 다른 사람 화면에는
+   * 그대로 남는다).
+   *
+   * `importantRooms` 는 방 하나당 **가장 최근의 미확인 중요 메시지 하나**만
+   * 대표로 들고 있다(위 주석 참고). 그 메시지를 확인하면 방이 목록에서
+   * 빠지고 `importantRooms` 가 다시 계산되므로, 새로 들어온 중요 메시지가
+   * 있으면 이 effect 가 다시 돈다 — 방을 계속 보고 있는 동안 온 것도 놓치지
+   * 않는다.
+   */
+  useEffect(() => {
+    const room = importantRooms.find((r) => r.id === selectedChatId)
+    if (!room) {
+      return undefined
+    }
+
+    let alive = true
+    confirmMessageImportant(room.messageId)
+      .then(() => {
+        if (alive) {
+          refreshImportant()
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      alive = false
+    }
+  }, [selectedChatId, importantRooms, refreshImportant])
 
   // 대리인 설정만 화면을 통째로 덮는다. 채팅 설정은 오른쪽 칸만 바뀐다 —
   // 어느 대화의 설정을 보고 있는지는 왼쪽 목록에서 눈으로 확인해야 한다.
@@ -217,7 +238,6 @@ export function ChatPage() {
         importantRooms={importantRooms}
         selectedChatId={selectedChatId}
         sidebar={sidebar.data}
-        onConfirmImportant={confirmImportant}
         onCreatedRoom={(room) => {
           // 만들자마자 연다. 목록에 새 줄이 생기기만 하면 사용자는 어느 것이
           // 방금 만든 것인지 찾아야 한다.
