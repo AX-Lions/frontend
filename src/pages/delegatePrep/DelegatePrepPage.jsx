@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { AppLink } from '../../app/AppLink.jsx'
-import { useSearchParam } from '../../app/navigation.js'
+import { navigate, useSearchParam } from '../../app/navigation.js'
 import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
 import { fetchAgentSettings } from '../account/account.data.js'
@@ -177,6 +177,65 @@ function PrepShell({ children }) {
   )
 }
 
+/**
+ * "설정을 완료했습니다" 모달.
+ *
+ * 논쟁점에 전부 답하고 Bordo 활동 설정까지 적용했을 때만 뜬다 — 준비가
+ * 실제로 끝났다는 확인이지, 저장 버튼을 눌렀다는 확인이 아니다. 하나만
+ * 됐는데 여기서 끝났다고 하면 사용자는 나머지를 잊고 회의로 넘어간다.
+ */
+function CompleteModal({ onClose }) {
+  const homeButtonRef = useRef(null)
+
+  useEffect(() => {
+    homeButtonRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="prep-complete-backdrop"
+      role="presentation"
+      onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
+    >
+      <div
+        className="prep-complete-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="prep-complete-title"
+      >
+        <button className="prep-complete-close" type="button" aria-label="닫기" onClick={onClose}>
+          ×
+        </button>
+        <h2 id="prep-complete-title">설정을 완료했습니다</h2>
+        <p>
+          모든 논쟁점에 입장을 남기고 Bordo 활동 설정까지 마쳤습니다.
+          회의 시간이 되면 Bordo가 대신 참석해 처리합니다.
+        </p>
+        {/* 닫기(×)는 이 화면에 남아 더 손보게 하고, 이 버튼은 준비가 끝났다는
+            사람의 판단을 그대로 따라 홈으로 데려간다. */}
+        <button
+          ref={homeButtonRef}
+          className="prep-complete-home"
+          type="button"
+          onClick={() => navigate('/')}
+        >
+          홈으로 가기
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function DelegatePrepPage() {
   const meetingId = useSearchParam('meeting')
 
@@ -226,6 +285,7 @@ export function DelegatePrepPage() {
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [showComplete, setShowComplete] = useState(false)
   const stanceInputRef = useRef(null)
   const menuRef = useRef(null)
   const panelRef = useRef(null)
@@ -286,6 +346,15 @@ export function DelegatePrepPage() {
   const orderOf = (rowId) => rows.find((row) => row.id === rowId)?.order ?? 0
   const stacked = [...entries]
     .sort((a, b) => (b.seq - a.seq) || (orderOf(a.rowId) - orderOf(b.rowId)))
+
+  /*
+    "완료" 모달을 띄울지 판단하는 기준.
+
+    논쟁점 하나하나가 아니라 **전부** 답했는지를 본다. 하나라도 `답변필요` 로
+    남아 있으면 회의에서 대리인이 그 쟁점에 대해 할 말이 없다 — 준비가 끝난
+    것이 아니다. 논쟁점이 하나도 없는 회의는 답할 것이 없으므로 통과시킨다.
+  */
+  const allAnswered = rows.length === 0 || rows.every((row) => Boolean(latestOf(row)))
 
   /*
     같은 논쟁점의 답은 **라벨 하나 아래로 묶는다.**
@@ -463,6 +532,10 @@ export function DelegatePrepPage() {
       setNotice(mode === 'current'
         ? '평소 설정으로 Bordo에게 맡겼습니다.'
         : '이번 회의에만 적용해 Bordo에게 맡겼습니다.')
+      // 이 적용으로 "논쟁점 전부 답변 + 설정 적용" 이 둘 다 갖춰졌을 때만 뜬다.
+      if (allAnswered) {
+        setShowComplete(true)
+      }
       return true
     } catch (caught) {
       setError(caught?.message || '적용하지 못했습니다.')
@@ -1017,6 +1090,8 @@ export function DelegatePrepPage() {
           </button>
         ) : null}
       </section>
+
+      {showComplete ? <CompleteModal onClose={() => setShowComplete(false)} /> : null}
     </PrepShell>
   )
 }

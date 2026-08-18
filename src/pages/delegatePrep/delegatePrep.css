@@ -887,3 +887,76 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ─────────────────────────────────────────── 완료 모달 */
+
+.prep-complete-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 17, 21, 0.45);
+  z-index: 100;
+}
+
+.prep-complete-dialog {
+  position: relative;
+  width: min(100%, 400px);
+  padding: 32px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 24px 48px rgba(15, 17, 21, 0.2);
+  text-align: center;
+}
+
+.prep-complete-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--prep-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.prep-complete-close:hover {
+  background: var(--prep-tint);
+  color: var(--prep-ink);
+}
+
+.prep-complete-dialog h2 {
+  margin: 8px 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--prep-ink);
+}
+
+.prep-complete-dialog p {
+  margin: 0 0 24px;
+  color: var(--prep-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.prep-complete-home {
+  width: 100%;
+  padding: 13px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--prep-orange);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prep-complete-home:hover {
+  background: #f58c26;
+}
