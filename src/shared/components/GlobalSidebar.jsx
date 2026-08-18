@@ -1,5 +1,6 @@
 import { AppLink } from '../../app/AppLink.jsx'
 import { globalNavItems } from '../constants/globalNav.js'
+import { useChatBadge } from '../hooks/useChatBadge.js'
 import { useLiveMeeting } from '../hooks/useLiveMeeting.js'
 import { LiveMeetingPrompt } from './LiveMeetingPrompt.jsx'
 import './GlobalSidebar.css'
@@ -51,6 +52,7 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
     liveMeeting, promptOpen, secondsLeft, responding,
     openPrompt, respondDecline, respondJoin,
   } = useLiveMeeting()
+  const chatBadge = useChatBadge()
 
   // 레일에는 아이콘만 보인다. 여러 계정을 오가는 사람이 지금 누구로 로그인해
   // 있는지 확인할 자리가 여기뿐이라, 이름을 받으면 라벨에 함께 적는다.
@@ -94,6 +96,9 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
                 onClick={(event) => onNavigate?.(event, item)}
               >
                 <img src={item.icon} alt="" />
+                {item.id === 'chat' && chatBadge > 0 ? (
+                  <span className="global-sidebar-badge">{chatBadge > 99 ? '99+' : chatBadge}</span>
+                ) : null}
               </AppLink>
             )
           })}

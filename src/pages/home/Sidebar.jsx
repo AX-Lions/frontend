@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from 'react'
 import { navigate } from '../../app/navigation.js'
 import { LiveMeetingPrompt } from '../../shared/components/LiveMeetingPrompt.jsx'
 import { globalNavItems } from '../../shared/constants/globalNav.js'
+import { useChatBadge } from '../../shared/hooks/useChatBadge.js'
 import { useInboxBadge } from '../../shared/hooks/useInboxBadge.js'
 import { useLiveMeeting } from '../../shared/hooks/useLiveMeeting.js'
 
@@ -69,6 +70,7 @@ export function Sidebar({
   const searchInputRef = useRef(null)
 
   const inboxBadge = useInboxBadge()
+  const chatBadge = useChatBadge()
   const {
     liveMeeting, promptOpen, secondsLeft, responding,
     openPrompt, respondDecline, respondJoin,
@@ -210,6 +212,9 @@ export function Sidebar({
                     <img src={item.icon} alt="" />
                     {item.id === 'inbox' && inboxBadge > 0 ? (
                       <span className="sidebar-icon-badge">{inboxBadge > 99 ? '99+' : inboxBadge}</span>
+                    ) : null}
+                    {item.id === 'chat' && chatBadge > 0 ? (
+                      <span className="sidebar-icon-badge">{chatBadge > 99 ? '99+' : chatBadge}</span>
                     ) : null}
                   </a>
                 )
