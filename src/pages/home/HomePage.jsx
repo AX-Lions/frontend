@@ -5,6 +5,7 @@ import { BriefingPrompt } from './BriefingPrompt.jsx'
 import { NewProjectDialog } from './NewProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { navigate } from '../../app/navigation.js'
+import { getCurrentTeamId, onCurrentTeamChange } from '../../lib/currentTeam.js'
 import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
@@ -56,6 +57,10 @@ export function HomePage() {
   */
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const toggleSidebar = () => setIsSidebarCollapsed((collapsed) => !collapsed)
+  // `팀 전환하기`(`TeamSwitchDialog`)가 고른 팀. `null` 이면 전체 보기다.
+  // `localStorage` 값이라 리액트 상태로 옮겨 받아야 바뀌었을 때 다시 그린다.
+  const [currentTeamId, setCurrentTeamIdState] = useState(getCurrentTeamId)
+  useEffect(() => onCurrentTeamChange(setCurrentTeamIdState), [])
   // 브리핑 팝업은 한 번만 뜬다. `homeData` 를 다시 읽을 때마다 뜨면, 별 하나
   // 눌렀다고 팝업이 다시 올라온다.
   const [briefingSeen, setBriefingSeen] = useState(false)
@@ -232,6 +237,17 @@ export function HomePage() {
   const summary = homeData.recent_meeting_summary
 
   /*
+    팀 전환하기가 고른 팀만 남긴다.
+
+    회의·오늘 일정은 안 거른다 — 저 둘은 이미 지나갔거나 오늘 잡힌
+    **참석 대상**이지 "지금 보는 팀" 과 무관하다. 팀을 바꿔도 오늘 회의가
+    없어지면 정작 봐야 할 것을 놓친다. 거르는 것은 프로젝트 목록뿐이다.
+  */
+  const inCurrentTeam = (project) => !currentTeamId || project.team_id === currentTeamId
+  const favoriteProjects = (homeData.favorite_projects ?? []).filter(inCurrentTeam)
+  const recentProjects = (homeData.recent_projects ?? []).filter(inCurrentTeam)
+
+  /*
     아무 데도 안 붙어 있는 사람.
 
     가입만 하고 팀이 없으면 홈이 **전부 0** 으로 뜨는데, 팀을 만들 버튼도 초대
@@ -253,6 +269,8 @@ export function HomePage() {
     동료들이 쓰는 판 옆에 빈 판을 하나 더 만들게 된다 — 이 화면이 막으려던
     바로 그 사고다.
   */
+  // 팀 전환하기로 고른 팀에 프로젝트가 없다고 해서 온보딩(첫 팀·프로젝트 만들기)을
+  // 다시 띄우면 안 된다 — 다른 팀엔 있을 수 있다. 판정은 거르기 전 값으로 한다.
   const nothingYet = recentMeetings.length === 0
     && (homeData.project_progress ?? []).length === 0
     && todaySchedule.length === 0
@@ -265,8 +283,8 @@ export function HomePage() {
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={toggleSidebar}
-        favoriteProjects={homeData.favorite_projects ?? []}
-        recentProjects={homeData.recent_projects ?? []}
+        favoriteProjects={favoriteProjects}
+        recentProjects={recentProjects}
         shortcuts={homeData.shortcuts}
         userName={homeData.user_name}
         avatarUrl={homeData.user_avatar_url}

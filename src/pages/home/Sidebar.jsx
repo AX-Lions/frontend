@@ -6,6 +6,7 @@ import { globalNavItems } from '../../shared/constants/globalNav.js'
 import { useChatBadge } from '../../shared/hooks/useChatBadge.js'
 import { useInboxBadge } from '../../shared/hooks/useInboxBadge.js'
 import { useLiveMeeting } from '../../shared/hooks/useLiveMeeting.js'
+import { TeamSwitchDialog } from './TeamSwitchDialog.jsx'
 
 /**
  * 홈의 사이드바.
@@ -67,6 +68,7 @@ export function Sidebar({
     recent: true,
     favorite: true,
   })
+  const [switchingTeam, setSwitchingTeam] = useState(false)
   const searchInputRef = useRef(null)
 
   const inboxBadge = useInboxBadge()
@@ -166,6 +168,20 @@ export function Sidebar({
         <a className="logo" href="/" aria-label="Bordo 홈" onClick={(event) => goInApp(event, '/')}>
           <img src="/BordoLogo.svg" alt="Bordo" />
         </a>
+        {/*
+          팀 전환하기(시안 `692:8230`, 여는 자리는 `576:4862`). 로고 옆의 작은
+          순환 아이콘 — 눌러야 알아챌 정도로만 있으면 된다. 계정이 팀을
+          하나만 가진 동안은 눌러도 목록에 하나(+ 전체 보기)뿐이다.
+        */}
+        <button
+          className="icon-button"
+          type="button"
+          aria-label="팀 전환하기"
+          title="팀 전환하기"
+          onClick={() => setSwitchingTeam(true)}
+        >
+          <img src="/icons/TeamSwitch.svg" alt="" />
+        </button>
       </div>
 
       {!isCollapsed ? (
@@ -334,6 +350,8 @@ export function Sidebar({
         onDecline={respondDecline}
         onJoin={respondJoin}
       />
+
+      {switchingTeam ? <TeamSwitchDialog onClose={() => setSwitchingTeam(false)} /> : null}
     </>
   )
 }
