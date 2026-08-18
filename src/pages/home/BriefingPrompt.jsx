@@ -51,14 +51,28 @@ export function BriefingPrompt({ briefing, onClose }) {
 
     저장에 실패해도 이동은 막지 않는다. 브리핑을 보러 가는 것이 이 팝업의
     본래 목적이고, 실패한 것은 다음 방문 동작일 뿐이다.
+
+    ## 저장한 값을 홈에 돌려준다
+
+    홈은 `/home` 응답을 30초 담아 둔다. 저장만 하고 알리지 않으면 담아 둔
+    `briefing_pending` 이 옛 값 그대로라, 채팅에 갔다 돌아왔을 때 **방금 닫은
+    팝업이 그대로 다시 뜬다.** 홈이 자기 캐시를 맞출 수 있도록 결과를
+    `onClose({ opened, alwaysOpen })` 로 넘긴다. 그냥 닫은 것(X·Esc·바깥 클릭)은
+    아무것도 저장하지 않았으므로 인자 없이 부른다 — 그 둘은 다른 일이다.
   */
   const finish = async (go) => {
     if (busy) {
       return
     }
     setBusy(true)
+
+    // 서버가 저장한 `always_open`. 저장에 실패하면 `null` 이다.
+    let saved = null
     try {
-      await dismissBriefing(always)
+      const body = await dismissBriefing(always)
+      // 서버가 저장한 값(`{always_open}`)을 그대로 쓴다. 본문 없는 200 도
+      // 있어서(`api.request` 는 그때 `null`) 그때는 보낸 값이 곧 저장된 값이다.
+      saved = typeof body?.always_open === 'boolean' ? body.always_open : always
     } catch (err) {
       if (!go) {
         setError(err?.message || '설정을 저장하지 못했습니다.')
@@ -67,10 +81,18 @@ export function BriefingPrompt({ briefing, onClose }) {
       }
     }
 
+    /*
+      **이동보다 먼저 알린다.**
+
+      `navigate` 가 먼저 가면 홈이 그 자리에서 사라진다. 사라질 컴포넌트에
+      건 상태 갱신은 React 가 실행하지 않으므로, 캐시를 맞추는 일이 통째로
+      버려진다 — 저장은 됐는데 화면만 옛 값으로 남는다.
+    */
+    onClose({ opened: go, alwaysOpen: saved })
+
     if (go) {
       navigate(`/flow-board?meeting=${briefing.meeting_id}&source=bordo-briefing`)
     }
-    onClose()
   }
 
   return (
@@ -90,7 +112,9 @@ export function BriefingPrompt({ briefing, onClose }) {
             <h2 id="briefing-title">확인하지 않은 브리핑이 있습니다</h2>
             <p>자리를 비운 사이 회의에서 무슨 일이 있었는지 정리해 두었습니다.</p>
           </div>
-          <button ref={closeRef} type="button" aria-label="닫기" onClick={onClose}>×</button>
+          {/* `onClick={onClose}` 로 넘기면 클릭 이벤트가 첫 인자로 들어가,
+              홈이 그것을 **저장 결과로 읽는다.** 인자 없이 부른다. */}
+          <button ref={closeRef} type="button" aria-label="닫기" onClick={() => onClose()}>×</button>
         </header>
 
         <div className="delegate-body">

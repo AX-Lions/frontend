@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 
+import { useSearchParam } from '../../app/navigation.js'
 import './flowBoard.css'
 import { FlowBriefingSidebar } from './FlowBriefingSidebar'
 import { FlowCanvas } from './FlowCanvas'
@@ -52,7 +53,22 @@ function rememberMeetingInUrl(meetingId) {
 export function FlowBoardPage() {
   const entryParams = new URLSearchParams(window.location.search)
   const [mode, setMode] = useState(MEETING_MODE)
-  const [pickedMeetingId, setPickedMeetingId] = useState(null)
+
+  /*
+    주소의 회의·프로젝트를 **계속 지켜본다.**
+
+    한 번만 읽으면 뒤로 가기가 먹통이 된다. 주소는 `?meeting=A` 로 돌아갔는데
+    화면은 회의 B 그대로고, 그 상태로 새로고침하면 갑자기 A 로 바뀐다.
+
+    헤더에서 고른 회의(`pick`)는 **그 주소에 대해서만** 유효하다. 주소가
+    달라지면 고른 것은 버린다 — 주소가 이긴다. 그래야 뒤로 가기로 돌아온
+    회의가 화면에 뜬다.
+  */
+  const urlMeetingId = useSearchParam('meeting')
+  const urlProjectId = useSearchParam('project')
+  const [pick, setPick] = useState(null)
+  const pickedMeetingId = pick && pick.forUrl === urlMeetingId ? pick.id : null
+  const setPickedMeetingId = (id) => setPick({ forUrl: urlMeetingId, id })
   const [panel, setPanel] = useState(
     entryParams.get('source') === 'bordo-briefing' ? { kind: 'briefing' } : null,
   )
@@ -70,9 +86,12 @@ export function FlowBoardPage() {
   const [excludedContents, setExcludedContents] = useState([])
 
   const me = useMe()
-  const meeting = useFlowBoardMeeting(pickedMeetingId)
+  const meeting = useFlowBoardMeeting(pickedMeetingId, urlMeetingId, urlProjectId)
   const meetingId = meeting.data?.meetingId ?? null
-  const projectId = meeting.data?.detail?.project_id ?? null
+  // 회의 상세에서 꺼내지 않는다. **회의가 없는 프로젝트도 자기 id 와 이름을
+  // 알아야** 하는데, 그때는 상세가 없다.
+  const projectId = meeting.data?.projectId ?? null
+  const projectName = meeting.data?.projectName ?? ''
 
   const ui = useFlowBoardUi()
   const indexes = useFlowIndexes(meetingId, mode)
@@ -245,11 +264,19 @@ export function FlowBoardPage() {
   // 여기서 막지 않으면 읽기는 성공했으므로 위 두 갈래를 지나쳐 보드가 그대로
   // 그려진다. 제목은 빈 문자열, 요약표는 빈 칸, 화살표 개수는 0 — 사용자에게는
   // **고장 난 화면으로 보인다.** "아직 회의가 없다" 와 "못 불러왔다" 는 다르다.
+  //
+  // 프로젝트 이름을 앞에 붙인다. 이 자리에는 헤더가 없어서, 사이드바에서 누른
+  // 것이 열렸는지 확인할 단서가 이 한 줄뿐이다. 이름 없이 `회의가 없습니다`
+  // 만 뜨면 **엉뚱한 프로젝트가 열린 것과 구별되지 않는다** — 방금 고친 결함이
+  // 그 모습이었다.
   if (!meetingId) {
     return (
       <div className="flow-board-page">
         <FlowRail />
-        <Empty>아직 열린 회의가 없습니다. 회의가 끝나면 여기에 흐름이 그려집니다.</Empty>
+        <Empty>
+          {projectName ? `${projectName}에는 ` : ''}
+          아직 열린 회의가 없습니다. 회의가 끝나면 여기에 흐름이 그려집니다.
+        </Empty>
       </div>
     )
   }

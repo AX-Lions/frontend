@@ -112,44 +112,138 @@ export function fetchMe(signal) {
 }
 
 /**
- * 어느 회의를 열지.
+ * 홈이 방금 읽어 둔 `/home` 을 나눠 쓴다.
  *
- * 홈에서 넘어오면 주소에 실려 있다. 주소로 바로 들어온 경우에는 **가장 최근
- * 회의**로 연다. 회의를 고르라고 빈 화면을 띄우면, 이 서비스가 처음 묻는 질문이
- * "내가 없는 동안 무슨 일이 있었지" 인데 그 답을 한 단계 뒤로 미루게 된다.
+ * 이 한 번이 **나머지 조회 전부를 막고 있다** — 회의 id 를 알아야 회의 상세 ·
+ * 요약표 · 브리핑 · 플로우를 부를 수 있으니, 여기가 왕복 하나만큼 통째로
+ * 지연이 된다. 홈에서 넘어온 경우가 대부분인데 그때는 이미 담겨 있다.
+ *
+ * `HomePage` 와 **같은 키**를 써야 한다. 각자 문자열을 만들면 같은 `/home`
+ * 이 두 키에 담겨, 캐시가 있는데도 다시 읽는다.
+ *
+ * **나눠 쓰는 요청에는 `signal` 을 넘기지 않는다.** 넘기면 그 약속이 처음 부른
+ * 화면의 수명에 묶인다. 이 화면이 뜨자마자 다시 뜨는 경우(개발 모드의 이중
+ * 마운트, 빠른 뒤로가기)에 첫 번째가 취소되는데, 두 번째는 `inflight` 에 남아
+ * 있는 **그 취소된 약속**을 받아 든다. 그러면 취소 오류가 오고, 그것은 "내가
+ * 떠나서 끊긴 것" 과 구별되지 않아 조용히 삼켜진다 — 화면이 `회의를 불러오는
+ * 중입니다…` 에서 멈춘다. 취소는 각 화면이 자기 것만 막는다(`useResource`).
  */
-export async function resolveMeetingId() {
-  const fromUrl = new URLSearchParams(window.location.search).get('meeting')
-  if (fromUrl) {
-    return fromUrl
+function readHome() {
+  const key = cacheKeyFor('home', [])
+  const cached = readCache(key)
+  return cached !== undefined
+    ? Promise.resolve(cached)
+    : dedupe(key, () => api.get('/home'))
+}
+
+/**
+ * `/home` 이 이미 들고 온 프로젝트 이름.
+ *
+ * 회의가 하나도 없는 프로젝트는 회의 응답에서 이름을 얻을 길이 없다. 그렇다고
+ * 이름 한 줄 때문에 요청을 하나 더 만들지 않는다 — 홈이 내가 속한 프로젝트를
+ * `project_progress` 로 **전부** 내려 준다. 최근·즐겨찾기는 그 부분집합이라,
+ * 응답 모양이 바뀌었을 때를 대비한 보조다.
+ */
+function projectNameIn(home, projectId) {
+  const pools = [home?.project_progress, home?.recent_projects, home?.favorite_projects]
+  for (const pool of pools) {
+    const hit = (pool ?? []).find((p) => String(p.id) === projectId)
+    if (hit?.name) {
+      return hit.name
+    }
+  }
+  return ''
+}
+
+/**
+ * 플로우 화면을 **무엇으로 열지**.
+ *
+ * 홈 사이드바가 주소에 두 가지를 싣는다.
+ *
+ *     ?meeting=<id>   그 회의를 연다
+ *     ?project=<id>   **그 프로젝트의** 최근 회의를 연다
+ *
+ * `?meeting` 이 먼저다. 사이드바는 회의를 알면 둘 다 싣는데, 그때는 답이 이미
+ * 나와 있어 더 물을 것이 없다.
+ *
+ * ## `?project` 를 안 읽어서 남의 회의가 열렸다
+ *
+ * 예전에는 `?meeting` 만 보고, 없으면 `/home` 의 **전체 최신 회의**로 떨어졌다.
+ * 최근 회의 목록에 없는 프로젝트를 사이드바에서 누르면 헤더 팀 이름도 제목도
+ * 요약표도 아무 상관 없는 프로젝트 것이 떴다. 오류도 안내도 없으니 사용자는
+ * 그것을 **자기가 누른 프로젝트로 읽는다** — "내가 없는 동안 무슨 일이 있었지"
+ * 에 남의 답을 준 셈이다.
+ *
+ * 그래서 프로젝트가 실려 있으면 그 프로젝트 안에서만 고른다. 하나도 없으면
+ * `null` 이다. 없는 것을 없다고 말하는 편이 남의 회의를 보여 주는 것보다 낫다.
+ *
+ * @returns `{ meetingId, projectId, projectName }` — 이름은 회의가 없는
+ *   프로젝트에서도 "무엇이 비어 있는지" 를 말해 주려고 함께 돌려준다.
+ */
+export async function resolveFlowEntry() {
+  const params = new URLSearchParams(window.location.search)
+  const meetingParam = params.get('meeting')
+  const projectId = params.get('project') || null
+
+  if (meetingParam) {
+    return { meetingId: meetingParam, projectId, projectName: '' }
+  }
+
+  const home = await readHome()
+
+  if (!projectId) {
+    // 주소로 바로 들어온 경우. 회의를 고르라고 빈 화면을 띄우면 이 서비스가
+    // 처음 묻는 질문의 답을 한 단계 뒤로 미루게 된다.
+    //
+    // `recent_meeting_summary` 는 **끝난 회의**만 채워진다. 예정된 회의밖에
+    // 없는 팀은 그것이 비어 있어서, 그 값만 보면 열 회의가 없다고 판단해
+    // 버린다. 최근 회의 목록으로 한 번 더 내려본다.
+    return {
+      meetingId: home?.recent_meeting_summary?.meeting_id
+        ?? home?.recent_meetings?.[0]?.meeting_id
+        ?? null,
+      projectId: null,
+      projectName: '',
+    }
+  }
+
+  const projectName = projectNameIn(home, projectId)
+
+  // 최근 회의 목록은 최신순이라 먼저 걸리는 것이 그 프로젝트의 가장 최근
+  // 회의다. 여기서 찾으면 요청 없이 끝난다.
+  const known = (home?.recent_meetings ?? [])
+    .find((m) => String(m.project_id) === projectId)
+  if (known?.meeting_id) {
+    return {
+      meetingId: known.meeting_id,
+      projectId,
+      projectName: known.project_name || projectName,
+    }
   }
 
   /*
-    홈이 방금 읽어 둔 것을 나눠 쓴다.
+    목록에 없다고 회의가 없는 것은 아니다.
 
-    이 한 번이 **나머지 조회 전부를 막고 있다** — 회의 id 를 알아야 회의 상세 ·
-    요약표 · 브리핑 · 플로우를 부를 수 있으니, 여기가 왕복 하나만큼 통째로
-    지연이 된다. 홈에서 넘어온 경우가 대부분인데 그때는 이미 담겨 있다.
+    `recent_meetings` 는 **내 프로젝트 전체에서 5개**다. 옆 프로젝트가 활발하면
+    조용한 프로젝트의 회의는 그 5개에 못 든다. 그걸 "회의 없음" 으로 읽으면
+    멀쩡한 회의가 있는 화면에 안내만 뜬다.
 
-    `HomePage` 와 **같은 키**를 써야 한다. 각자 문자열을 만들면 같은 `/home`
-    이 두 키에 담겨, 캐시가 있는데도 다시 읽는다.
+    실패는 삼키지 않는다. 못 물어본 것과 없는 것은 다르다 — 500 을 `아직 열린
+    회의가 없습니다` 로 바꿔 놓으면 장애가 "아무 일도 없었다" 로 둔갑하고
+    `다시 시도` 조차 안 그려진다.
 
-    **나눠 쓰는 요청에는 `signal` 을 넘기지 않는다.** 넘기면 그 약속이 처음 부른
-    화면의 수명에 묶인다. 이 화면이 뜨자마자 다시 뜨는 경우(개발 모드의 이중
-    마운트, 빠른 뒤로가기)에 첫 번째가 취소되는데, 두 번째는 `inflight` 에 남아
-    있는 **그 취소된 약속**을 받아 든다. 그러면 취소 오류가 오고, 그것은 "내가
-    떠나서 끊긴 것" 과 구별되지 않아 조용히 삼켜진다 — 화면이 `회의를 불러오는
-    중입니다…` 에서 멈춘다. 취소는 각 화면이 자기 것만 막는다(`useResource`).
+    `dedupe` 로 감싸는 이유는 이 화면이 뜨자마자 다시 뜨는 경우에 같은 목록이
+    두 번 나가기 때문이다. 여기서도 **`signal` 은 넘기지 않는다.**
   */
-  const key = cacheKeyFor('home', [])
-  const cached = readCache(key)
-  const home = cached !== undefined
-    ? cached
-    : await dedupe(key, () => api.get('/home'))
-  // `recent_meeting_summary` 는 **끝난 회의**만 채워진다. 예정된 회의밖에 없는
-  // 팀은 그것이 비어 있어서, 그 값만 보면 열 회의가 없다고 판단해 버린다.
-  // 최근 회의 목록으로 한 번 더 내려본다.
-  return home?.recent_meeting_summary?.meeting_id
-    ?? home?.recent_meetings?.[0]?.meeting_id
-    ?? null
+  const list = await dedupe(
+    cacheKeyFor('project-meetings', [projectId]),
+    () => fetchProjectMeetings(projectId),
+  )
+  const latest = list?.results?.[0] ?? null
+
+  return {
+    meetingId: latest?.id ?? null,
+    projectId,
+    projectName: latest?.project_name || projectName,
+  }
 }

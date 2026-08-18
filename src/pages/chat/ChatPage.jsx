@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
+import { useSearchParam } from '../../app/navigation.js'
 
 import './chat.css'
 import { AgentSettingsPanel } from './AgentSettingsPanel.jsx'
@@ -40,8 +41,37 @@ function BordoSettingsPage({ onBack }) {
   )
 }
 
+/**
+ * 주소에 실려 온 방.
+ *
+ * 홈 사이드바의 `Bordo 바로가기` 가 `/chat?room=<id>` 로 보낸다. 이걸 안 읽으면
+ * 주소에 방이 있는데도 오른쪽 칸은 `왼쪽에서 대화를 고르십시오.` 로 남아,
+ * `/home` 이 `shortcuts.agent_room_id` 를 실어 보내는 이유 자체가 없어진다.
+ * 그 링크를 북마크하거나 새 탭으로 연 경우도 마찬가지다.
+ */
+function roomIdFromUrl() {
+  return new URLSearchParams(window.location.search).get('room') || null
+}
+
 export function ChatPage() {
-  const [selectedChatId, setSelectedChatId] = useState(null)
+  /*
+    주소로 들어온 방과 목록에서 고른 방을 **상태 하나로** 다룬다. 주소를 따로
+    보고 있으면 두 경로가 갈려, 목록에서 고른 방은 열리는데 주소로 들어온 방만
+    안 열리는 지금 같은 일이 또 생긴다.
+
+    **주소를 계속 지켜본다.** 한 번만 읽으면 `?room=5` 가 붙은 채로 왼쪽
+    `채팅` 을 눌러 쿼리를 지워도 방이 그대로 열려 있다 — 주소는 방이 없다고
+    하는데 화면엔 방이 있고, 그 상태로 새로고침하면 방이 갑자기 닫힌다.
+    뒤로 가기도 같은 이유로 먹통이 된다.
+
+    고른 방을 주소에 되쓰지는 않는다. 그건 주소를 화면 상태의 저장소로 쓰는
+    일이라 범위가 다르다 — 지금 고치는 것은 **주소가 화면을 못 바꾸는 것**이다.
+  */
+  const urlRoomId = useSearchParam('room')
+  const [pick, setPick] = useState(() => ({ forUrl: roomIdFromUrl(), id: roomIdFromUrl() }))
+  // 주소가 바뀌면 목록에서 고른 것은 무효다. 주소가 이긴다.
+  const selectedChatId = pick.forUrl === urlRoomId ? pick.id : urlRoomId
+  const setSelectedChatId = (id) => setPick({ forUrl: urlRoomId, id })
   // `chat` 대화창 · `room-settings` 채팅 설정 · `agent` 대리인 설정.
   // 앞의 둘은 오른쪽 칸만 바뀌고, 대리인 설정만 화면을 통째로 덮는다.
   const [view, setView] = useState('chat')
@@ -86,6 +116,25 @@ export function ChatPage() {
     return all.find((room) => room.id === selectedChatId) ?? null
   }, [sidebar.data, importantRooms, selectedChatId])
 
+  /**
+   * 중요 상태가 바뀌었다 — 같은 값을 그리는 곳을 전부 다시 읽는다.
+   *
+   * 중요 표시·해제·확인은 **말풍선 한 줄만의 일이 아니다.** 좌측 `중요 채팅`
+   * 목록과 사이드바 `!` 뱃지가 같은 서버 상태를 보고 그린다. 대화창에서
+   * 바꿨을 때 그 줄만 갈아 끼우면 두 목록은 옛 값으로 남아, **말풍선의
+   * `확인` 을 눌러도 목록에서는 안 사라진다.** 같은 버튼이 두 군데인데
+   * 한쪽만 동작하니 사용자는 계속 누른다.
+   *
+   * 낙관적으로 미리 지우지 않는 이유 — 무엇이 목록에서 빠지는지는 서버 규칙이다.
+   * `is_important` 를 내리면 확인 기록까지 지워지고, 같은 방에 중요 메시지가
+   * 더 있으면 그 방은 목록에 남는다. 화면이 그 규칙을 흉내 내면 두 곳이 갈린다.
+   * 요청 두 번은 감수한다 — 좌측 `확인` 도 원래 이 둘을 다시 읽는다.
+   */
+  const refreshImportant = () => {
+    important.reload()
+    sidebar.reload()
+  }
+
   /*
     방을 열면 읽음 워터마크를 올린다.
 
@@ -112,8 +161,7 @@ export function ChatPage() {
    */
   const confirmImportant = async (messageId) => {
     await confirmMessageImportant(messageId)
-    important.reload()
-    sidebar.reload()
+    refreshImportant()
   }
 
   const { setData: setSidebarData, reload: reloadSidebar } = sidebar
@@ -215,6 +263,7 @@ export function ChatPage() {
           room={openRoom}
           roomId={selectedChatId}
           onClose={() => setSelectedChatId(null)}
+          onImportantChanged={refreshImportant}
           onOpenSettings={() => setView('room-settings')}
           onToggleFullscreen={() => setFullscreen((on) => !on)}
         />

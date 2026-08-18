@@ -73,7 +73,15 @@ function DailySummary({ roomId, date }) {
   )
 }
 
-export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, onToggleFullscreen }) {
+export function ChatRoom({
+  room,
+  roomId,
+  fullscreen,
+  onClose,
+  onImportantChanged,
+  onOpenSettings,
+  onToggleFullscreen,
+}) {
   /*
     목록에 없는 방은 그 자체로 읽는다.
 
@@ -196,6 +204,10 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
    *
    * 목록 전체를 다시 읽지 않는 이유 — 위로 이어 붙인 페이지가 통째로 날아가고,
    * 사용자는 중요 표시 하나 눌렀는데 읽던 자리를 잃는다.
+   *
+   * 다만 **중요 표시는 이 줄 안에서 끝나지 않는다.** 좌측 `중요 채팅` 목록과
+   * 사이드바 `!` 뱃지가 같은 값을 그린다. 대화창은 지금 어떤 목록이 열려 있는지
+   * 모르므로 그쪽은 `onImportantChanged` 로 위(`ChatPage`)에 맡긴다.
    */
   const replaceMessage = (updated) => {
     setData((current) => ({
@@ -345,6 +357,7 @@ export function ChatRoom({ room, roomId, fullscreen, onClose, onOpenSettings, on
                 key={row.id}
                 message={row.message}
                 onChanged={replaceMessage}
+                onImportantChanged={onImportantChanged}
               />
             )))}
           </>

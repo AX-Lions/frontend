@@ -6,6 +6,7 @@ import { BriefingPrompt } from './BriefingPrompt.jsx'
 import { CreateProjectDialog } from './CreateProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { navigate } from '../../app/navigation.js'
+import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
 import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
@@ -18,6 +19,19 @@ const starIcons = {
 function isModifiedClick(event) {
   return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
     || (event.button !== undefined && event.button !== 0)
+}
+
+/**
+ * 브리핑으로 가기 전에 담아 둔 홈을 버린다.
+ *
+ * 브리핑을 열면 서버가 그 자리에서 읽음으로 표시한다 — `GET /meetings/{id}/
+ * ai-briefing` 이 `read_at` 을 찍는다. 담아 둔 홈에는 `briefing_pending.exists`
+ * 가 아직 참으로 남아 있어, 30초 안에 홈으로 돌아오면 **방금 읽은 브리핑이 다시
+ * 대기 중으로 뜬다.** 자동 열기를 켜 둔 사람은 더 나쁘다 — 그 값 때문에 홈에
+ * 들어오는 족족 브리핑으로 밀려나 홈을 못 본다.
+ */
+function dropHomeCache() {
+  evict(cacheKeyFor('home', []))
 }
 
 /** 앱 안 링크는 문서를 다시 받지 않는다. 새 탭으로 여는 클릭은 그대로 둔다. */
@@ -81,9 +95,45 @@ export function HomePage() {
       return
     }
     autoOpenedRef.current = true
+    dropHomeCache()
     navigate(`/flow-board?meeting=${briefing.meeting_id}&source=bordo-briefing`,
       { replace: true })
   }, [autoOpenBriefing, briefing.meeting_id])
+
+  /*
+    팝업이 닫힌 뒤 홈이 할 일.
+
+    `result` 는 **서버에 저장이 끝났을 때만** 온다(`POST /me/briefing-dismiss`).
+    X·Esc·바깥 클릭으로 그냥 닫은 것은 아무 결정도 아니라서, 그때는 담아 둔
+    홈도 그대로 둔다.
+
+    `briefing_pending.exists` 는 건드리지 않는다. 그 요청이 서버에서 바꾸는
+    것은 `always_open` 하나뿐이고, 대기 표시는 브리핑을 실제로 열었을 때만
+    꺼진다. 화면에서 미리 꺼 버리면 상단 버튼이 `새 브리핑 없음` 으로 바뀌어
+    **아직 안 읽은 브리핑으로 가는 길이 사라진다.**
+  */
+  const closeBriefing = (result) => {
+    setBriefingSeen(true)
+    if (!result) {
+      return
+    }
+
+    // 이번 방문에서는 자동 열기가 발동하면 안 된다. 방금 닫은 사람을 뒤늦게
+    // 도착한 값으로 브리핑에 밀어 넣으면, **닫았을 뿐인데 화면이 튄다.**
+    autoOpenedRef.current = true
+
+    if (result.opened) {
+      // 브리핑을 보러 가는 길이면 곧 읽음이 된다. 설정 저장이 실패했더라도
+      // 그건 마찬가지라, 담아 둔 홈은 고쳐 쓰지 않고 버린다.
+      dropHomeCache()
+      return
+    }
+
+    setData((current) => (current ? {
+      ...current,
+      briefing_pending: { ...current.briefing_pending, always_open: result.alwaysOpen },
+    } : current))
+  }
 
   /*
     프로젝트 하나가 어느 회의로 열리는지.
@@ -212,7 +262,10 @@ export function HomePage() {
                 <a
                   className="ai-brief-button"
                   href={briefingHref}
-                  onClick={(event) => goInApp(event, briefingHref)}
+                  onClick={(event) => {
+                    dropHomeCache()
+                    goInApp(event, briefingHref)
+                  }}
                 >
                   Bordo 브리핑 보러가기
                 </a>
@@ -460,7 +513,7 @@ export function HomePage() {
       ) : null}
 
       {briefing.exists && !briefing.always_open && !briefingSeen ? (
-        <BriefingPrompt briefing={briefing} onClose={() => setBriefingSeen(true)} />
+        <BriefingPrompt briefing={briefing} onClose={closeBriefing} />
       ) : null}
     </div>
   )

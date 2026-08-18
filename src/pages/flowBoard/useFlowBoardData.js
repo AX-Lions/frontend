@@ -9,7 +9,7 @@ import {
   fetchProjectFlow,
   fetchProjectMeetings,
   fetchSummaryTable,
-  resolveMeetingId,
+  resolveFlowEntry,
 } from './flowBoard.data.js'
 
 /**
@@ -49,22 +49,45 @@ function flowCategory(mode) {
  *
  * `meetingIdOverride` 는 헤더에서 회의를 골랐을 때 들어온다. 주소만 고치고
  * 다시 읽지 않으면 제목만 바뀌고 판은 그대로라, 고른 회의가 아닌 것을 보게 된다.
+ *
+ * ## 프로젝트를 회의와 함께 돌려준다
+ *
+ * 예전에는 화면이 `detail.project_id` 로만 프로젝트를 알았다. 그러면 **회의가
+ * 없는 프로젝트는 자기 이름조차 말할 수 없다** — 상세가 없으니 딸려 오는 것도
+ * 없다. 사이드바에서 누른 것이 열렸는지 확인할 길이 사라진다.
  */
-export function useFlowBoardMeeting(meetingIdOverride = null) {
+export function useFlowBoardMeeting(meetingIdOverride = null, urlMeetingId = null, urlProjectId = null) {
   return useResource(async (signal) => {
-    const meetingId = meetingIdOverride ?? await resolveMeetingId()
-    if (!meetingId) {
-      return { meetingId: null, detail: null, summary: null, briefing: null }
+    // 고른 회의가 있으면 주소도 홈도 다시 뒤질 필요가 없다. 프로젝트는 아래
+    // 회의 상세가 알려 준다.
+    const entry = meetingIdOverride
+      ? { meetingId: meetingIdOverride, projectId: null, projectName: '' }
+      : await resolveFlowEntry()
+
+    if (!entry.meetingId) {
+      return { ...entry, detail: null, summary: null, briefing: null }
     }
 
     const [detail, summary, briefing] = await Promise.all([
-      fetchMeeting(meetingId, signal),
-      fetchSummaryTable(meetingId, signal).catch(() => null),
-      fetchBriefing(meetingId, signal).catch(() => null),
+      fetchMeeting(entry.meetingId, signal),
+      fetchSummaryTable(entry.meetingId, signal).catch(() => null),
+      fetchBriefing(entry.meetingId, signal).catch(() => null),
     ])
 
-    return { meetingId, detail, summary, briefing }
-  }, [meetingIdOverride])
+    return {
+      meetingId: entry.meetingId,
+      // **회의 상세가 정답이다.** 주소의 `?project` 는 사람이 손으로 고칠 수
+      // 있고, 그러면 헤더가 열린 회의와 다른 프로젝트 이름을 말하게 된다.
+      projectId: detail?.project_id ?? entry.projectId,
+      projectName: detail?.project_name || entry.projectName,
+      detail,
+      summary,
+      briefing,
+    }
+    // 주소의 두 칸도 의존성이다. `resolveFlowEntry()` 가 주소를 직접 읽으므로
+    // **여기 안 넣으면 뒤로 가기로 주소만 바뀐 경우 다시 읽지 않는다** — 주소는
+    // 회의 A 인데 화면은 B 그대로가 된다.
+  }, [meetingIdOverride, urlMeetingId, urlProjectId])
 }
 
 /**
