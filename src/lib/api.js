@@ -32,6 +32,7 @@ import {
   getRefreshToken,
   setTokens,
 } from './auth.js'
+import { serveMock, shouldMock } from '../mocks/index.js'
 
 const BASE = '/api/v1'
 
@@ -154,6 +155,19 @@ async function send(path, { method = 'GET', body, params, signal, auth = true } 
 }
 
 export async function request(path, options = {}) {
+  /*
+    가상 데이터 모드면 여기서 끝난다.
+
+    **한 곳에서만 가른다.** 화면마다 조회 함수를 바꾸면 바꾼 곳만 가짜가 되고
+    안 바꾼 곳은 진짜를 불러, 서버가 없을 때 화면 절반만 뜨는 상태가 된다.
+    모든 호출이 이 함수를 지나가므로 여기가 유일한 갈림길이다.
+
+    `login` · `signup` 도 이 함수를 쓰므로 로그인까지 서버 없이 된다.
+  */
+  if (shouldMock()) {
+    return serveMock(path, options)
+  }
+
   let response = await send(path, options)
 
   // 만료된 토큰은 한 번만 갱신하고 그 요청을 다시 보낸다.
