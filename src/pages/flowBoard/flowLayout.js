@@ -425,6 +425,156 @@ function collapseAgents(nodes, arrows) {
 }
 
 /**
+ * 같은 쌍의 화살표를 **한 선으로 합친다.**
+ *
+ * 서버는 `(보낸 이, 받은 이 묶음)` 마다 arrow 를 하나씩 만든다. 그래서 `A→B` 와
+ * `A→B·C` 가 따로 오고, 대리인을 주인에게 접고 나면 `A→B` 와 `A의 Bordo→B` 도
+ * 둘 다 `A→B` 가 된다. 그대로 그리면 두 사람 사이에 굵기도 색도 같은 선이 네댓
+ * 줄씩 나란히 서는데, **어느 줄이 무엇인지 구별할 방법이 판 위에 없다.**
+ * 평행선을 벌리는 장치(`PARALLEL_SPREAD`)는 겹침만 없앨 뿐 뜻을 만들지 못한다.
+ *
+ * 판이 답해야 하는 질문은 "A 가 B 에게 무엇을 보냈나" 하나다. 그 답의 갈래는
+ * **사람이 직접 보낸 것 · 대리인이 낀 것** 둘뿐이므로 한 쌍에 선도 둘이면
+ * 족하다. 나머지는 전부 그 두 선의 뱃지 묶음 안으로 들어간다.
+ *
+ * 합성 arrow 는 서버 arrow 와 **같은 필드 이름**을 갖는다. 패널·페이지가
+ * 서버 것과 합친 것을 구별하지 않고 그대로 읽을 수 있어야 하기 때문이다.
+ */
+function mergedArrowId(fromId, toId, isAi) {
+  return `${fromId}~${toId}~${isAi ? 'ai' : 'human'}`
+}
+
+function bucketOf(buckets, from, to, isAi) {
+  const id = mergedArrowId(from.id, to.id, isAi)
+  const seen = buckets.get(id)
+  if (seen) {
+    return seen
+  }
+
+  const bucket = {
+    id,
+    from,
+    to,
+    isAi,
+    counts: new Map(),
+    surfaces: [],
+    sourceArrowIds: [],
+    sourceLabel: null,
+    latestAt: null,
+    latestStamp: -Infinity,
+    opacity: 1,
+  }
+  buckets.set(id, bucket)
+  return bucket
+}
+
+/**
+ * 서버 arrow 하나를 묶음에 붓는다.
+ *
+ * `edge_ids` 를 **Set 으로** 모은다. 같은 arrow 가 한 묶음에 두 번 들어올 수
+ * 있어서다 — `to_node_ids` 가 `[강다은, 강다은의 Bordo]` 인 화살표는 접고 나면
+ * 같은 노드를 두 번 가리킨다. 그때 `count` 를 그냥 더하면 건수가 두 배로 뛰고,
+ * 목 데이터 검사기(`src/mocks/crosscheck.mjs`)가 보는 `count === edge_ids.length`
+ * 도 깨진다. 그래서 개수는 더하지 않고 **모인 id 를 세어** 만든다.
+ */
+function absorbArrow(bucket, arrow) {
+  if (!bucket.sourceArrowIds.includes(arrow.id)) {
+    bucket.sourceArrowIds.push(arrow.id)
+  }
+  if (bucket.sourceLabel === null) {
+    bucket.sourceLabel = arrow.direction_label ?? null
+  }
+
+  ;(arrow.counts ?? []).forEach((entry) => {
+    /*
+      칸 순서는 **처음 나타난 순서**를 지킨다. `Map` 이 넣은 순서를 지켜 준다.
+      여기서 다시 정렬하면 서버가 정해 둔 순서(의견·요청사항·변동사항 …)와
+      갈려서, 판의 뱃지 순서와 패널의 카드 순서가 서로 다른 줄로 선다.
+    */
+    const seat = bucket.counts.get(entry.content_type) ?? {
+      content_type: entry.content_type,
+      label: entry.label,
+      edgeIds: new Set(),
+    }
+    ;(entry.edge_ids ?? []).forEach((edgeId) => seat.edgeIds.add(edgeId))
+    bucket.counts.set(entry.content_type, seat)
+  })
+
+  ;(arrow.surfaces ?? []).forEach((surface) => {
+    if (!bucket.surfaces.includes(surface)) {
+      bucket.surfaces.push(surface)
+    }
+  })
+
+  /*
+    진하기는 **가장 늦은 것**을 따른다. 합친 선 하나가 오래된 발언 때문에
+    흐려지면 방금 오간 것이 판에서 안 보인다 — 시간 흐름을 opacity 로만 말하는
+    화면이라 이 값이 곧 "최근" 이다.
+  */
+  const parsed = Date.parse(arrow.latest_occurred_at ?? '')
+  const stamp = Number.isNaN(parsed) ? -Infinity : parsed
+  if (stamp >= bucket.latestStamp) {
+    bucket.latestStamp = stamp
+    bucket.latestAt = arrow.latest_occurred_at ?? null
+    bucket.opacity = arrow.opacity ?? 1
+  }
+}
+
+/** 묶음을 **서버 arrow 와 같은 모양**으로 굳힌다. */
+function sealBucket(bucket) {
+  const counts = [...bucket.counts.values()]
+    // 근거(`edge_ids`)가 하나도 없는 칸은 뺀다. 숫자만 있고 열어 볼 것이 없는
+    // 뱃지는 눌러도 빈 패널이 뜬다 — 안 보이는 것보다 나쁘다.
+    .filter((seat) => seat.edgeIds.size > 0)
+    .map((seat) => ({
+      content_type: seat.content_type,
+      label: seat.label,
+      count: seat.edgeIds.size,
+      edge_ids: [...seat.edgeIds],
+    }))
+
+  return {
+    id: bucket.id,
+    from_node_id: bucket.from.id,
+    to_node_ids: [bucket.to.id],
+    /*
+      자기 대리인과 오간 묶음은 접고 나면 양 끝이 같은 사람이라, 이름을 두 번
+      쓰면 `강다은 → 강다은` 이 된다. 그때만 서버가 준 문구(`강다은 → 강다은의
+      Bordo`)를 그대로 쓴다 — 판에서 대리인 이름이 남는 유일한 자리다.
+    */
+    direction_label: bucket.from.id === bucket.to.id && bucket.sourceLabel
+      ? bucket.sourceLabel
+      : `${bucket.from.name} → ${bucket.to.name}`,
+    // 패널이 "대리인이 날랐다" 를 말할 때 쓴다. 선 색과 같은 이야기지만, 글로
+    // 말하는 쪽은 색을 볼 수 없으므로 값으로도 실어 보낸다.
+    via_agent: bucket.isAi,
+    counts,
+    total_count: counts.reduce((sum, entry) => sum + entry.count, 0),
+    latest_occurred_at: bucket.latestAt,
+    opacity: bucket.opacity,
+    surfaces: bucket.surfaces,
+    // 어떤 서버 arrow 들이 합쳐졌는지. 판에서 숫자가 이상할 때 되짚을 실이다.
+    source_arrow_ids: bucket.sourceArrowIds,
+  }
+}
+
+/**
+ * `visibleEdgeIds` 에 든 엣지만 남기고 뱃지 숫자를 **다시 센다.**
+ *
+ * 더하지 않고 다시 세는 이유는 `count === edge_ids.length` 를 깨지 않기
+ * 위해서다. 남은 것이 없는 칸은 통째로 뺀다 — `0` 이라고 적힌 뱃지는 "아직 안
+ * 왔다" 가 아니라 "0 건이 왔다" 로 읽힌다.
+ */
+function maskCounts(counts, visibleEdgeIds) {
+  return (counts ?? [])
+    .map((entry) => {
+      const edgeIds = (entry.edge_ids ?? []).filter((edgeId) => visibleEdgeIds.has(edgeId))
+      return edgeIds.length === 0 ? null : { ...entry, count: edgeIds.length, edge_ids: edgeIds }
+    })
+    .filter(Boolean)
+}
+
+/**
  * 캔버스 한 판을 만든다.
  *
  * @param nodes  `GET .../flow` 의 `nodes`
@@ -433,12 +583,15 @@ function collapseAgents(nodes, arrows) {
  *                상자 높이가 곧 그래프가 시작하는 자리라 배치에 필요하다.
  *                `boardWidth` · `boardHeight` — 판이 실제로 차지할 수 있는
  *                크기(`.board-center-frame`). 0 이면 예전처럼 고정 링을 쓴다.
+ *                `visibleEdgeIds` — `Set<string>` 또는 `null`. 재생이 쓴다.
+ *                `null` 이면 전부 보인다. Set 이면 **뱃지 숫자만** 그 안에 든
+ *                엣지로 깎이고, 배치는 거르기 전 전체 그대로다(아래 ★ 참고).
  * @returns `{ nodes, links, badges, stage, summary }`
  */
 export function buildFlowLayout(
   nodes = [],
   arrows = [],
-  { summaryRows = 0, boardWidth = 0, boardHeight = 0 } = {},
+  { summaryRows = 0, boardWidth = 0, boardHeight = 0, visibleEdgeIds = null } = {},
 ) {
   const raw = nodes.filter(Boolean)
   // 접기 전 노드를 들고 있어야 선 색을 정할 수 있다. 접은 뒤에는 전부 사람이다.
@@ -501,17 +654,14 @@ export function buildFlowLayout(
   const byId = new Map(placed.map((node) => [node.id, node]))
 
   /*
-    같은 두 노드를 잇는 선이 몇 번째인지 세어 둔다.
+    서버 arrow 를 `(from, to, isAi)` 묶음에 붓는다. 합치는 이유는
+    `mergedArrowId` 위 주석에 적었다.
 
-    서버가 `(보낸 이, 받은 이들)` 마다 하나로 묶어 주지만, 방향이 반대인 것과
-    받는 사람 묶음이 다른 것(A→B 와 A→B·C)은 다른 화살표라 같은 쌍 사이에
-    선이 여럿 생긴다. 오프셋을 안 주면 그 선들이 **한 줄로 겹쳐 보이고**
-    뱃지가 같은 점에 쌓인다. 방향이 달라도 겹치는 것은 같으므로 정렬한 쌍을
-    키로 쓴다.
+    **거르지 않은 `arrows` 전부**를 훑는다. `visibleEdgeIds` 는 여기 끼지
+    않는다 — 아래 ★ 주석 참고.
   */
-  const pairSlots = new Map()
-  const pending = []
-  const selfPending = []
+  const pairBuckets = new Map()
+  const selfBuckets = new Map()
 
   arrows.forEach((arrow) => {
     const fromRaw = rawById.get(arrow.from_node_id)
@@ -521,14 +671,24 @@ export function buildFlowLayout(
     }
 
     /*
-      접고 나면 같은 사람이 여러 번 나온다.
+      이 화살표가 **받는 사람마다 어느 갈래로 갈지**를 먼저 정한다.
 
-      `[강다은, 강다은의 Bordo]` 로 간 화살표는 둘 다 `강다은` 이 된다. 안
-      걸러 내면 **같은 자리에 같은 선을 두 번 긋고**, 평행선 세는 값까지
-      부풀어 멀쩡한 옆 선들이 괜히 벌어진다.
+      바로 묶음에 부으면 안 된다. `[강다은, 강다은의 Bordo]` 처럼 한 사람과 그
+      사람의 대리인이 같은 화살표에 함께 실리면, 접은 뒤 둘 다 `강다은` 인데
+      갈래만 갈려 **회색 선과 주황 선 양쪽에 같은 건수가 실린다.** 판 전체
+      합계로는 한 번 오간 것이 두 번 센 것이 된다.
+
+      그때는 **주황 쪽만 남긴다.** 대리인이 끼었다는 것이 이 화면이 파는 사실
+      이고, 회색으로 접어 넣으면 그 사실이 통째로 사라진다. 반대로 주황만 남기면
+      "사람에게도 같이 갔다" 가 흐려지지만, 그건 화살표를 눌러 연 패널의 카드가
+      말해 준다 — 판은 한 번 일어난 일을 한 번만 그려야 한다.
+
+      목 데이터에는 아직 이런 화살표가 없다. 없을 때 미리 막아 두는 이유는,
+      생겼을 때 드러나는 모습이 **"숫자가 좀 이상하다"** 뿐이라 아무도 결함으로
+      읽지 않기 때문이다.
     */
-    const drawnTargets = new Set()
-    let selfHit = null
+    const branchOf = new Map()
+    const selfBranch = new Map()
 
     // `to_node_ids` 는 여럿일 수 있다. 작업 플로우 한 건이 팀 전원에게 가면
     // 대상 수만큼 선이 그어진다 — 하나만 그리면 나머지 사람에게는 그 일이
@@ -544,26 +704,12 @@ export function buildFlowLayout(
       const isAi = isAiLink(fromRaw, toRaw)
 
       // 자기 대리인과 오간 것. 접고 나면 자기 자신을 가리켜 그릴 선이 없다.
-      if (to.id === from.id) {
-        selfHit = selfHit ?? { arrow, node: from, isAi }
-        return
-      }
+      const lane = to.id === from.id ? selfBranch : branchOf
+      lane.set(to.id, { to, isAi: (lane.get(to.id)?.isAi ?? false) || isAi })
+    })
 
-      if (drawnTargets.has(to.id)) {
-        return
-      }
-      drawnTargets.add(to.id)
-
-      const pairKey = [from.id, to.id].sort().join('|')
-      const slot = pairSlots.get(pairKey) ?? 0
-      pairSlots.set(pairKey, slot + 1)
-      /*
-        뱃지는 화살표당 하나다. 브로드캐스트에서 팔마다 같은 숫자를 붙이면
-        같은 일이 네 번 일어난 것처럼 읽힌다. **실제로 그린 첫 팔**에 붙인다 —
-        원래 순서의 첫 대상이 자기 대리인이라 안 그려질 수 있어서, 목록의
-        첫 칸을 기준으로 삼으면 그 화살표만 숫자가 통째로 빠진다.
-      */
-      pending.push({ arrow, from, to, isAi, pairKey, slot, isBadgeAnchor: drawnTargets.size === 1 })
+    branchOf.forEach(({ to, isAi }) => {
+      absorbArrow(bucketOf(pairBuckets, from, to, isAi), arrow)
     })
 
     /*
@@ -572,12 +718,39 @@ export function buildFlowLayout(
       한 화살표가 자기 대리인과 남에게 같이 갔다면 숫자는 이미 선 쪽에 붙는다.
       양쪽에 다 붙이면 **같은 건수가 두 번 일어난 것처럼 읽힌다.**
     */
-    if (selfHit && drawnTargets.size === 0) {
-      selfPending.push(selfHit)
+    if (branchOf.size === 0) {
+      selfBranch.forEach(({ to, isAi }) => {
+        absorbArrow(bucketOf(selfBuckets, to, to, isAi), arrow)
+      })
     }
   })
 
-  const links = pending.map(({ arrow, from, to, isAi, pairKey, slot, isBadgeAnchor }) => {
+  /*
+    같은 두 노드를 잇는 선이 몇 번째인지 세어 둔다.
+
+    합치고 나면 한 쌍에 최대 넷이다 — 양방향 × (사람·대리인). 그래도 겹치는
+    것은 겹치므로 오프셋은 여전히 필요하다. 넷일 때 간격은
+    `(MAX_PARALLEL_OFFSET × 2) / 3 ≈ 27px` 로 좁혀지고, 그만큼 밀어도 끝점은
+    원 안에서 출발한다(`√(62² − 40.3²) ≈ 47`). 방향이 달라도 겹치는 것은
+    마찬가지라 정렬한 쌍을 키로 쓴다.
+  */
+  const pairSlots = new Map()
+  const pending = [...pairBuckets.values()].map((bucket) => {
+    const pairKey = [bucket.from.id, bucket.to.id].sort().join('|')
+    const slot = pairSlots.get(pairKey) ?? 0
+    pairSlots.set(pairKey, slot + 1)
+
+    return {
+      arrow: sealBucket(bucket),
+      from: bucket.from,
+      to: bucket.to,
+      isAi: bucket.isAi,
+      pairKey,
+      slot,
+    }
+  })
+
+  const links = pending.map(({ arrow, from, to, isAi, pairKey, slot }) => {
     const total = pairSlots.get(pairKey) ?? 1
     // 선이 많아지면 간격을 좁힌다. 넓게 유지하면 바깥 선이 노드에서 떨어진다.
     const spread = total > 1
@@ -601,20 +774,32 @@ export function buildFlowLayout(
     const offset = rank * spread * forward
 
     return {
-      id: `${arrow.id}::${to.id}`,
+      // 합성 arrow 하나가 곧 선 하나라 `::받는 이` 꼬리표가 필요 없다. 예전에는
+      // 한 화살표가 여러 팔로 갈라져 그 꼬리표로만 key 가 갈렸다.
+      id: arrow.id,
       arrowId: arrow.id,
       arrow,
       fromId: from.id,
       toId: to.id,
       isAi,
       opacity: arrow.opacity ?? 1,
-      isBadgeAnchor,
       ...lineBetween(from, to, offset, rank * forward),
     }
   })
 
+  /*
+    뱃지는 **선마다 하나**다.
+
+    합치기 전에는 화살표 하나가 여러 팔로 갈라져서, 팔마다 숫자를 붙이면 같은
+    일이 네 번 일어난 것처럼 읽혔다. 그래서 실제로 그린 첫 팔에만 붙였다
+    (`isBadgeAnchor`). 이제 선 하나가 곧 한 쌍의 한 갈래라 그 장치가 필요
+    없어졌다 — 붙일 자리가 애초에 하나뿐이다.
+
+    여기서는 **거르기 전** 전체로 만든다. 무대 경계를 이 목록으로 재기
+    때문이다. 실제로 내보낼 때 안 보이는 것을 걸러 낸다.
+  */
   const badges = links
-    .filter((link) => link.isBadgeAnchor && (link.arrow.counts ?? []).length > 0)
+    .filter((link) => (link.arrow.counts ?? []).length > 0)
     .map((link) => ({
       id: link.arrowId,
       arrow: link.arrow,
@@ -633,15 +818,21 @@ export function buildFlowLayout(
 
     링 중심의 **반대쪽**으로 민다. 안쪽으로 밀면 요약표·다른 선과 겹치는데,
     바깥은 어차피 비어 있다. 한 사람에게 여럿이면 같은 방향으로 더 밀어 쌓는다.
+
+    선과 같은 규칙으로 합쳐서 **노드당 뱃지 묶음도 최대 둘**(사람·대리인)이다.
+    합치기 전에는 대리인에게 지시할 때마다 알약이 하나씩 바깥으로 쌓여서, 회의
+    한 판이면 노드 옆에 숫자 기둥이 섰다.
   */
   const selfByNode = new Map()
-  selfPending
-    .filter((entry) => (entry.arrow.counts ?? []).length > 0)
-    .forEach((entry) => {
-      const list = selfByNode.get(entry.node.id) ?? []
-      list.push(entry)
-      selfByNode.set(entry.node.id, list)
-    })
+  const selfEntries = [...selfBuckets.values()]
+    .map((bucket) => ({ arrow: sealBucket(bucket), node: bucket.from, isAi: bucket.isAi }))
+    .filter((entry) => entry.arrow.counts.length > 0)
+
+  selfEntries.forEach((entry) => {
+    const list = selfByNode.get(entry.node.id) ?? []
+    list.push(entry)
+    selfByNode.set(entry.node.id, list)
+  })
 
   selfByNode.forEach((entries, nodeId) => {
     const node = byId.get(nodeId)
@@ -696,6 +887,47 @@ export function buildFlowLayout(
   const at = (p) => ({ x: p.x + shiftX, y: p.y + shiftY })
   const round = (v) => Number(v.toFixed(1))
 
+  /*
+    ★ `visibleEdgeIds` 가 손대는 **유일한** 자리다.
+
+    재생은 0.5 초마다 이 함수를 다시 부르며 `visibleEdgeIds` 를 키운다. 그 사이
+    노드 자리·선 각도·무대 크기가 한 픽셀이라도 움직이면 판 전체가 0.5 초마다
+    덜컹거려서 **무엇이 늘어났는지를 볼 수가 없다.** 늘어난 것을 보라고 만든
+    기능인데 그것 하나가 안 보이게 된다.
+
+    그래서 위쪽은 전부 **거르지 않은 `arrows`** 로 계산했다 — 접기·정렬·각도·
+    반지름·평행선 슬롯·오프셋, 그리고 `xs`·`ys` 경계까지. 거르기는 다 그린 뒤
+    뱃지 숫자에만 건다.
+
+    안 보이는 선을 배열에서 빼지 않고 `isVisible` 로 **표시만** 하는 것도 같은
+    결이다. 빼 버리면 읽는 쪽이 배열 순서나 길이에 기대고 있을 때 조용히
+    어긋나고, 다시 나타날 때 React 가 노드를 새로 만든다.
+
+    한 합성 arrow 를 선과 뱃지가 같이 들고 있으므로 깎은 것을 **한 번만 만들어
+    나눠 쓴다.** 따로 만들면 같은 화살표인데 객체가 둘이라, 참조로 비교하는
+    코드가 생기는 순간 어긋난다.
+  */
+  const maskedArrows = new Map()
+  const maskArrow = (arrow) => {
+    if (!visibleEdgeIds) {
+      return arrow
+    }
+
+    const seen = maskedArrows.get(arrow.id)
+    if (seen) {
+      return seen
+    }
+
+    const counts = maskCounts(arrow.counts, visibleEdgeIds)
+    const masked = {
+      ...arrow,
+      counts,
+      total_count: counts.reduce((sum, entry) => sum + entry.count, 0),
+    }
+    maskedArrows.set(arrow.id, masked)
+    return masked
+  }
+
   return {
     nodes: placed.map((node) => ({ ...node, x: node.x + shiftX, y: node.y + shiftY })),
     /*
@@ -709,19 +941,30 @@ export function buildFlowLayout(
     links: links.map((link) => {
       const start = at(link.start)
       const end = at(link.end)
+      const arrow = maskArrow(link.arrow)
+
       return {
         ...link,
+        arrow,
+        // 거르기가 없으면 늘 보인다. 걸렸을 때만 "남은 칸이 있느냐" 를 본다 —
+        // 근거가 하나도 안 남은 선은 그 시점에 아직 일어나지 않은 일이다.
+        isVisible: !visibleEdgeIds || arrow.counts.length > 0,
         start,
         end,
         midpoint: at(link.midpoint),
         d: `M${round(start.x)} ${round(start.y)} L${round(end.x)} ${round(end.y)}`,
       }
     }),
-    badges: badges.map((badge) => ({
-      ...badge,
-      x: badge.point.x + shiftX,
-      y: badge.point.y + shiftY,
-    })),
+    // 뱃지는 반대로 **빼서** 내보낸다. 선은 자리를 지켜야 판이 안 흔들리지만,
+    // 알약은 숫자가 0 이면 그릴 것이 없다.
+    badges: badges
+      .map((badge) => ({
+        ...badge,
+        arrow: maskArrow(badge.arrow),
+        x: badge.point.x + shiftX,
+        y: badge.point.y + shiftY,
+      }))
+      .filter((badge) => (badge.arrow.counts ?? []).length > 0),
     stage: {
       width: Math.ceil(Math.max(...xs) - Math.min(...xs) + STAGE_MARGIN * 2),
       height: Math.ceil(Math.max(...ys) - Math.min(...ys) + STAGE_MARGIN * 2),

@@ -111,6 +111,14 @@ function FlowNode({ node, isMine, isSelected, onSelect }) {
   )
 }
 
+/*
+  `showRecency` 를 없앴다.
+
+  좌측 `필터링 > 시간순` 체크박스가 인덱스에 합쳐지면서 삭제됐고, 시간순은 이제
+  이 화면의 **기본 전제**다 — 끌 수 있는 것이 아니다. 끌 수 없는 것을 끌 수 있는
+  척 받아 두면 다음 사람이 `false` 를 넘길 자리를 찾다가 켜지지 않는 스위치를
+  하나 더 만든다. 그래서 `link.opacity` 를 늘 적용한다.
+*/
 export function FlowCanvas({
   activeBadgeId,
   className = '',
@@ -122,7 +130,6 @@ export function FlowCanvas({
   onNodeSelect,
   selectedArrowId,
   selectedNodeId,
-  showRecency,
   style,
   children,
 }) {
@@ -209,7 +216,19 @@ export function FlowCanvas({
             }))}
         </defs>
 
-        {links.map((link) => {
+        {/*
+          재생 중에는 아직 안 온 선을 아예 안 그린다.
+
+          흐리게 두는 방법도 있었지만, 이 화면은 **안 보이는 것과 없는 것을
+          구별해서 보여 주는** 자리라 "아직 일어나지 않은 일" 을 옅게 그려 두면
+          이미 일어난 것과 같은 층위로 읽힌다. 누를 자리(`flow-link-hit`)까지
+          같이 빼야 한다 — 안 보이는 선이 눌려 패널이 열리면 판보다 패널이 앞선
+          이야기를 한다.
+
+          `layout` 이 배열에서 빼지 않고 `isVisible` 로만 표시하는 이유는
+          `flowLayout` 의 ★ 주석에 있다(기하가 흔들리면 안 된다).
+        */}
+        {links.filter((link) => link.isVisible !== false).map((link) => {
           const lit = isHighlighted(link.arrow)
           const picked = link.arrowId === selectedArrowId
           const tone = toneOfLink(link)
@@ -247,14 +266,14 @@ export function FlowCanvas({
                 markerStart={`url(#flow-arrow-tail${markerSuffix(tone, picked ? 'on' : 'base')})`}
                 markerEnd={`url(#flow-arrow-head${markerSuffix(tone, picked ? 'on' : 'base')})`}
                 /*
-                  `시간순` 을 켰을 때만 진하기를 적용한다. 서버가 최근일수록 1 에
-                  가까운 값을 주는데, 항상 걸면 오래된 선이 늘 흐려 **회의 초반에
-                  오간 것을 못 보고 지나친다.**
+                  진하기를 **늘** 적용한다. 서버가 최근일수록 1 에 가까운 값을
+                  준다. 한때는 `시간순` 을 켰을 때만 걸었는데, 그 체크박스가
+                  인덱스에 합쳐져 사라지면서 늘 켜져 있는 상태가 됐다.
 
                   고른 선은 그 규칙에서 뺀다 — 오래된 선을 골랐을 때 흐린 채로
                   남으면 무엇을 골랐는지 안 보인다.
                 */
-                opacity={picked ? 1 : (lit ? (showRecency ? link.opacity : 1) : 0.14)}
+                opacity={picked ? 1 : (lit ? link.opacity : 0.14)}
               />
             </g>
           )
