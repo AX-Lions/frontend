@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './Sidebar.jsx'
 import { AgentDock } from './AgentDock.jsx'
 import { BriefingPrompt } from './BriefingPrompt.jsx'
 import { ConfirmedScheduleDialog } from './ConfirmedScheduleDialog.jsx'
-import { NewMeetingDialog } from './NewMeetingDialog.jsx'
 import { NewProjectDialog } from './NewProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { navigate } from '../../app/navigation.js'
+import { NEW_EVENT_PARAM } from '../meetingSchedule/meetingSchedule.data.js'
 import { getCurrentTeamId, onCurrentTeamChange } from '../../lib/currentTeam.js'
 import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
@@ -52,7 +52,6 @@ export function HomePage() {
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
   const [pendingFavorites, setPendingFavorites] = useState([])
   const [addingProject, setAddingProject] = useState(false)
-  const [addingMeeting, setAddingMeeting] = useState(false)
   // 「오늘 일정」 한 줄을 눌렀을 때 뜨는 확정된 일정 확인 팝업의 대상 회의.
   const [confirmingMeetingId, setConfirmingMeetingId] = useState(null)
   /*
@@ -350,6 +349,7 @@ export function HomePage() {
                 className="section-arrow"
                 href="/flow-board"
                 aria-label="회의 화면으로"
+                data-tip="회의 화면으로"
                 onClick={(event) => goInApp(event, '/flow-board')}
               >
                 <img src="/icons/Expandright.svg" alt="" aria-hidden="true" />
@@ -390,6 +390,7 @@ export function HomePage() {
                           className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
                           type="button"
                           aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
+                          data-tip={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
                           disabled={pendingFavorites.includes(meeting.meeting_id)}
                           onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
                         >
@@ -405,22 +406,25 @@ export function HomePage() {
                           goInApp(event, href)
                         }}
                       >
-                        <strong>{meeting.title}</strong>
+                        <strong><span>{meeting.title}</span></strong>
 
                         {/*
                           이 서비스가 답하려는 질문이 "내가 없는 동안 무슨 일이
                           있었지" 다. **그 질문에 해당하는 회의를 골라내는 표시가
                           이 뱃지**인데 서버(`recent_meetings[].missed`)만 주고
                           화면이 그리지 않았다. 다섯 장이 전부 똑같아 보였다.
+
+                          시각이 뱃지보다 **위**다. 카드 바닥에 붙는 두 줄
+                          중에서 아래쪽이 눈에 먼저 걸리는데, 다섯 장을 훑을 때
+                          찾는 것은 언제 열린 회의인지가 아니라 **어느 것이
+                          내가 빠진 회의인지**다.
                         */}
-                        {/* 뱃지가 없어도 자리는 그린다. 줄이 사라지면 그 카드만
-                            위쪽 요소가 밀려 다섯 장이 어긋난다. */}
-                        <span className="missed-slot">
+                        <span className="card-foot">
+                          <time>{meeting.displayed_at}</time>
                           {meeting.missed ? (
                             <span className="missed-badge">불참한 회의</span>
                           ) : null}
                         </span>
-                        <time>{meeting.displayed_at}</time>
                       </a>
                     </article>
                   )
@@ -434,16 +438,20 @@ export function HomePage() {
               <div className="section-heading">
                 <h2>오늘 일정</h2>
                 {/*
-                  전체 일정 화면은 아직 없다 — 화살표는 안 둔다. `+` 는
-                  화면 하나로 안 가고 팝업을 여는 것이라 이 사정과 무관하다
-                  (시안 `692:8292`).
+                  `+` 는 회의 일정 화면으로 보내고 거기서 `일정 추가하기`
+                  팝업을 연다.
+
+                  홈에서 바로 팝업을 띄우던 자리였다. 그런데 만들고 나면
+                  **방금 잡은 일정이 어디에 놓였는지 볼 수 없었다** — 오늘이
+                  아닌 날로 잡으면 홈 「오늘 일정」에는 아예 안 나타난다.
+                  달력 위에서 만들면 만든 자리가 곧 결과라 그 자리에서 확인된다.
                 */}
                 <button
                   className="icon-button"
                   type="button"
                   aria-label="회의 일정 추가"
-                  title="회의 일정 추가"
-                  onClick={() => setAddingMeeting(true)}
+                  data-tip="회의 일정 추가"
+                  onClick={() => navigate(`/meeting-schedule?${NEW_EVENT_PARAM}=1`)}
                 >
                   <img src="/icons/AddIcon.svg" alt="" />
                 </button>
@@ -451,97 +459,92 @@ export function HomePage() {
               <div className="schedule-content">
                 {todaySchedule.length === 0 ? (
                   <Empty>오늘 잡힌 일정이 없습니다.</Empty>
-                ) : todaySchedule.map((schedule) => {
+                ) : todaySchedule.map((schedule, index) => {
                   const scheduleKey = schedule.meeting_id ?? `${schedule.at}-${schedule.project_id}`
 
                   return (
-                    <div className="schedule-item" key={scheduleKey}>
-                      {/*
-                        시각은 회의 이름 **바깥**에 둔다.
+                    <Fragment key={scheduleKey}>
+                      {index > 0 ? <hr className="summary-divider" /> : null}
+                      <div className="schedule-item">
+                        {/*
+                          시각은 회의 이름 **바깥**에 둔다.
 
-                        좁아지면 시각이 제 줄로 빠지고 이름과 버튼이 그 아래 한 줄에
-                        선다(시안 `754:5742`). 이름 상자 안에 있으면 그 상자 밖으로
-                        나갈 수 없어 이 배치가 안 나온다.
+                          좁아지면 시각이 제 줄로 빠지고 이름과 버튼이 그 아래 한
+                          줄에 선다(시안 `754:5742`). 이름 상자 안에 있으면 그
+                          상자 밖으로 나갈 수 없어 이 배치가 안 나온다.
 
-                        `time_range` 는 참여자 시간대로 서버가 계산해 준다. 브라우저
-                        시간대로 다시 찍으면 같은 회의를 사람마다 다른 시각으로 본다.
-                      */}
-                      <time className="schedule-time">{schedule.time_range}</time>
-                      <button
-                        className={selectedScheduleKey === scheduleKey ? 'schedule-info selected' : 'schedule-info'}
-                        type="button"
-                        onClick={() => {
-                          setSelectedScheduleKey(scheduleKey)
-                          // 상세가 있는 회의만 확인 팝업을 연다 — 회의 없이 시각만
-                          // 잡힌 일정(`meeting_id: null`)은 보여 줄 회의가 없다.
-                          if (schedule.meeting_id) {
-                            setConfirmingMeetingId(schedule.meeting_id)
-                          }
-                        }}
-                      >
-                        <div>
-                          <strong>{schedule.title}</strong>
-                          {/*
-                            `·` 뒤를 붙임표 없는 공백으로 묶는다.
-
-                            좁은 칸에서 두 줄이 될 때 `글로벌 회의 도구 ·` / `Discord`
-                            로 갈려 **구분점만 줄 끝에 남았다.** 뒤 낱말과 함께
-                            넘기면 앞줄이 온전한 말로 끝난다.
-                          */}
-                          <span>
-                            {schedule.project_name}
-                            {' · '}
-                            {schedule.location}
-                          </span>
-                        </div>
-                      </button>
-                      {/*
-                        `참여하기` 가 아니라 **불참 등록** 버튼이다.
-
-                        회의에 들어갈 사람은 Discord 를 이미 열어 두고 있다.
-                        이 화면에서 눌러야 하는 것은 오히려 그 반대 —
-                        "못 간다, 대리인이 대신 가라" 다. 이 서비스가 답하려는
-                        질문이 "내가 없는 동안 무슨 일이 있었지" 이므로,
-                        **없을 것을 미리 등록하는 자리**가 첫 화면에 있어야 한다.
-
-                        참석자가 아닌 회의는 `delegation` 이 `null` 이라 버튼을
-                        내리지 않고 회의로 가는 링크만 남긴다.
-                      */}
-                      {schedule.delegation ? (
+                          `time_range` 는 참여자 시간대로 서버가 계산해 준다.
+                          브라우저 시간대로 다시 찍으면 같은 회의를 사람마다 다른
+                          시각으로 본다.
+                        */}
+                        <time className="schedule-time">{schedule.time_range}</time>
                         <button
-                          className={schedule.delegation.delegated ? 'is-delegated' : ''}
+                          className={selectedScheduleKey === scheduleKey ? 'schedule-info selected' : 'schedule-info'}
                           type="button"
-                          /*
-                            팝업이 아니라 화면으로 보낸다.
+                          onClick={() => {
+                            setSelectedScheduleKey(scheduleKey)
+                            // 상세가 있는 회의만 확인 팝업을 연다 — 회의 없이 시각만
+                            // 잡힌 일정(`meeting_id: null`)은 보여 줄 회의가 없다.
+                            if (schedule.meeting_id) {
+                              setConfirmingMeetingId(schedule.meeting_id)
+                            }
+                          }}
+                        >
+                          <div>
+                            <strong>{schedule.title}</strong>
+                            <span>
+                              {schedule.project_name} · {schedule.location}
+                            </span>
+                          </div>
+                        </button>
+                        {/*
+                          `참여하기` 가 아니라 **불참 등록** 버튼이다.
 
-                            회의 전에 해야 하는 준비가 자료 범위 네 칸에서
-                            **예상 논쟁점 · 내 입장 · Bordo 활동 설정**까지
-                            늘었다. 회의를 주소에 실어 보내므로 새로고침하거나
-                            링크를 복사해도 같은 회의가 열린다.
-                          */
-                          onClick={() => navigate(
-                            `/delegate-prep?meeting=${schedule.meeting_id}`)}
-                        >
-                          {schedule.delegation.delegated ? '대리 참석 중' : '회의에 참여하지 않아요'}
-                        </button>
-                      ) : schedule.action?.url ? (
-                        <button
-                          type="button"
-                          onClick={() => window.open(schedule.action.url, '_blank', 'noopener')}
-                        >
-                          {schedule.action.label ?? '회의 참여하기'}
-                        </button>
-                      ) : (
-                        // 링크가 없는 회의는 서비스 안에서 연다. 비활성 버튼을
-                        // 두면 그 회의만 갈 데가 없어 보인다.
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/flow-board?meeting=${schedule.meeting_id}`)}
-                        >
-                          {schedule.action?.label ?? '보러가기'}
-                        </button>
-                      )}
-                    </div>
+                          회의에 들어갈 사람은 Discord 를 이미 열어 두고 있다.
+                          이 화면에서 눌러야 하는 것은 오히려 그 반대 —
+                          "못 간다, 대리인이 대신 가라" 다. 이 서비스가 답하려는
+                          질문이 "내가 없는 동안 무슨 일이 있었지" 이므로,
+                          **없을 것을 미리 등록하는 자리**가 첫 화면에 있어야 한다.
+
+                          참석자가 아닌 회의는 `delegation` 이 `null` 이라 버튼을
+                          내리지 않고 회의로 가는 링크만 남긴다.
+                        */}
+                        {schedule.delegation ? (
+                          <button
+                            className={schedule.delegation.delegated ? 'is-delegated' : ''}
+                            type="button"
+                            /*
+                              팝업이 아니라 화면으로 보낸다.
+
+                              회의 전에 해야 하는 준비가 자료 범위 네 칸에서
+                              **예상 논쟁점 · 내 입장 · Bordo 활동 설정**까지
+                              늘었다. 회의를 주소에 실어 보내므로 새로고침하거나
+                              링크를 복사해도 같은 회의가 열린다.
+                            */
+                            onClick={() => navigate(
+                              `/delegate-prep?meeting=${schedule.meeting_id}`)}
+                          >
+                            {schedule.delegation.delegated ? '대리 참석 중' : '회의에 참여하지 않아요'}
+                          </button>
+                        ) : schedule.action?.url ? (
+                          <button
+                            type="button"
+                            onClick={() => window.open(schedule.action.url, '_blank', 'noopener')}
+                          >
+                            {schedule.action.label ?? '회의 참여하기'}
+                          </button>
+                        ) : (
+                          // 링크가 없는 회의는 서비스 안에서 연다. 비활성 버튼을
+                          // 두면 그 회의만 갈 데가 없어 보인다.
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/flow-board?meeting=${schedule.meeting_id}`)}
+                          >
+                            {schedule.action?.label ?? '보러가기'}
+                          </button>
+                        )}
+                      </div>
+                    </Fragment>
                   )
                 })}
               </div>
@@ -555,6 +558,7 @@ export function HomePage() {
                     className="section-arrow"
                     href={`/flow-board?meeting=${summary.meeting_id}`}
                     aria-label={`${summary.title} 자세히 보기`}
+                    data-tip="회의 자세히 보기"
                     onClick={(event) => goInApp(event, `/flow-board?meeting=${summary.meeting_id}`)}
                   >
                     <img src="/icons/Expandright.svg" alt="" aria-hidden="true" />
@@ -625,15 +629,6 @@ export function HomePage() {
             recent_projects: [project, ...(current.recent_projects ?? [])],
             project_progress: [project, ...(current.project_progress ?? [])],
           } : current))}
-        />
-      ) : null}
-
-      {addingMeeting ? (
-        <NewMeetingDialog
-          onClose={() => setAddingMeeting(false)}
-          // 새로 만든 회의가 오늘 일정·최근 회의 어디에 걸리는지는 서버
-          // 집계 규칙이다(시간대별 "오늘" 판정 등). 흉내 내지 않고 다시 읽는다.
-          onCreated={() => reload()}
         />
       ) : null}
 

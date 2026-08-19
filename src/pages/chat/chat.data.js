@@ -21,6 +21,33 @@ export function fetchSidebar(signal) {
   return api.get('/chat/sidebar', undefined, { signal })
 }
 
+/**
+ * 지금 자리에 있는지. `ACTIVE` · `AWAY`
+ *
+ * 서버 상태다. 브라우저에만 두면 창을 닫는 순간 내 Bordo 가 다시 조용해지는데,
+ * **자리를 비운다는 것은 브라우저를 닫는 일**이라 그러면 기능 자체가 성립하지
+ * 않는다.
+ */
+export function fetchPresence(signal) {
+  return api.get('/me/presence', undefined, { signal })
+}
+
+export function setPresence(status) {
+  return api.patch('/me/presence', { status })
+}
+
+/**
+ * 자리를 비운 사이 내 Bordo 가 대신 나눈 대화.
+ *
+ * 좌측 목록의 `중요 채팅` 자리를 이것이 가져갔다. 그쪽은 **내가 미리 별을 찍어
+ * 둔 것**만 모이는데, 자리를 비우기 전에 무엇이 중요해질지 알 수 있으면 애초에
+ * 자리를 안 비웠을 것이다. 돌아와서 가장 먼저 봐야 하는 것은 내가 없는 동안
+ * 오간 말이다.
+ */
+export function fetchAwayHandled(signal) {
+  return api.get('/chat/away-handled', undefined, { signal })
+}
+
 export function fetchImportant(signal) {
   return api.get('/chat/important', undefined, { signal })
 }
@@ -34,9 +61,9 @@ export function fetchCandidates({ query, type } = {}, signal) {
 /**
  * 방 하나를 그 자체로 읽는다.
  *
- * 사이드바는 **팀 단체방을 id 로만** 내려준다(`group_chat_room_id`). 트리 어디에도
- * 방 객체가 없어서, `모두 채팅 바로가기` 로 연 방은 제목을 그릴 수가 없었다.
- * 열린 방은 목록과 별개로 한 번 더 읽는다.
+ * 사이드바 트리에 없는 방도 열릴 수 있다 — 주소(`/chat?room=<id>`)로 들어온
+ * 방, 팀 단체방(`group_chat_room_id` 만 오고 방 객체가 없다)이 그렇다. 트리에서
+ * 못 찾은 방은 제목 칸이 비어 어느 대화인지 알 수 없으므로 한 번 더 읽는다.
  */
 export function fetchRoom(roomId, signal) {
   return api.get(`/chat/rooms/${roomId}`, undefined, { signal })
@@ -206,21 +233,66 @@ export function deletePrompt(promptId) {
  * 각 층에서 필요한 것만 뽑는다.
  */
 export function toTeamRows(sidebar) {
-  return (sidebar?.teams ?? []).map((team) => ({
-    id: team.team_id,
-    name: team.team_name,
-    unread: team.unread_count,
-    marked: team.has_important,
-    groupRoomId: team.group_chat_room_id,
-    projects: (team.projects ?? []).map((project) => ({
+  return (sidebar?.teams ?? []).map((team) => {
+    const projects = (team.projects ?? []).map((project) => ({
       id: project.project_id,
       name: project.project_name,
       unread: project.unread_count,
       marked: project.has_important,
-      groupRoomId: project.group_chat_room_id,
       rooms: (project.rooms ?? []).map(toPreview),
-    })),
-  }))
+    }))
+    return {
+      id: team.team_id,
+      name: team.team_name,
+      unread: team.unread_count,
+      marked: team.has_important,
+      groupRoom: toTeamGroupRoom(team, projects),
+      projects,
+    }
+  })
+}
+
+/**
+ * 팀 단체방을 목록에 세울 수 있는 모양으로.
+ *
+ * ## 왜 서버가 준 것을 그대로 못 쓰는가
+ *
+ * 사이드바는 팀 단체방을 **`group_chat_room_id` 하나로만** 준다. 방 객체가
+ * 트리에 없어서 제목도 미리보기도 미읽음도 따로 오지 않는다.
+ *
+ * 그런데 팀 뱃지에는 그 방 몫이 **이미 들어 있다**(서버 `chat/views.py` 의
+ * `team_unread`). 그래서 이 방을 목록에서 빼면 열 수 없는 방의 숫자가
+ * 뱃지에 남아 **영영 안 꺼진다.** 사용자가 할 수 있는 일이 없는 숫자다.
+ *
+ * ## 미읽음은 빼서 알아낸다
+ *
+ * 서버가 `팀 합계 = 팀 단체방 + 프로젝트 합계` 로 만들므로, 화면에 보이는
+ * 프로젝트 합계를 빼면 남는 것이 곧 이 방 몫이다. 중요 표시도 같은 논리다 —
+ * 팀에 표시가 섰는데 어느 프로젝트에도 없으면 이 방에 선 것이다.
+ *
+ * 제목은 여기서 짓지 않고 빈 값으로 둔다. 방을 열면 `fetchRoom` 이 서버가
+ * 만든 이름을 가져온다 — 화면이 이름을 조립하면 규칙이 두 군데로 갈린다.
+ */
+function toTeamGroupRoom(team, projects) {
+  if (!team?.group_chat_room_id) {
+    return null
+  }
+  const seen = projects.reduce((sum, project) => sum + (project.unread || 0), 0)
+  return {
+    id: team.group_chat_room_id,
+    type: 'TEAM',
+    name: team.team_name,
+    context: '팀 전체',
+    message: '',
+    sentAt: null,
+    unread: Math.max(0, (team.unread_count || 0) - seen),
+    marked: Boolean(team.has_important) && !projects.some((project) => project.marked),
+    avatars: [],
+    avatar: null,
+    bordo: false,
+    stacked: true,
+    members: [],
+  }
 }
 
 /** 어느 팀·프로젝트에도 안 매달린 1:1 · 동료 대리인 방. */
@@ -256,6 +328,9 @@ export function toPreview(room) {
     avatar: room.avatar_urls?.[0] ?? null,
     bordo: room.type === 'AI' || room.type === 'PEER_AGENT',
     stacked: room.type === 'PROJECT' || room.type === 'TEAM',
+    // 방 머리의 `그곳 시각` 줄이 쓴다. 없는 방(목록에만 있는 옛 응답)은
+    // 빈 배열이라 그 줄이 통째로 안 그려진다.
+    members: room.members ?? [],
   }
 }
 

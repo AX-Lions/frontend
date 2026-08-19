@@ -16,7 +16,9 @@ import { home } from './data/home.js'
 import {
   briefings, meetingIndexes, meetings, summaryTables, workIndexes,
 } from './data/meetings.js'
-import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
+import {
+  flowEdges, meetingFlows, meetingTimelines, participantFlows, projectFlows, projectTimelines,
+} from './data/flow.js'
 import { preps } from './data/prep.js'
 import { activeDates, chatSidebar, roomDetails, roomMessages } from './data/chat.js'
 import { agentConversations, conversationMessages } from './data/agent.js'
@@ -213,15 +215,126 @@ for (const [mid, prep] of Object.entries(preps)) {
     `${tag} 의 자료 범위가 배열도 null 도 아니다`)
 }
 
+/*
+  10. 시간순 인덱스.
+
+  좌측 목록이면서 **재생 대본**이다. 재생 버튼은 판의 화살표를 전부 지우고 이
+  목록 순서대로 하나씩 되살리므로, 목록과 판이 어긋나면 화면에서는 "재생했는데
+  화살표 하나가 끝까지 안 나온다" 로만 보인다. 목록이 빠뜨린 것인지 재생이 중간에
+  멈춘 것인지 구별할 방법이 없다.
+
+  seq 와 정렬까지 보는 이유도 같다. 번호가 건너뛰거나 시각이 뒤집혀 있으면 좌측
+  숫자는 멀쩡한데 되살아나는 순서만 이상해져서, 회의를 처음 보는 사람은 그것을
+  "실제로 그런 순서로 오갔다" 로 읽는다.
+*/
+const allTimelines = { ...meetingTimelines, ...projectTimelines }
+let timelineTotal = 0
+
+for (const [scope, flow] of allFlows) {
+  const tag = scope.slice(0, 8)
+  const timeline = allTimelines[scope]
+  if (!timeline) {
+    bad.push(`판은 있는데 시간순 인덱스가 없다: ${tag}`)
+    continue
+  }
+
+  const rows = timeline.results ?? []
+  timelineTotal += rows.length
+  ok(timeline.count === rows.length,
+    `${tag} 시간순 인덱스: count=${timeline.count} 인데 목록은 ${rows.length}`)
+
+  // 판의 화살표가 실제로 나르고 있는 엣지 전부.
+  const onBoard = new Set(
+    (flow.arrows ?? []).flatMap((a) => (a.counts ?? []).flatMap((c) => c.edge_ids ?? [])),
+  )
+  const listed = new Set(rows.map((r) => r.edge_id))
+
+  rows.forEach((row, i) => {
+    ok(row.seq === i + 1, `${tag} 시간순 ${i + 1}번째 줄의 seq 가 ${row.seq} 다 — 순번이 건너뛴다`)
+    ok(flowEdges[row.edge_id], `${tag} 시간순 "${row.title}" 의 엣지 상세 ${row.edge_id} 가 없다`)
+    // 5-0 과 같은 취지다. 판에 없는 엣지를 가리키면 눌러도 강조될 것이 없다.
+    ok(onBoard.has(row.edge_id),
+      `${tag} 시간순 "${row.title}" 이 가리키는 ${row.edge_id} 가 그 판에 없다`)
+    for (const e of row.related_edge_ids ?? []) {
+      ok(onBoard.has(e), `${tag} 시간순 "${row.title}" 의 강조 대상 ${e} 가 그 판에 없다`)
+    }
+    if (i > 0) {
+      ok(Date.parse(rows[i - 1].occurred_at) <= Date.parse(row.occurred_at),
+        `${tag} 시간순 ${i + 1}번째 줄이 앞줄보다 이르다 — 재생 순서가 뒤집힌다`)
+    }
+  })
+
+  // 판에 있는데 목록에 없는 화살표. **재생해도 영영 안 나타난다.**
+  for (const e of onBoard) {
+    ok(listed.has(e), `${tag} 판의 ${e} 가 시간순 인덱스에 없다 — 재생해도 안 나타난다`)
+  }
+}
+
+/*
+  11. 참여자 패널 — 판에서 사람이나 대리인을 눌렀을 때 열리는 우측 패널.
+
+  이 패널은 `전달한 내용`(sent)과 `전달받은 내용`(received)을 **둘 다** 그리고,
+  `counts` 로 만든 알약 줄이 그 둘을 **함께 거르는 필터**다. 그래서 알약을 한쪽만
+  보고 만들면 화면에서 두 가지가 깨진다.
+
+    · 받기만 한 종류는 알약이 없다 — 알약을 하나라도 켜는 순간 그 묶음이 화면에서
+      빠지고 **다시 부를 방법이 없다.** 보는 사람에게는 "카드가 그냥 사라졌다" 로만
+      보여서, 데이터가 빠진 것인지 필터가 고장 난 것인지 구별이 안 된다
+    · 숫자가 실제로 펼쳐지는 카드 수와 다르다 — `일정 1` 을 눌렀는데 세 장이 뜬다
+
+  `발언` 알약은 여기서 보지 않는다. 그건 엣지가 아니라 엣지 **안에서** 입을 연
+  횟수라 거를 묶음이 애초에 없고, 화면도 그것만은 누를 수 없는 통계로 그린다.
+*/
+let pillTotal = 0
+
+for (const [key, panel] of Object.entries(participantFlows)) {
+  const [meetingId] = key.split('::')
+  const tag = `참여자 패널 ${meetingId.slice(0, 8)} / ${panel.name}`
+  const groups = [...(panel.sent ?? []), ...(panel.received ?? [])]
+
+  // 그 종류로 **실제로 그려지는 카드 수.** 알약 숫자는 이것과 같아야 한다.
+  const drawn = new Map()
+  const labelOf = new Map()
+  for (const g of groups) {
+    drawn.set(g.content_type, (drawn.get(g.content_type) ?? 0) + (g.items ?? []).length)
+    labelOf.set(g.content_type, g.label)
+  }
+
+  const pills = (panel.counts ?? []).filter((c) => c.content_type)
+  pillTotal += pills.length
+
+  for (const c of pills) {
+    ok(c.count === (drawn.get(c.content_type) ?? 0),
+      `${tag} 의 ${c.label} 알약: count=${c.count} 인데 펼쳐지는 카드는 ${drawn.get(c.content_type) ?? 0}`)
+  }
+
+  const listed = new Set(pills.map((c) => c.content_type))
+  for (const type of drawn.keys()) {
+    ok(listed.has(type),
+      `${tag} 의 ${labelOf.get(type)} 에 알약이 없다 — 다른 알약을 켜면 영영 사라진다`)
+  }
+
+  // 카드 앞의 순번은 시간순 인덱스에서 온다. 거기 없는 엣지는 번호가 안 붙는데,
+  // 화면에서는 그것이 「번호를 모르는 항목」 과 구별되지 않는다.
+  const onTimeline = new Set((meetingTimelines[meetingId]?.results ?? []).map((r) => r.edge_id))
+  for (const g of groups) {
+    for (const item of g.items ?? []) {
+      ok(onTimeline.has(item.edge_id),
+        `${tag} 의 "${item.title}" 이 가리키는 ${item.edge_id} 가 그 회의 시간순 인덱스에 없다`)
+    }
+  }
+}
+
 const msgCount = Object.values(roomMessages).reduce((s, r) => s + (r.results?.length ?? 0), 0)
 console.log('== 규모 ==')
 console.log(`  최근회의 ${(home.recent_meetings ?? []).length} · 오늘일정 ${(home.today_schedule ?? []).length} · 회의상세 ${Object.keys(meetings).length}`)
 console.log(`  플로우 ${allFlows.length} · 엣지상세 ${Object.keys(flowEdges).length} (화살표가 참조 ${edgeTotal})`)
+console.log(`  시간순 인덱스 ${Object.keys(allTimelines).length} · 줄 ${timelineTotal}`)
 console.log(`  브리핑 ${Object.keys(briefings).length} · 채팅방 ${uniq.length} · 메시지 ${msgCount}`)
 console.log(`  대리인 대화 ${(agentConversations.results ?? []).length}`)
 const pointCount = Object.values(preps)
   .reduce((s, one) => s + (one.debate?.points?.length ?? 0), 0)
-console.log(`  준비화면 ${Object.keys(preps).length} · 논쟁점 ${pointCount}`)
+console.log(`  준비화면 ${Object.keys(preps).length} · 논쟁점 ${pointCount} · 참여자 패널 ${Object.keys(participantFlows).length}(알약 ${pillTotal})`)
 console.log(`\n== 어긋남 ${bad.length} 건 ==`)
 bad.slice(0, 25).forEach((b) => console.log('  ·', b))
 if (bad.length > 25) console.log(`  ... 외 ${bad.length - 25} 건`)

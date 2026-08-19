@@ -25,7 +25,9 @@
  * 여기뿐이다. 다만 목록 자체를 비우지는 않는다.
  */
 
-import { ME, PEOPLE, PROJECTS, TEAM, agentName, daysAgo, minutesAgo, person, todayAt } from './people.js'
+import {
+  ME, PEOPLE, PROJECTS, TEAM, agentName, daysAgo, minutesAgo, person, teamOf, todayAt,
+} from './people.js'
 import { meetingAgendas } from './flow.js'
 
 /** 팀이 회의를 여는 Discord 채널. 실제 응답과 같은 값이다. */
@@ -132,6 +134,15 @@ function meetingOf({
     id,
     project_id: project.id,
     project_name: project.name,
+    /*
+      회의가 **어느 팀 것인지**. 서버는 `meeting.project.team` 을 읽는다.
+
+      팀이 하나뿐일 때는 화면이 `TEAM` 을 갖다 써도 맞았다. 팀이 둘이 되면
+      학술제 회의 머리에 해커톤 팀 이름이 붙는데, 그 화면만 보고는 틀린 줄
+      모른다 — 회의 안에서 팀 이름을 확인할 다른 곳이 없다.
+    */
+    team_id: teamOf(project).id,
+    team_name: teamOf(project).name,
     title,
     status,
     scheduled_at: scheduledAt,
@@ -303,6 +314,44 @@ export const projectMeetings = {
 
 /* --------------------------------------------------------------- 요약표 */
 
+/**
+ * 요약표 한 칸.
+ *
+ * 원래는 그냥 문자열이었다. 누르면 브리핑이 열리기만 해서, 그 한 줄이
+ * **어쩌다 나온 얘기인지 · 누가 뭘로 갈렸는지**는 화면 어디에도 없었다.
+ * 회의에 없던 사람이 이 서비스에 오는 이유가 그건데, 결론만 있고 과정이
+ * 없으면 "그래서 왜?" 를 물으러 다시 사람을 찾아가야 한다.
+ *
+ * ## 왜 `related_edge_ids` 를 손으로 안 적나
+ *
+ * 안건 키(`slot` 등)만 대면 판을 만든 원장(`flow.js`)이 이미 계산해 둔 것을
+ * 가져온다 — 좌측 인덱스(`meetingIndexes`)와 같은 방식이다. 손으로 적으면
+ * **판에 없는 화살표를 가리키게 되고**, 눌러도 아무것도 강조되지 않는다.
+ * 이 저장소에서 실제로 한 번 어긋났던 자리다.
+ *
+ * ## 왜 전부 채우지 않나
+ *
+ * `detail` 없이 문자열만 넘길 수 있다. 상세가 없는 항목을 화면이 어떻게
+ * 그리는지도 봐야 하는데, 전부 채워 두면 그 경로는 시연 직전까지 아무도
+ * 안 본다. 실서버도 처음에는 문자열만 내려 줄 것이다.
+ */
+function summaryItem(meetingId, text, detail = null) {
+  if (!detail) {
+    return { text }
+  }
+
+  const { agenda: agendaKey, ...rest } = detail
+  const found = agendaKey ? meetingAgendas[meetingId]?.[agendaKey] : null
+
+  return {
+    text,
+    ...rest,
+    agenda_id: found?.id ?? null,
+    agenda_title: found?.title ?? null,
+    related_edge_ids: found?.related_edge_ids ?? [],
+  }
+}
+
 export const summaryTables = {
   [MEETING_IDS.academyBooth]: {
     one_line: '포스터는 두 번째 안으로 확정, 부스 인원 배치는 서재민 확인 뒤로 미뤘습니다.',
@@ -326,22 +375,153 @@ export const summaryTables = {
 
   [MEETING_IDS.direction]: {
     discovered_issues: [
-      '팀별 시간대가 달라 회의 슬롯이 겹친다',
-      '디자인 시안 확정이 개발 착수를 막고 있다',
+      summaryItem(MEETING_IDS.direction, '팀별 시간대가 달라 회의 슬롯이 겹친다', {
+        agenda: 'slot',
+        context: '최비성이 기획안을 공유하면서 "시간대 계산은 서버가 하는 게 맞다"고 먼저 못을 박았고, 거기서 후보 슬롯을 몇 개까지 보여 줄지로 이야기가 번졌습니다. 베를린에 있는 팀원 두 명에게 현재 정기 슬롯이 새벽 2시라는 것이 이 자리에서 처음 확인됐습니다.',
+        debates: [
+          {
+            speaker: '최비성',
+            stance: '후보는 세 개까지',
+            body: '더 늘리면 고르기가 더 어려워집니다. 대신 슬롯마다 몇 명한테 새벽인지를 같이 내려 주죠.',
+          },
+          {
+            speaker: '임수연',
+            stance: '세 개면 카드 한 줄',
+            body: '세 개면 카드로 한 줄에 들어갑니다. "베를린 02:00" 같은 보조 문구를 붙일게요.',
+          },
+        ],
+        resolution: '후보 슬롯은 세 개로 제한하고, 각 슬롯이 누구에게 새벽인지를 응답에 함께 내려 주기로 했습니다.',
+        open_question: '프로필에 timezone 이 비어 있는 사람을 어떻게 처리할지는 정하지 못했습니다. 회의 생성 폼에서 한 번 묻자는 제안까지만 나왔습니다.',
+      }),
+      // 상세를 일부러 안 붙인 항목. 눌렀을 때 화면이 무엇을 하는지 봐야 한다.
+      summaryItem(MEETING_IDS.direction, '디자인 시안 확정이 개발 착수를 막고 있다'),
       // 긴 항목을 하나 섞는다. 요약표 칸이 한 줄로 잘리는지 줄바꿈이 되는지는
       // 짧은 문장만 넣어 두면 시연 직전까지 아무도 모른다.
-      'Discord 봇이 같은 메시지를 두 번 올리는 경우가 있다. 멱등키를 message_id 하나로만 잡아 둬서, 같은 내용이 다른 채널에 다시 붙으면 새 이벤트로 세는 것이 원인으로 보인다',
-      '브리핑에 유보가 하나도 안 뜨는 회의가 있어, 대리인이 판단을 미룬 것인지 애초에 물어본 사람이 없었던 것인지 구별이 안 된다',
+      summaryItem(
+        MEETING_IDS.direction,
+        'Discord 봇이 같은 메시지를 두 번 올리는 경우가 있다. 멱등키를 message_id 하나로만 잡아 둬서, 같은 내용이 다른 채널에 다시 붙으면 새 이벤트로 세는 것이 원인으로 보인다',
+        {
+          agenda: 'botScope',
+          context: '봇이 읽는 채널을 연결한 것만으로 줄이자는 이야기를 하다가, 강다은의 대리인이 "봇 토큰을 채널마다 나누자는 제안이 지난주에 나왔다가 운영이 복잡해져서 접혔다"는 기록을 꺼내면서 중복 문제가 같이 올라왔습니다.',
+          debates: [
+            {
+              speaker: '최비성',
+              stance: '저장 범위를 좁게',
+              body: '전체를 읽으면 사적인 대화까지 회의 기록으로 들어옵니다. 연결한 채널만 읽습니다.',
+            },
+            {
+              speaker: '강다은',
+              stance: '키에 채널 id 를',
+              body: '봇 쪽은 멱등키만 고치면 됩니다. 채널 id 를 키에 넣을게요.',
+            },
+            {
+              speaker: '서재민',
+              stance: '토큰은 하나로',
+              body: '채널마다 토큰을 나누는 건 지난주에 접혔습니다. 이번에도 하나로 갑시다.',
+            },
+          ],
+          resolution: '멱등키 유니크 제약을 내일 오전 마이그레이션으로 넣고, 봇 토큰은 하나로 유지합니다.',
+          open_question: '',
+        },
+      ),
+      summaryItem(
+        MEETING_IDS.direction,
+        '브리핑에 유보가 하나도 안 뜨는 회의가 있어, 대리인이 판단을 미룬 것인지 애초에 물어본 사람이 없었던 것인지 구별이 안 된다',
+        {
+          agenda: 'agentTone',
+          context: '대리인 요약이 결정처럼 읽힌다는 지적이 여러 번 나왔고, 그 이야기를 정리하다가 "유보가 0건인 화면"이 두 가지 서로 다른 상황을 같은 모양으로 그린다는 것이 드러났습니다. 담당인 유수인이 이 회의에 없어서 확정은 못 했습니다.',
+          debates: [
+            {
+              speaker: '임수연',
+              stance: '응답에 둘 다 남기자',
+              body: '화면이 구별하려면 서버가 구별해서 줘야 합니다. 쓴 답과 미룬 답을 따로 내려 주세요.',
+            },
+            {
+              speaker: '최비성',
+              stance: '조인을 늘리지 말자',
+              body: '플로우는 flow_edge 한 테이블만 읽으면 그려집니다. 조인을 더 늘리지 말고 이대로 갑시다.',
+            },
+          ],
+          resolution: '브리핑 응답에 used_answers · deferred_answers 를 남기기로 했습니다. 두 배열이 모두 비면 "물어본 사람이 없었다" 로 읽습니다.',
+          open_question: '톤 규칙 자체는 유수인이 돌아온 뒤에 확정합니다. 이 안건은 아직 PENDING 입니다.',
+        },
+      ),
     ],
     changes: [
-      '디자인 시안 마감을 8/18 로 앞당김',
-      '개발 일정 1주 연장',
-      '브리핑 응답에 used_answers · deferred_answers 를 남기기로 함',
+      summaryItem(MEETING_IDS.direction, '디자인 시안 마감을 8/18 로 앞당김', {
+        agenda: 'release',
+        context: 'MVP 완료 기준에 없는 항목을 이번 배포에서 빼기로 정리하는 자리에서, 시안이 늦으면 뒤가 전부 밀린다는 이야기가 나와 마감을 당기는 쪽으로 옮겨 갔습니다.',
+        debates: [
+          {
+            speaker: '임수연',
+            stance: '당기는 대신 범위를 줄이자',
+            body: '시안이 늦어지면 개발이 통째로 밀립니다. 대신 이번 배포에 들어갈 화면만 먼저 넘길게요.',
+          },
+          {
+            speaker: '서재민',
+            stance: '일정으로 흡수 가능',
+            body: '일정 1주 연장이면 감당 가능합니다. 마감을 당기고 남는 건 다음 배포로 미룹시다.',
+          },
+        ],
+        resolution: '마감은 8/18 로 앞당기고, 이번 배포에 들어갈 화면만 먼저 넘깁니다.',
+        open_question: '',
+      }),
+      summaryItem(MEETING_IDS.direction, '개발 일정 1주 연장', {
+        agenda: 'release',
+        context: '마감을 앞당기는 대신 뒤쪽 일정을 어디서 흡수할지 물었고, 서재민이 1주까지는 감당 가능하다고 답하면서 정리됐습니다.',
+        debates: [
+          {
+            speaker: '서재민',
+            stance: '1주까지',
+            body: '1주 연장이면 감당 가능합니다. 그 이상은 심사 일정에 걸립니다.',
+          },
+        ],
+        resolution: '개발 일정을 1주 연장합니다. 추가 연장은 심사 일정 때문에 불가합니다.',
+        open_question: '',
+      }),
+      summaryItem(MEETING_IDS.direction, '브리핑 응답에 used_answers · deferred_answers 를 남기기로 함', {
+        agenda: 'agentTone',
+        context: '유보가 0건인 화면이 두 상황을 같은 모양으로 그린다는 문제의 해결책으로 나왔습니다.',
+        debates: [
+          {
+            speaker: '최비성',
+            stance: '한 테이블만 읽자',
+            body: '조인을 더 늘리지 않는 선에서 두 배열을 만들 수 있습니다.',
+          },
+        ],
+        resolution: '두 배열을 응답에 추가합니다. 둘 다 비면 "물어본 사람이 없었다" 로 읽습니다.',
+        open_question: '',
+      }),
     ],
     next_plans: [
-      '디자인 작업 우선 진행 후 개발팀에 전달',
-      '다음 회의에서 API 명세 리뷰',
-      '멱등키에 guild_id + channel_id 를 함께 넣어 재현 테스트',
+      summaryItem(MEETING_IDS.direction, '디자인 작업 우선 진행 후 개발팀에 전달', {
+        agenda: 'release',
+        context: '마감을 앞당기기로 한 뒤, 그럼 무엇부터 넘길지를 정하는 자리에서 나왔습니다.',
+        debates: [
+          {
+            speaker: '임수연',
+            stance: '배포 대상 화면부터',
+            body: '이번 배포에 들어갈 화면만 먼저 넘기고 나머지는 다음 주에 이어서 하겠습니다.',
+          },
+        ],
+        resolution: '임수연이 배포 대상 화면을 먼저 넘기고, 개발팀이 받는 대로 착수합니다.',
+        open_question: '',
+      }),
+      // 여기도 상세 없는 항목을 하나 남긴다.
+      summaryItem(MEETING_IDS.direction, '다음 회의에서 API 명세 리뷰'),
+      summaryItem(MEETING_IDS.direction, '멱등키에 guild_id + channel_id 를 함께 넣어 재현 테스트', {
+        agenda: 'botScope',
+        context: '중복 원인이 멱등키라는 데까지는 합의가 됐고, 남은 것은 그 키로 실제로 중복이 사라지는지 확인하는 일입니다.',
+        debates: [
+          {
+            speaker: '강다은',
+            stance: '재현부터',
+            body: '같은 내용을 다른 채널에 다시 붙이는 시나리오로 먼저 재현해 보고 키를 바꾸겠습니다.',
+          },
+        ],
+        resolution: '강다은이 재현 시나리오를 만들고, 최비성이 내일 오전 마이그레이션으로 유니크 제약을 넣습니다.',
+        open_question: '이미 쌓인 중복 행을 어떻게 정리할지는 정하지 않았습니다.',
+      }),
     ],
     one_line: '디자인 작업을 우선 진행한 후 개발팀에 전달하기로 결정했어요.',
     main_opinions: [
@@ -364,7 +544,17 @@ export const summaryTables = {
 
   [MEETING_IDS.weekly]: {
     discovered_issues: [
-      '홈 카드에서 회의로 들어가는 길이 두 갈래라 사람마다 다른 화면을 연다',
+      summaryItem(MEETING_IDS.weekly, '홈 카드에서 회의로 들어가는 길이 두 갈래라 사람마다 다른 화면을 연다', {
+        agenda: 'slot',
+        context: '리허설 준비를 점검하다가, 같은 카드를 눌렀는데 어떤 사람은 브리핑이 뜨고 어떤 사람은 플로우가 떴다는 이야기가 나왔습니다.',
+        debates: [
+          { speaker: '서재민', stance: '플로우로 통일', body: '심사에서 보여 줄 화면은 플로우입니다. 카드는 전부 그리로 보냅시다.' },
+          { speaker: '임수연', stance: '브리핑이 먼저', body: '못 온 사람은 요약부터 보고 싶을 텐데요. 다만 두 갈래인 건 확실히 문제입니다.' },
+        ],
+        resolution: '홈 카드 클릭은 플로우로 통일하고, 브리핑은 플로우에서 한 번 더 열도록 했습니다.',
+        open_question: '',
+      }),
+      // 여긴 날문자열로 둔다 — 서버가 아직 문자열만 줄 때 화면이 안 깨지는지 봐야 한다.
       '가상 데이터 모드인지 아닌지 화면만 보고는 구별이 안 된다',
     ],
     changes: [
@@ -384,7 +574,16 @@ export const summaryTables = {
 
   [MEETING_IDS.devSync]: {
     discovered_issues: [
-      'JWT 만료 처리에서 재발급 요청이 두 번 나간다',
+      summaryItem(MEETING_IDS.devSync, 'JWT 만료 처리에서 재발급 요청이 두 번 나간다', {
+        agenda: 'release',
+        context: '배포 범위를 좁히던 중에, 로그에 재발급이 짝으로 찍힌다는 것이 발견돼 이번 배포에 넣을지부터 이야기했습니다.',
+        debates: [
+          { speaker: '최비성', stance: '클라이언트 문제', body: '재발급은 서버가 아니라 클라이언트 큐 문제입니다. 서버에서 막으면 원인이 가려집니다.' },
+          { speaker: '서재민', stance: '이번 배포에 포함', body: '토큰이 두 번 나가면 세션이 엇갈립니다. 범위를 줄여도 이건 넣죠.' },
+        ],
+        resolution: '재발급은 요청 큐에서 한 번만 나가도록 클라이언트에서 정리하고, 이번 배포에 포함합니다.',
+        open_question: '이미 발급된 짝 토큰을 무효화할지는 정하지 않았습니다.',
+      }),
       '플로우 필터를 전부 끄면 서버가 전체를 다시 돌려준다',
     ],
     changes: [

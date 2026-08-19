@@ -2,12 +2,14 @@ import { useResource } from '../../lib/useResource.js'
 import {
   fetchBriefing,
   fetchEdge,
-  fetchIndexes,
   fetchMe,
   fetchMeeting,
   fetchMeetingFlow,
+  fetchMeetingTimeline,
+  fetchParticipantFlow,
   fetchProjectFlow,
   fetchProjectMeetings,
+  fetchProjectTimeline,
   fetchSummaryTable,
   resolveFlowEntry,
 } from './flowBoard.data.js'
@@ -39,10 +41,6 @@ import {
 /** 회의 모드 / 작업 모드. 화면의 `카테고리` 두 칸과 1:1. */
 export const MEETING_MODE = 'meeting'
 export const WORK_MODE = 'work'
-
-function flowCategory(mode) {
-  return mode === WORK_MODE ? 'WORK' : 'MEETING'
-}
 
 /**
  * 어느 회의를 볼지 정하고, 그 회의에 딸린 것을 한 번에 읽는다.
@@ -92,59 +90,45 @@ export function useFlowBoardMeeting(meetingIdOverride = null, urlMeetingId = nul
   }, [meetingIdOverride, urlMeetingId, urlProjectId])
 }
 
-/**
- * 좌측 인덱스. 모드에 따라 안건(회의) 또는 문서(작업)다.
- *
- * 카테고리가 바뀌면 다시 읽는다 — 회의 안건을 띄운 채 작업 판을 그리면
- * 안건을 눌러도 강조될 화살표가 없다.
- */
-export function useFlowIndexes(meetingId, mode) {
-  return useResource(
-    (signal) => (meetingId
-      ? fetchIndexes(meetingId, flowCategory(mode), signal).catch(() => ({ results: [] }))
-      : Promise.resolve({ results: [] })),
-    [meetingId, mode],
-  )
-}
+/** 좌측 목록이 비었을 때 내려 줄 것. 응답 모양(`{ count, results }`)과 같다. */
+const NO_TIMELINE = { count: 0, results: [] }
 
 /**
- * 필터 목록을 **거르지 않은 조회에서** 받는다.
+ * 좌측 `시간순 인덱스`. 재생 기능의 대본이기도 하다.
  *
- * `filter_options.content_types` 는 그 조회에 실제로 나온 종류만 담는다.
- * 필터를 건 응답에서 목록을 뽑으면 `의견` 을 끄는 순간 `의견` 칸 자체가
- * 사라져 **다시 켤 방법이 없다.** 한 번 더 부르는 값이 있다.
+ * 스코프는 판과 같이 간다 — 작업 모드면 프로젝트, 아니면 회의다. 회의 id 로
+ * 작업 타임라인을 물으면 작업 엣지에는 회의가 없어 무엇을 넣든 0건이다.
+ *
+ * ## 실패를 삼킨다 — 판(`useFlowGraph`)과 정반대다
+ *
+ * 판 조회가 실패를 삼키면 안 되는 것은, 삼키는 순간 서버 장애가 `이 회의에서
+ * 오간 내용이 없습니다` 로 둔갑하고 `다시 시도` 버튼조차 안 그려지기 때문이다.
+ * 이 서비스가 묻는 질문이 "내가 없는 동안 무슨 일이 있었지" 인데 그 답을
+ * 틀리게 말하는 셈이 된다.
+ *
+ * 여기는 그 반대다. 이 조회는 아무와도 키를 나눠 쓰지 않고, 실서버에는
+ * `/timeline` 경로가 **아직 없어서 반드시 404 가 난다.** 미구현을 붉은 오류
+ * 상자로 그리면 사용자가 할 수 있는 일이 없는 경고를 화면 한 칸이 계속
+ * 붙잡고 있게 된다. 좌측 목록이 비는 편이 낫다 — 고장과 미구현은 사용자가
+ * 할 수 있는 일이 다르고, 지금은 후자다.
+ *
+ * 서버가 이 경로를 구현하고 나면 이 `.catch` 는 걷어낸다. 그때부터는 빈
+ * 목록이 진짜로 "오간 것이 없다" 를 뜻하게 된다.
  */
-export function useFlowOptions(mode, meetingId, projectId) {
+export function useFlowTimeline(mode, meetingId, projectId) {
   const scopeId = mode === WORK_MODE ? projectId : meetingId
 
-  return useResource((signal) => {
-    if (!scopeId) {
-      return Promise.resolve(null)
-    }
-    /*
-      **여기서 실패를 삼키면 안 된다.**
-
-      이 조회는 아래 `useFlowGraph` 와 캐시 키가 같아 `dedupe` 로 합쳐진다.
-      합쳐진다는 것은 **먼저 등록한 쪽의 약속을 뒤엣것이 그대로 받는다**는
-      뜻이다. 이 훅이 먼저 돌므로(화면에서 위에 있다), 여기에 `.catch(() => null)`
-      을 달면 캔버스 쪽 `error` 가 통째로 사라진다.
-
-      그러면 서버가 500 을 내도 화면에는 `이 회의에서 오간 내용이 없습니다.` 가
-      뜬다. **장애가 "이 회의엔 아무 일도 없었다" 로 둔갑하고**, `다시 시도`
-      버튼조차 안 그려진다. 이 서비스가 묻는 질문이 "내가 없는 동안 무슨 일이
-      있었지" 인데 그 답을 틀리게 말하는 셈이다.
-
-      거절은 그대로 흘려보낸다. 이 훅을 쓰는 쪽은 `error` 를 읽지 않고
-      `data` 가 없으면 필터 목록을 비우므로, 삼키지 않아도 전과 같다.
-    */
-    return mode === WORK_MODE
-      ? fetchProjectFlow(scopeId, {}, signal)
-      : fetchMeetingFlow(scopeId, {}, signal)
-    // `deps` 모양을 `useFlowGraph` 와 **글자 그대로 맞춘다.** 캐시 키는
-    // `deps` 를 직렬화해 만들므로, 하나라도 다르면 같은 무필터 조회가 두 키에
-    // 담겨 요청이 두 번 나간다. 필터를 걸기 시작하면 뒤의 두 칸이 달라져
-    // 저절로 갈린다.
-  }, [mode, scopeId, true, '', ''], { cacheKey: 'flow' })
+  return useResource(
+    (signal) => {
+      if (!scopeId) {
+        return Promise.resolve(NO_TIMELINE)
+      }
+      return mode === WORK_MODE
+        ? fetchProjectTimeline(scopeId, signal).catch(() => NO_TIMELINE)
+        : fetchMeetingTimeline(scopeId, signal).catch(() => NO_TIMELINE)
+    },
+    [mode, scopeId],
+  )
 }
 
 /**
@@ -153,27 +137,33 @@ export function useFlowOptions(mode, meetingId, projectId) {
  * 응답 모양은 두 모드가 같다(`meeting_label` ↔ `period_label` 만 다르다).
  * 백엔드가 렌더러를 하나만 만들면 되도록 맞춰 둔 것이라, 여기서도 갈래를
  * **호출 한 줄로만** 둔다.
+ *
+ * ## 필터를 안 건다
+ *
+ * 예전에는 참여자·내용 종류 체크가 조회 조건으로 실렸고, 그 목록을 채우려고
+ * `useFlowOptions` 라는 **거르지 않은 조회**를 하나 더 두었다. 좌측 `필터링`
+ * 이 `시간순 인덱스` 로 바뀌면서 걸 조건이 없어졌으므로 그 훅도 같이 없앴다 —
+ * 이제 이 조회 하나가 곧 거르지 않은 조회다.
+ *
+ * `cacheKey` 는 그대로 `flow` 로 둔다. 두 훅이 합쳐지던 자리라 키를 바꿀
+ * 이유가 없고, 남겨 두면 다른 화면이 같은 판을 열 때 캐시를 나눠 쓴다.
  */
-export function useFlowGraph({ mode, meetingId, projectId, participantIds, contentTypes, enabled = true }) {
+export function useFlowGraph({ mode, meetingId, projectId }) {
   const scopeId = mode === WORK_MODE ? projectId : meetingId
 
   return useResource(
     (signal) => {
-      if (!enabled || !scopeId) {
+      if (!scopeId) {
         return Promise.resolve(null)
       }
-      const filters = { participantIds, contentTypes }
       return mode === WORK_MODE
         // `from`·`to` 를 안 보낸다. 안 보내면 백엔드가 최근 7일로 잡고
         // `period_label`(`8.10 - 8.16 작업 흐름`)까지 완성해 준다. 클라이언트가
         // 기간을 만들면 그 라벨과 실제 조회 구간이 갈릴 수 있다.
-        ? fetchProjectFlow(scopeId, filters, signal)
-        : fetchMeetingFlow(scopeId, filters, signal)
+        ? fetchProjectFlow(scopeId, {}, signal)
+        : fetchMeetingFlow(scopeId, {}, signal)
     },
-    // 배열을 그대로 넣으면 매 렌더마다 새 배열이라 끝없이 다시 읽는다.
-    [mode, scopeId, enabled, participantIds.join(','), contentTypes.join(',')],
-    // 아무것도 안 걸렀을 때 `useFlowOptions` 와 **키가 완전히 같아져** 두
-    // 요청이 하나로 합쳐진다. 그쪽 `deps` 도 이 모양에 맞춰 뒀다.
+    [mode, scopeId],
     { cacheKey: 'flow' },
   )
 }
@@ -221,6 +211,22 @@ export function useEdgeDetails(edgeIds) {
  * 여기에 붙은 `.catch(() => null)` 까지 그쪽이 물려받아, 개인 설정이 오류
  * 대신 **빈 입력칸**을 그리게 된다. 부르는 곳이 다르면 키도 달라야 한다.
  */
+/**
+ * 판에서 고른 사람·대리인 한 명의 상세(시안 `601:9055`).
+ *
+ * 실서버에는 아직 이 경로가 없다. `.catch(() => null)` 로 **오류가 아니라
+ * 없음**으로 내린다 — 패널이 붉은 오류 상자 대신 "아직 서버에 없습니다" 를
+ * 그리게 하려는 것이다. 고장과 미구현은 사용자가 할 수 있는 일이 다르다.
+ */
+export function useParticipantFlow(meetingId, nodeId) {
+  return useResource(
+    (signal) => (meetingId && nodeId
+      ? fetchParticipantFlow(meetingId, nodeId, signal).catch(() => null)
+      : Promise.resolve(null)),
+    [meetingId, nodeId],
+  )
+}
+
 export function useMe() {
   return useResource((signal) => fetchMe(signal).catch(() => null), [], { cacheKey: 'flow-me' })
 }

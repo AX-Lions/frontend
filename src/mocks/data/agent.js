@@ -11,9 +11,15 @@
  * ## 설정 키는 실제 응답 그대로다
  *
  * `mention_feasibility` · `allow_schedule_change` · `allow_midmeeting_question` ·
- * `disclose_work_plan_thought` 네 개뿐이고, 화면의 스위치는 여섯 개다(뒤의 셋이
- * 한 키를 나눠 쓴다). **전부 켜 두지 않은 이유**는 켜짐만 있으면 꺼진 스위치가
- * 어떻게 그려지는지 알 수 없기 때문이다. 지금은 2개 켜짐 · 4개 꺼짐으로 보인다.
+ * `disclose_work` · `disclose_plan` · `disclose_thought` **여섯 개이고 화면의
+ * 스위치와 1:1 이다**(backend #88 에서 공개가 셋으로 갈렸다). 옛 한 칸
+ * `disclose_work_plan_thought` 도 함께 싣는다 — 지난 실행 스냅샷을 읽는 자리가
+ * 아직 그 이름을 본다.
+ *
+ * **전부 켜 두지 않은 이유**는 켜짐만 있으면 꺼진 스위치가 어떻게 그려지는지
+ * 알 수 없기 때문이다. 임수연 눈은 **작업·계획은 켜고 생각만 끈** 상태로 둔다 —
+ * 한 칸으로는 만들 수 없는 값이라, 셋으로 나눈 것이 무엇을 가능하게 했는지를
+ * 화면에서 바로 볼 수 있다.
  *
  * ## 지어낸 부분을 밝혀 둔다
  *
@@ -31,7 +37,7 @@
  * 중요하다.
  */
 
-import { ME, PROJECTS, agentName, daysAgo, minutesAgo, person } from './people.js'
+import { ME, PROJECTS, agentName, daysAgo, minutesAgo, person, teamOf } from './people.js'
 
 /*
   오늘 나눈 대화는 `todayAt()` 이 아니라 `minutesAgo()` 로 센다.
@@ -149,7 +155,7 @@ export const agentConversations = {
     },
     {
       id: 'f052a6c4-8b71-4e39-9c05-3d7a1e64b8f0',
-      title: `${PROJECTS.academy.name} 발표 순서`,
+      title: `${teamOf(PROJECTS.academy).name} 발표 순서`,
       last_message_preview: '시연 스크립트에서 디자인 설명이 들어갈 자리를 표시해 두겠습니다.',
       last_message_at: daysAgo(3, 16, 16),
       message_count: 4,
@@ -279,7 +285,7 @@ export const conversationMessages = {
       {
         id: '83e52ca9-f5b0-4e4d-b68a-923d7156bcf8',
         role: 'USER',
-        body: `${PROJECTS.academy.name} 회의에서 발표 순서 정해졌습니까?`,
+        body: `${teamOf(PROJECTS.academy).name} 회의에서 발표 순서 정해졌습니까?`,
         sent_at: daysAgo(3, 16, 12),
         run: { status: 'DONE', run_id: 'a04b7cd9-06ed-425b-a187-9d53e1046f2a' },
       },

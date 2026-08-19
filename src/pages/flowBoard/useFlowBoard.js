@@ -73,21 +73,43 @@ export function useFlowBoard(contentBounds) {
   const zoomOut = () => setZoomFromPoint(zoom - ZOOM_STEP)
   const zoomIn = () => setZoomFromPoint(zoom + ZOOM_STEP)
 
-  const handleBoardWheel = (event) => {
-    if (!event.ctrlKey && !event.metaKey) {
-      return
+  /*
+    휠 확대를 **직접 붙인다.** React 의 `onWheel` 로는 안 된다.
+
+    React 는 `wheel` 을 **passive 리스너**로 단다. passive 안에서는
+    `preventDefault()` 가 무시되고 콘솔에 이렇게만 남는다.
+
+        Unable to preventDefault inside passive event listener invocation.
+
+    그래서 판은 확대되는데 **브라우저까지 같이 확대됐다.** 판만 키우려던 사람이
+    글자 크기가 통째로 커진 화면을 만나고, 되돌리려면 브라우저 배율을 따로
+    맞춰야 한다.
+
+    `{ passive: false }` 로 직접 달면 막을 수 있다. React 가 지원하지 않는
+    옵션이라 이 방법 말고는 없다.
+  */
+  useEffect(() => {
+    const board = boardRef.current
+    if (!board) {
+      return undefined
     }
 
-    event.preventDefault()
-    const board = boardRef.current
-    const rect = board.getBoundingClientRect()
-    const zoomDelta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+    const onWheel = (event) => {
+      if (!event.ctrlKey && !event.metaKey) {
+        return
+      }
+      event.preventDefault()
+      const rect = board.getBoundingClientRect()
+      const zoomDelta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+      setZoomFromPoint(zoom + zoomDelta, {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      })
+    }
 
-    setZoomFromPoint(zoom + zoomDelta, {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    })
-  }
+    board.addEventListener('wheel', onWheel, { passive: false })
+    return () => board.removeEventListener('wheel', onWheel)
+  })
 
   const handleBoardPointerDown = (event) => {
     if (
@@ -235,7 +257,6 @@ export function useFlowBoard(contentBounds) {
     boardRef,
     handleBoardPointerDown,
     handleBoardPointerMove,
-    handleBoardWheel,
     isPanning,
     maxZoom: MAX_ZOOM,
     minZoom: MIN_ZOOM,

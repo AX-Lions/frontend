@@ -1,9 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
-import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 import { useResource } from '../../lib/useResource.js'
 import { navigate } from '../../app/navigation.js'
+import { getCurrentTeamId, onCurrentTeamChange } from '../../lib/currentTeam.js'
+import { NewProjectDialog } from '../home/NewProjectDialog.jsx'
+import { Sidebar } from '../home/Sidebar.jsx'
+import { fetchHome } from '../home/home.api.js'
+// `Sidebar` 는 자기 스타일을 안 갖고 다닌다(`.sidebar` · `.home-layout` 이
+// 전부 `home.css` 에 있다) — 회의 일정 화면과 같은 이유로 여기서도 가져온다.
+import '../home/home.css'
 import { ApprovalDialog } from './ApprovalDialog.jsx'
 import { fetchInbox } from './inbox.data.js'
 import './inbox.css'
@@ -15,6 +21,14 @@ import './approval.css'
  * Bordo가 대신 활동하며 사용자의 답변 · 확인 · 승인이 필요한 것을 회의 구분
  * 없이 날짜별로 모아 보여준다(시안 `666:5248`).
  *
+ * ## 왼쪽은 홈과 같은 사이드바다
+ *
+ * 세로 아이콘 레일(`GlobalSidebar`)을 쓰고 있었다. 시안(`666:5248`)의 왼쪽은
+ * **홈과 똑같은 240px 사이드바**다 — 로고 밑 아이콘 줄에 요청함이 켜진 채로
+ * 있고, 그 아래로 프로젝트 목록이 그대로 이어진다. 요청함은 홈에서 아이콘
+ * 하나를 눌러 들어오는 자리라, 들어오자마자 왼쪽이 좁은 레일로 바뀌면 다른
+ * 앱에 온 것처럼 보인다.
+ *
  * ## 날짜는 오늘만 펼쳐서 보여준다
  *
  * 시안 이름이 `홈화면_요청함 선택` 이다 — 오늘 하나만 펼쳐지고 나머지 날짜는
@@ -23,6 +37,13 @@ import './approval.css'
  */
 export function InboxPage() {
   const { data, error, loading, reload } = useResource(fetchInbox, [], { cacheKey: 'inbox' })
+  // 사이드바가 그릴 프로젝트 목록·바로가기·프로필. 홈이 이미 한 번에 주므로
+  // 요청함 전용 요청을 따로 만들지 않는다(`cacheKey` 도 같아 재사용된다).
+  const home = useResource(fetchHome, [], { cacheKey: 'home' })
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [addingProject, setAddingProject] = useState(false)
+  const [currentTeamId, setCurrentTeamIdState] = useState(getCurrentTeamId)
+  useEffect(() => onCurrentTeamChange(setCurrentTeamIdState), [])
   const [query, setQuery] = useState('')
   const [openDates, setOpenDates] = useState(null)
   // 「승인 필요」 줄이 여는 팝업의 대상 태스크. 항목마다 태스크가 여럿일 수
@@ -60,10 +81,31 @@ export function InboxPage() {
       .filter((group) => group.items.length > 0)
   }, [groups, query])
 
+  const homeData = home.data
+  const inCurrentTeam = (project) => !currentTeamId || project.team_id === currentTeamId
+
+  /*
+    사이드바는 요청함이 실패해도 자리에 있어야 한다. 요청함을 못 불러왔다고
+    프로젝트로 갈 길까지 사라지면 사용자는 새로고침 말고 할 수 있는 것이 없다.
+  */
+  const sidebar = (
+    <Sidebar
+      active="inbox"
+      isCollapsed={isSidebarCollapsed}
+      onToggleCollapse={() => setIsSidebarCollapsed((was) => !was)}
+      favoriteProjects={(homeData?.favorite_projects ?? []).filter(inCurrentTeam)}
+      recentProjects={(homeData?.recent_projects ?? []).filter(inCurrentTeam)}
+      shortcuts={homeData?.shortcuts}
+      userName={homeData?.user_name}
+      avatarUrl={homeData?.user_avatar_url}
+      onAddProject={() => setAddingProject(true)}
+    />
+  )
+
   if (loading && !data) {
     return (
-      <div className="inbox-page">
-        <GlobalSidebar active="inbox" />
+      <div className="home-layout inbox-page">
+        {sidebar}
         <Loading label="요청함을 불러오는 중입니다…" />
       </div>
     )
@@ -71,16 +113,16 @@ export function InboxPage() {
 
   if (error && !data) {
     return (
-      <div className="inbox-page">
-        <GlobalSidebar active="inbox" />
+      <div className="home-layout inbox-page">
+        {sidebar}
         <LoadError error={error} onRetry={reload} />
       </div>
     )
   }
 
   return (
-    <div className="inbox-page">
-      <GlobalSidebar active="inbox" />
+    <div className="home-layout inbox-page">
+      {sidebar}
 
       <main className="inbox-main">
         <header className="inbox-header">
@@ -156,6 +198,17 @@ export function InboxPage() {
           // 승인·반려 뒤 다시 읽는다. 처리한 태스크는 `applyTaskPatches` 가
           // 걸러내므로 뱃지 숫자가 그만큼 줄어든 채로 돌아온다.
           onResolved={() => reload()}
+        />
+      ) : null}
+
+      {addingProject ? (
+        <NewProjectDialog
+          onClose={() => setAddingProject(false)}
+          onCreated={(project) => home.setData((current) => (current ? {
+            ...current,
+            recent_projects: [project, ...(current.recent_projects ?? [])],
+            project_progress: [project, ...(current.project_progress ?? [])],
+          } : current))}
         />
       ) : null}
     </div>

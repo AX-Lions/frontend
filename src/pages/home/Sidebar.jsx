@@ -53,6 +53,15 @@ function goInApp(event, href) {
   값을 봐야 하므로 값은 공통 부모에 둔다.
 */
 export function Sidebar({
+  /*
+    아이콘 줄에서 켜진 것.
+
+    `홈` 으로 박혀 있었다. 이 사이드바는 홈 전용이었으니 맞는 말이었는데,
+    회의 일정·요청함이 같은 사이드바를 쓰게 되면서 **어느 화면에 있든 홈이
+    켜진 채로** 보였다. 시안(`666:5248`)은 요청함에서 요청함 아이콘이 켜져
+    있다 — 그것이 지금 어디인지 말해 주는 유일한 표시다.
+  */
+  active = 'home',
   isCollapsed = false,
   onToggleCollapse,
   recentProjects = [],
@@ -196,12 +205,13 @@ export function Sidebar({
       return <p className="project-nav-empty">{emptyLabel}</p>
     }
 
+    /* 이름이 옆에 적혀 있으므로 말풍선은 붙이지 않는다 — 같은 글이 아래에
+       한 번 더 뜰 뿐이다. 말풍선은 그림만 있는 단추의 몫이다. */
     return list.map((project) => (
       <a
         className="project-link"
         href={projectHref(project)}
         key={project.id}
-        title={project.name}
         onClick={(event) => goInApp(event, projectHref(project))}
       >
         <img className="doc-icon" src={icons.folder} alt="" aria-hidden="true" />
@@ -210,11 +220,9 @@ export function Sidebar({
     ))
   }
 
-  // `GET /home` 의 `shortcuts` 가 방 id 와 Discord 주소를 이미 들고 온다.
-  // 여기서 채팅 사이드바를 한 번 더 부르면 홈 첫 화면에 요청이 하나 더 는다.
-  const agentRoomId = shortcuts?.agent_room_id ?? null
+  // `GET /home` 의 `shortcuts` 가 Discord 주소를 이미 들고 온다. 여기서
+  // 채팅 사이드바를 한 번 더 부르면 홈 첫 화면에 요청이 하나 더 는다.
   const discord = shortcuts?.discord ?? null
-  const agentHref = agentRoomId ? `/chat?room=${agentRoomId}` : '/chat'
 
   return (
     <>
@@ -224,12 +232,13 @@ export function Sidebar({
           className="icon-button"
           type="button"
           aria-label={isCollapsed ? '사이드바 열기' : '사이드바 접기'}
+          data-tip={isCollapsed ? '사이드바 열기' : '사이드바 접기'}
           aria-expanded={!isCollapsed}
           onClick={onToggleCollapse}
         >
           <img src={icons.menu} alt="" />
         </button>
-        <a className="logo" href="/" aria-label="Bordo 홈" onClick={(event) => goInApp(event, '/')}>
+        <a className="logo" href="/" aria-label="Bordo 홈" data-tip="홈으로" onClick={(event) => goInApp(event, '/')}>
           <img src="/BordoLogo.svg" alt="Bordo" />
         </a>
       </div>
@@ -255,8 +264,8 @@ export function Sidebar({
                       key={item.id}
                       type="button"
                       className="sidebar-icon-btn sidebar-icon-live"
-                      aria-label="지금 진행 중인 회의"
-                      title="지금 진행 중인 회의"
+                      aria-label="진행 중인 회의 참여하기"
+                      data-tip="진행 중인 회의 참여하기"
                       onClick={openPrompt}
                     >
                       <img src="/icons/LiveMeetingIcon.svg" alt="" />
@@ -278,7 +287,7 @@ export function Sidebar({
                         aria-label={item.label}
                         aria-haspopup="menu"
                         aria-expanded={meetingMenuOpen}
-                        title={item.label}
+                        data-tip={item.label}
                         onClick={() => setMeetingMenuOpen((open) => !open)}
                       >
                         <img src={item.icon} alt="" />
@@ -327,15 +336,15 @@ export function Sidebar({
                   )
                 }
 
-                const isActive = item.id === 'home'
+                const isActive = item.id === active
                 return (
                   <a
                     key={item.id}
                     className={isActive ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
                     href={item.href}
-                    aria-label={item.label}
+                    aria-label={item.tip ?? item.label}
                     aria-current={isActive ? 'page' : undefined}
-                    title={item.label}
+                    data-tip={item.tip ?? item.label}
                     onClick={(event) => goInApp(event, item.href)}
                   >
                     <img src={item.icon} alt="" />
@@ -356,7 +365,7 @@ export function Sidebar({
               className={searchOpen ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
               aria-label="검색"
               aria-expanded={searchOpen}
-              title="검색"
+              data-tip="검색"
               onClick={() => setSearchOpen((open) => {
                 const next = !open
                 if (next) {
@@ -388,7 +397,7 @@ export function Sidebar({
           <nav className="project-nav" aria-label="프로젝트">
             <div className="section-title">
               <span>프로젝트</span>
-              <button type="button" aria-label="프로젝트 추가" onClick={onAddProject}>
+              <button type="button" aria-label="프로젝트 추가" data-tip="프로젝트 추가" onClick={onAddProject}>
                 <img src={icons.add} alt="" />
               </button>
             </div>
@@ -419,31 +428,6 @@ export function Sidebar({
               ? renderProjects(shownFavorite, needle ? '찾는 이름이 없습니다.' : '즐겨찾기한 프로젝트가 없습니다.')
               : null}
           </nav>
-
-          <div className="quick-links">
-            {/* `Bordo 바로가기` 는 **내 대리인과의 채팅**이다. 이름만 보고
-                홈으로 보내면 이미 홈에 있는 사람이 누른 것이라 아무 일도
-                안 일어난 것처럼 보인다. */}
-            <a href={agentHref} onClick={(event) => goInApp(event, agentHref)}>
-              Bordo 바로가기
-            </a>
-
-            {/*
-              Discord 주소는 서버가 조립해 준다. 팀이 아직 연결되지 않았으면
-              `connected: false` 로만 온다 — 그때 링크를 그럴듯하게 띄워 두면
-              눌렀을 때 Discord 첫 화면으로 튕긴다. 갈 곳이 없다는 것을
-              그대로 말한다.
-            */}
-            {discord?.connected && discord.url ? (
-              <a href={discord.url} target="_blank" rel="noreferrer noopener">
-                Discord 바로가기
-              </a>
-            ) : (
-              <span className="quick-link-off" title="팀이 아직 Discord 서버와 연결되지 않았습니다">
-                Discord 미연결
-              </span>
-            )}
-          </div>
 
           {/* 하단 프로필. `사용자 이름` 하드코딩에 목적지도 `/` 였다.
               이름은 `GET /home` 의 `user_name` 을 그대로 쓴다. */}

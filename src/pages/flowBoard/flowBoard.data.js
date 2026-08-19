@@ -79,8 +79,29 @@ export function fetchMeeting(meetingId, signal) {
   return api.get(`/meetings/${meetingId}`, undefined, { signal })
 }
 
-export function fetchIndexes(meetingId, category, signal) {
-  return api.get(`/meetings/${meetingId}/indexes`, { category }, { signal })
+/**
+ * 좌측 `시간순 인덱스`.
+ *
+ * ## 판과 같은 스코프를 같은 방식으로 가른다
+ *
+ *     회의   GET /meetings/{id}/timeline
+ *     작업   GET /projects/{id}/timeline
+ *
+ * 안건 인덱스(`/meetings/{id}/indexes?category=`)처럼 한 주소에 `category` 를
+ * 붙여 가르지 않는다. 작업 타임라인의 스코프는 회의가 아니라 **프로젝트**라,
+ * 회의 id 로 물으면 작업 엣지는 한 건도 안 걸린다 — 예전에 작업 모드 좌측이
+ * 늘 비어 있던 원인이 정확히 그것이었다. 플로우 조회가 두 경로로 갈려 있는
+ * 것과 같은 이유이므로 여기서도 경로를 갈라 둔다.
+ *
+ * 응답 모양은 두 모드가 같다(`{ count, results }`). 좌측 목록 컴포넌트는
+ * 하나면 된다.
+ */
+export function fetchMeetingTimeline(meetingId, signal) {
+  return api.get(`/meetings/${meetingId}/timeline`, undefined, { signal })
+}
+
+export function fetchProjectTimeline(projectId, signal) {
+  return api.get(`/projects/${projectId}/timeline`, undefined, { signal })
 }
 
 export function fetchSummaryTable(meetingId, signal) {
@@ -106,6 +127,28 @@ export function fetchBriefing(meetingId, { markRead = true } = {}, signal) {
 
 export function fetchEdge(edgeId, signal) {
   return api.get(`/flow-edges/${edgeId}`, undefined, { signal })
+}
+
+/**
+ * 판에서 사람·대리인 하나를 눌렀을 때 열리는 우측 패널의 내용(시안 `601:9055`).
+ *
+ * ## 이 저장소가 계약을 먼저 정한다
+ *
+ * 백엔드에 아직 없는 자리다. 화면이 무엇을 그려야 하는지가 먼저 정해졌으므로
+ * (`주요 발언` · 종류별 개수 · `전달한 내용` · `전달받은 내용`) 그 모양을
+ * 목으로 확정하고 여기 적어 둔다 — `frontend/CLAUDE.md` 의 작업 순서다.
+ * 서버에 붙기 전까지 실서버에서는 404 가 나고, 패널은 그때 "아직 서버에
+ * 없습니다" 를 그대로 보여 준다.
+ *
+ * 대리인 노드 id 는 `{user_id}:agent` 라 `:` 가 들어간다. 경로 조각 하나로
+ * 보내야 하므로 감싸 준다 — 안 감싸면 서버에 따라 조각이 둘로 쪼개진다.
+ */
+export function fetchParticipantFlow(meetingId, nodeId, signal) {
+  return api.get(
+    `/meetings/${meetingId}/participants/${encodeURIComponent(nodeId)}/flow`,
+    undefined,
+    { signal },
+  )
 }
 
 /** 헤더의 회의 선택(▼)이 띄울 목록. */

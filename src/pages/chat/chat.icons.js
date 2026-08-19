@@ -17,6 +17,7 @@ export const icons = {
   expandDown: '/icons/ExpandDown.svg',
   expandLeft: '/chat-icons/expand-left.svg',
   expandRight: '/icons/Expandright.svg',
+  exitFullscreen: '/chat-icons/exit-full-screen-corner.svg',
   filter: '/chat-icons/filter-alt.svg',
   fullscreen: '/chat-icons/full-screen-corner.svg',
   menu: '/chat-icons/menu.svg',

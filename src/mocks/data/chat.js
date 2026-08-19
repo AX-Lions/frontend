@@ -39,10 +39,12 @@ import {
   PEOPLE,
   PROJECTS,
   TEAM,
+  TEAM_ACADEMY,
   agentName,
   daysAgo,
   minutesAgo,
   person,
+  teamOf,
   todayAt,
 } from './people.js'
 
@@ -57,7 +59,10 @@ const ROOM_IDS = {
   agent: '6e1b85a4-d3b7-4abd-92f8-1e4eb692caec',
   lounge: '8fb541e3-e926-4f48-ab2e-3cb545c9b4f6',
   design: 'c4a7d210-9b3e-4f61-8a52-0d61f0a9c7b4',
+  rehearsal: 'a1c47f6b-2d90-4e83-b5f1-70ac9d3e6428',
+  slides: 'd06b3e95-8f24-4a17-9c68-31e5b7a0c42d',
   academy: '27d8cb39-34ad-48fb-809c-f7659c43eaf5',
+  academySubmit: 'f92d5a08-6c31-4b7e-a04f-83b1e7c26d95',
   team: '6d30247e-c0d3-4983-a006-65236ddd97cc',
   daeun: '7c0f9851-6ea1-4c82-bff5-b26196f2604a',
   suyeon: '2a5d47b8-11c3-4e0a-9df6-8c7b3e5a1902',
@@ -135,6 +140,17 @@ function message(roomId, sender, body, sentAt, extra = {}) {
     attachments: [],
     sent_at: sentAt,
     is_mine: sender.id === ME.id,
+    /*
+      **내 대리인이 내 대신 한 말.**
+
+      `is_mine` 과는 다르다. 화면에서 자리는 내 쪽(오른쪽)이지만 — 상대에게는
+      나에게서 온 말이므로 — **고치거나 지울 수는 없다.** 내가 쓴 문장이
+      아니기 때문이다. 둘을 한 필드로 합치면 대리인이 한 말에 `수정` 이
+      붙는데, 눌러 봐야 서버가 거절한다.
+
+      남의 대리인이 한 말은 여기서 거짓이다. 그건 상대 쪽 말풍선이다.
+    */
+    is_from_my_agent: sender.is_agent && sender.id === AGENT_IDS[ME.name],
     is_important: false,
     important_confirmed_at: null,
     read_count: 0,
@@ -442,6 +458,110 @@ const designMessages = [
   say(designRoom, '임수연', '확인했습니다.', minutesAgo(160)),
 ]
 
+// ─────────────────────────────────────────── 프로젝트 방: 데모 리허설
+/*
+  `데모 발표 준비` 프로젝트의 방 둘.
+
+  프로젝트를 하나 더 둔 이유는 **팀 아래 프로젝트가 하나뿐이면 팀과 프로젝트의
+  경계가 화면에서 안 보이기 때문**이다. 팀 선과 프로젝트 선이 겹쳐 한 줄로만
+  읽혀서, 어느 선이 무엇을 감싸는지 확인할 방법이 없었다.
+*/
+const rehearsalRoom = ROOM_IDS.rehearsal
+const rehearsalMessages = [
+  say(rehearsalRoom, '서재민', '데모 순서 확정합니다. 홈 → 대리인 → 플로우 순서입니다.', daysAgo(3, 10, 20)),
+  say(rehearsalRoom, '임수연', '화면 전환은 제가 잡겠습니다. 세 화면 다 같은 계정으로 갑니다.', daysAgo(3, 10, 24)),
+  say(rehearsalRoom, '최비성', '서버는 리허설 30분 전에 한 번 더 올려 두겠습니다.', daysAgo(3, 10, 31)),
+  say(
+    rehearsalRoom,
+    '서재민',
+    '시연 중에 무엇이 실패했을 때 어디서 멈출지 미리 정해 둡시다. 지난 중간 점검 때 로그인이 한 번 안 돼서 3분을 거기서 썼습니다. 각 화면마다 "여기서 막히면 다음으로 넘어간다" 를 하나씩 적어 주세요.',
+    daysAgo(2, 11, 5),
+    { is_important: true },
+  ),
+  say(rehearsalRoom, '임수연', '홈은 브리핑 팝업까지만 보여주고 넘어가겠습니다.', daysAgo(2, 11, 12)),
+  say(rehearsalRoom, '최비성', '플로우는 필터 하나만 걸고 끝냅니다. 세 개 다 누르면 시간이 안 맞습니다.', daysAgo(2, 11, 18)),
+  say(
+    rehearsalRoom,
+    '유수인',
+    '대리인 화면은 유보 카드가 보이는 데까지 가야 합니다. 심사에서 지적받은 부분이 거기라서요.',
+    daysAgo(1, 14, 40),
+    { is_important: true, read_count: 3 },
+  ),
+  say(rehearsalRoom, '서재민', '그럼 대리인 화면에 시간을 더 주고 홈을 줄입시다.', daysAgo(1, 14, 52)),
+  say(rehearsalRoom, '임수연', '수인님, 리허설용 계정 비밀번호 어디에 적어 두셨나요?', minutesAgo(35)),
+  /*
+    자리를 비운 사이 대리인이 대신 답한 자리를 이 프로젝트에도 하나 둔다.
+    `자리 비운 사이` 목록이 늘 같은 세 방만 보이면, 그 목록이 방을 어떻게
+    가리키는지(`path_label`) 새 프로젝트에서 확인할 수가 없다.
+  */
+  bot(
+    rehearsalRoom,
+    '유수인',
+    '수인님은 지금 자리를 비우셨습니다. 리허설 계정은 지난주에 팀 방에 공유된 것을 그대로 쓰기로 되어 있고, 그 뒤로 바뀐 기록은 없습니다. 비밀번호 자체는 제가 옮겨 적지 않겠습니다 — 수인님이 돌아오시면 직접 전달하시도록 남겨 두겠습니다.',
+    minutesAgo(34),
+    { answered_while_away: true },
+  ),
+  say(rehearsalRoom, '임수연', '알겠습니다. 그럼 기다릴게요.', minutesAgo(31)),
+]
+
+// ─────────────────────────────────────────── 프로젝트 방: 발표 자료
+const slidesRoom = ROOM_IDS.slides
+const slidesMessages = [
+  say(slidesRoom, '유수인', '발표 자료 초안 올립니다. 12장이고 데모는 6장부터입니다.', daysAgo(4, 9, 30), {
+    attachments: [
+      attachment('bordo-demo-v1.pdf', { sizeBytes: 1284300, mimeType: 'application/pdf' }),
+    ],
+    read_count: 2,
+  }),
+  say(slidesRoom, '서재민', '문제 정의가 3장까지 가는 게 길어 보입니다. 두 장으로 줄이죠.', daysAgo(4, 9, 48)),
+  say(slidesRoom, '유수인', '줄이겠습니다. 대신 "내가 없는 동안" 문장은 남기겠습니다.', daysAgo(4, 9, 55), {
+    read_count: 2,
+  }),
+  say(
+    slidesRoom,
+    '임수연',
+    '9장 화면 캡처가 옛날 시안입니다. 원형 프로필 적용 전 것이라 데모랑 안 맞습니다.',
+    daysAgo(1, 15, 10),
+    { is_important: true },
+  ),
+  say(slidesRoom, '유수인', '오늘 시안 다시 올리면서 같이 갈아 끼우겠습니다.', daysAgo(1, 15, 22), { read_count: 1 }),
+  say(slidesRoom, '서재민', '심사 시간이 7분이라 12장은 많습니다. 9장까지 줄여 봅시다.', minutesAgo(210)),
+]
+
+// ─────────────────────────────────────────── 프로젝트 방: 학술제 제출물
+/*
+  다른 팀(`연합 학술제`)의 방. 사람은 겹쳐도 **팀은 다르다.**
+
+  이 방이 있어야 팀이 둘인 목록이 실제로 그려진다. 팀 하나에 방을 더 넣는
+  것으로는 "이 대화가 어느 팀 것인지" 를 화면에서 확인할 수 없다.
+*/
+const academySubmitRoom = ROOM_IDS.academySubmit
+const academySubmitMessages = [
+  say(academySubmitRoom, '강다은', '제출물 목록 정리했습니다. 시연 영상은 3분 넘으면 잘립니다.', daysAgo(5, 19, 10)),
+  say(academySubmitRoom, '임수연', '그럼 화면 녹화는 두 화면만 담죠.', daysAgo(5, 19, 22)),
+  say(
+    academySubmitRoom,
+    '강다은',
+    '저장소를 공개로 두기 전에 서버 정보가 든 파일이 없는지 확인하는 항목을 넣었습니다. 지난번에 설정 파일이 그대로 올라간 적이 있어서요.',
+    daysAgo(2, 20, 15),
+    { is_important: true },
+  ),
+  say(academySubmitRoom, '유수인', '포스터는 제가 목요일까지 올리겠습니다.', daysAgo(2, 20, 30), { read_count: 2 }),
+  say(academySubmitRoom, '강다은', '체크리스트 공유합니다. 각자 맡은 줄에 이름 적어 주세요.', daysAgo(1, 22, 5), {
+    attachments: [
+      attachment('academy-checklist.pdf', { sizeBytes: 118400, mimeType: 'application/pdf' }),
+    ],
+  }),
+  say(
+    academySubmitRoom,
+    '서재민',
+    '체크리스트에 담당자 칸이 비어 있는 줄이 셋 있습니다. 비워 두면 아무도 안 합니다.',
+    minutesAgo(70),
+    { is_important: true },
+  ),
+  say(academySubmitRoom, '강다은', '오늘 안에 채우겠습니다.', minutesAgo(58)),
+]
+
 // ─────────────────────────────────────────── 팀 방
 const teamRoom = ROOM_IDS.team
 const teamMessages = [
@@ -480,6 +600,26 @@ const daeunMessages = [
   ),
   say(daeunRoom, '강다은', '고칠게요.', daysAgo(2, 21, 42)),
   say(daeunRoom, '강다은', '고쳤습니다. 다시 봐 주세요.', daysAgo(1, 9, 12)),
+  /*
+    자리를 비운 사이 내 대리인이 대신 답한 자리.
+
+    **이 서비스가 파는 장면이 정확히 이것**인데 목에 한 줄도 없었다. 대리인은
+    남의 방(`동료 대리인`)에서만 말했고, 내 대리인이 내 대신 팀원에게 답한
+    기록은 화면 어디에도 없었다 — `자리 비운 사이` 목록을 만들어도 늘 비어
+    있게 된다.
+
+    `answered_while_away` 로 표시한다. 대리인이 한 말이라고 다 부재 중 응답은
+    아니다(내가 옆에서 시켜서 한 것도 있다). 목록에 담을지 가르는 것은 서버가
+    아는 사실이라 필드로 온다.
+  */
+  bot(
+    daeunRoom,
+    '유수인',
+    '수인님이 자리를 비우셔서 제가 대신 답합니다. 공지 문구는 지난주에 정한 템플릿을 그대로 쓰기로 되어 있어, 마지막 줄만 빼면 확정입니다. 최종 확인은 수인님이 돌아오시면 남기겠습니다.',
+    daysAgo(1, 9, 30),
+    { answered_while_away: true },
+  ),
+  say(daeunRoom, '강다은', '네 알겠습니다. 그럼 그대로 올릴게요.', daysAgo(1, 9, 34)),
   // 지운 메시지. 자리는 남고 본문만 빈다 — 사이드바 미리보기도 `삭제된 메시지입니다` 가 된다.
   say(daeunRoom, '유수인', '', minutesAgo(320), { deleted_at: minutesAgo(319), read_count: 1 }),
 ]
@@ -502,6 +642,15 @@ const suyeonMessages = [
   say(suyeonRoom, '유수인', '2시까지 올릴게요.', minutesAgo(230), { read_count: 1 }),
   say(suyeonRoom, '임수연', '넵', minutesAgo(30)),
   say(suyeonRoom, '임수연', '그리고 아까 말한 색 이름 표는 정리해서 라운지에 올려 뒀습니다.', minutesAgo(28)),
+  say(suyeonRoom, '임수연', '수인님, 원형 프로필 시안 지금 올라왔나요? 리허설 10분 뒤예요.', minutesAgo(24)),
+  bot(
+    suyeonRoom,
+    '유수인',
+    '수인님은 지금 자리를 비우셨습니다. 원형 프로필 시안은 오늘 14:00 까지 올리기로 하신 것이 기록에 있고, 아직 올라오지 않았습니다. 리허설에는 직전 버전으로 진행해 주시면, 돌아오시는 대로 바로 전달하겠습니다.',
+    minutesAgo(23),
+    { answered_while_away: true },
+  ),
+  say(suyeonRoom, '임수연', '알겠습니다. 직전 버전으로 갈게요.', minutesAgo(22)),
 ]
 
 const biseongRoom = ROOM_IDS.biseong
@@ -520,12 +669,19 @@ const biseongMessages = [
     '아바타 없는 계정은 빈 문자열로 내려갑니다. 화면에서 기본 아이콘 처리 부탁드려요.',
     minutesAgo(400),
   ),
+  bot(
+    biseongRoom,
+    '유수인',
+    '수인님 대신 확인했습니다. 기본 아이콘 처리는 이미 들어가 있고(사진 없는 계정은 Bordo 아이콘), 경로 규칙이 바뀌면 화면 쪽은 손댈 곳이 없습니다. 이 내용은 수인님께 남겨 두겠습니다.',
+    minutesAgo(395),
+    { answered_while_away: true },
+  ),
 ]
 
 /*
   빈 방 둘.
 
-  하나는 아직 말을 안 건 1:1(서재민), 하나는 만들어만 둔 프로젝트 방(연합학술제)
+  하나는 아직 말을 안 건 1:1(서재민), 하나는 만들어만 둔 프로젝트 방(부스 배치)
   이다. **목록 전체를 비우지는 않되 빈 방은 남겨 둔다** — `아직 나눈 이야기가
   없습니다` 를 그리는 자리가 실제로 어떻게 보이는지 확인해야 한다.
 */
@@ -536,7 +692,10 @@ export const roomMessages = {
   [ROOM_IDS.agent]: page(agentMessages),
   [ROOM_IDS.lounge]: page(loungeMessages),
   [ROOM_IDS.design]: page(designMessages),
+  [ROOM_IDS.rehearsal]: page(rehearsalMessages),
+  [ROOM_IDS.slides]: page(slidesMessages),
   [ROOM_IDS.academy]: page(emptyMessages),
+  [ROOM_IDS.academySubmit]: page(academySubmitMessages),
   [ROOM_IDS.team]: page(teamMessages),
   [ROOM_IDS.daeun]: page(daeunMessages),
   [ROOM_IDS.suyeon]: page(suyeonMessages),
@@ -547,8 +706,16 @@ export const roomMessages = {
 
 // ─────────────────────────────────────────── 방
 
-/** 방 하나. 미리보기 · 중요 여부는 메시지에서 계산한다. */
-function buildRoom({ id, type, title, team = true, project = null, members, unread = 0 }) {
+/**
+ * 방 하나. 미리보기 · 중요 여부는 메시지에서 계산한다.
+ *
+ * 팀은 **참·거짓이 아니라 팀 객체**로 받는다. 팀이 하나뿐일 때는 `team: true`
+ * 로 두고 `TEAM` 을 갖다 써도 됐지만, 팀이 둘이 되면 그 방식은 조용히 틀린다 —
+ * 학술제 방에 해커톤 팀 이름이 붙는다. 프로젝트가 있으면 팀은 물어볼 것도 없이
+ * 그 프로젝트의 팀이다.
+ */
+function buildRoom({ id, type, title, team = TEAM, project = null, members, unread = 0 }) {
+  const owner = project ? teamOf(project) : team
   const list = roomMessages[id].results
   const avatars = members
     .map((name) => person(name).avatar_url)
@@ -559,13 +726,44 @@ function buildRoom({ id, type, title, team = true, project = null, members, unre
     id,
     type,
     title,
-    team_id: team ? TEAM.id : null,
-    team_name: team ? TEAM.name : '',
+    /*
+      참여자. **시간대까지 같이 준다.**
+
+      방 머리에 각자의 그곳 시각을 띄우려면 필요하다. 화면이 사람 id 로
+      팀 구성원 목록을 다시 뒤지게 두면, 팀에 안 매인 1:1 방에서는 뒤질
+      목록조차 없다.
+
+      `is_me` 는 서버가 정한다 — 1:1 방에서 "상대"가 누구인지는 보는 사람에
+      따라 다르고, 그 판정을 화면이 하면 계정마다 다른 규칙이 생긴다.
+    */
+    members: members.map((name) => {
+      const who = person(name)
+      return {
+        id: who.id,
+        name: who.name,
+        avatar_url: who.avatar_url,
+        timezone: who.timezone,
+        // 나라 이름은 서버가 완성해 준다 — 시간대 문자열에서 화면이 유추하면
+        // 그 표를 화면마다 하나씩 들고 있게 된다.
+        country: who.country,
+        /*
+          지금 자리에 있는지. 자리를 비운 사람에게 보낸 말은 **그 사람의 Bordo
+          가 먼저 받는다** — 답이 늦는 것과, 사람이 아닌 대리인이 답하는 것은
+          받는 쪽이 알아야 하는 다른 사실이다.
+        */
+        presence: who.presence ?? 'ACTIVE',
+        agent_name: agentName(who.name),
+        is_me: who.id === ME.id,
+        is_agent: false,
+      }
+    }),
+    team_id: owner ? owner.id : null,
+    team_name: owner ? owner.name : '',
     project_id: project ? project.id : null,
     project_name: project ? project.name : '',
     // 서버가 완성해 주는 문자열. 화면이 팀·프로젝트 이름을 직접 이어 붙이면
     // 규칙이 두 군데로 갈린다.
-    path_label: team ? (project ? `${TEAM.name} - ${project.name}` : TEAM.name) : '',
+    path_label: owner ? (project ? `${owner.name} - ${project.name}` : owner.name) : '',
     avatar_urls: avatars,
     last_message: toLastMessage(list),
     unread_count: unread,
@@ -579,7 +777,7 @@ const ALL = [
     id: ROOM_IDS.agent,
     type: 'AI',
     title: agentName(ME.name),
-    team: false,
+    team: null,
     members: ['유수인'],
     unread: 0,
   }),
@@ -600,17 +798,44 @@ const ALL = [
     unread: 2,
   }),
   buildRoom({
+    id: ROOM_IDS.rehearsal,
+    type: 'PROJECT',
+    title: '데모 리허설',
+    project: PROJECTS.demo,
+    members: ['서재민', '임수연', '최비성', '유수인'],
+    unread: 2,
+  }),
+  buildRoom({
+    id: ROOM_IDS.slides,
+    type: 'PROJECT',
+    title: '발표 자료',
+    project: PROJECTS.demo,
+    members: ['유수인', '임수연', '서재민'],
+    unread: 1,
+  }),
+  // 만들어만 두고 아직 말이 없는 방. `아직 나눈 이야기가 없습니다` 를 그리는
+  // 자리가 실제로 어떻게 보이는지 확인해야 한다.
+  buildRoom({
     id: ROOM_IDS.academy,
     type: 'PROJECT',
-    title: '연합학술제',
+    title: '부스 배치',
     project: PROJECTS.academy,
-    members: ['임수연', '최비성', '유수인'],
+    members: ['강다은', '유수인'],
     unread: 0,
+  }),
+  buildRoom({
+    id: ROOM_IDS.academySubmit,
+    type: 'PROJECT',
+    title: '제출물 점검',
+    project: PROJECTS.academy,
+    members: ['강다은', '유수인', '임수연', '서재민'],
+    unread: 3,
   }),
   buildRoom({
     id: ROOM_IDS.team,
     type: 'TEAM',
     title: TEAM.name,
+    team: TEAM,
     members: ['서재민', '최비성', '임수연', '유수인', '강다은'],
     unread: 3,
   }),
@@ -670,6 +895,48 @@ export const chatRooms = {
   }),
 }
 
+/**
+ * `GET /chat/away-handled` — 자리를 비운 사이 내 Bordo 가 대신 나눈 대화.
+ *
+ * ## 왜 「중요 채팅」 자리를 이것이 가져갔나
+ *
+ * 그 자리는 **내가 미리 별을 찍어 둔 것**만 모였다. 자리를 비우기 전에 무엇이
+ * 중요해질지 알 수 있으면 애초에 자리를 안 비웠을 것이다. 이 서비스가 파는
+ * 것은 "없는 동안에도 대화가 이어진다" 인데, 그 이어진 대화를 한 자리에서
+ * 보는 곳이 화면에 없었다 — 방을 하나씩 열어 봐야 알 수 있었다.
+ *
+ * 방마다 **대리인이 대신 답한 횟수**와 마지막 응답을 같이 준다. 화면이 방
+ * 메시지를 전부 받아 세게 두면, 목록 하나 그리려고 방 수만큼 요청이 나간다.
+ */
+export const awayHandled = (() => {
+  const rows = ALL
+    .map((room) => {
+      const handled = (roomMessages[room.id]?.results ?? [])
+        .filter((m) => m.answered_while_away && m.sender.id === AGENT_IDS[ME.name])
+      if (handled.length === 0) {
+        return null
+      }
+      const last = handled[handled.length - 1]
+      return {
+        room_id: room.id,
+        title: room.title,
+        path_label: room.path_label,
+        avatar_urls: room.avatar_urls,
+        // 상대가 누구였는지. 1:1 이면 한 사람, 단체방이면 물어본 사람들이다.
+        handled_count: handled.length,
+        last_reply: {
+          id: last.id,
+          preview: last.body.length > 60 ? `${last.body.slice(0, 60)}…` : last.body,
+          sent_at: last.sent_at,
+        },
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.last_reply.sent_at.localeCompare(a.last_reply.sent_at))
+
+  return { count: rows.length, results: rows }
+})()
+
 // ─────────────────────────────────────────── 사이드바
 /*
   미읽음 합계는 **상위 노드에 미리 들어 있어야 한다.** 사이드바가 접혀 있어도
@@ -679,7 +946,8 @@ export const chatRooms = {
   트리 안에 방 객체로 없어서, 클라이언트가 뺄셈으로 알아낼 수 없는 값이다.
 */
 const bordoRooms = [byId[ROOM_IDS.lounge], byId[ROOM_IDS.design]]
-const academyRooms = [byId[ROOM_IDS.academy]]
+const demoRooms = [byId[ROOM_IDS.rehearsal], byId[ROOM_IDS.slides]]
+const academyRooms = [byId[ROOM_IDS.academy], byId[ROOM_IDS.academySubmit]]
 const directRooms = [
   byId[ROOM_IDS.suyeon],
   byId[ROOM_IDS.biseongAgent],
@@ -697,10 +965,23 @@ function markedIn(rooms) {
 }
 
 const bordoUnread = unreadOf(bordoRooms)
+const demoUnread = unreadOf(demoRooms)
 const academyUnread = unreadOf(academyRooms)
 const teamGroupUnread = byId[ROOM_IDS.team].unread_count
 
-/** `GET /chat/sidebar`. */
+/**
+ * `GET /chat/sidebar`.
+ *
+ * ## 팀이 둘이다
+ *
+ * 학술제는 해커톤 팀이 하는 일이 아니다. 사람이 겹칠 뿐 심사도 일정도 다른
+ * 곳에서 굴러가는데, 목에서는 학술제 프로젝트가 해커톤 팀 밑에 매달려 있어서
+ * **채팅 목록만 보면 한 팀이 두 가지를 하는 것처럼** 읽혔다.
+ *
+ * 팀을 가르면서 해커톤 팀에는 프로젝트를 하나 더 둔다. 팀 아래 프로젝트가
+ * 하나뿐이면 팀 칸과 프로젝트 칸이 겹쳐 한 줄로 읽혀서, 어느 칸이 무엇을
+ * 감싸는지 화면에서 확인할 방법이 없다.
+ */
 export const chatSidebar = {
   my_agent_room: byId[ROOM_IDS.agent],
   // 상단 `중요 채팅`. 중요 메시지가 남아 있는 방만 올라온다.
@@ -710,8 +991,8 @@ export const chatSidebar = {
       team_id: TEAM.id,
       team_name: TEAM.name,
       group_chat_room_id: ROOM_IDS.team,
-      unread_count: bordoUnread + academyUnread + teamGroupUnread,
-      has_important: markedIn([...bordoRooms, ...academyRooms, byId[ROOM_IDS.team]]),
+      unread_count: bordoUnread + demoUnread + teamGroupUnread,
+      has_important: markedIn([...bordoRooms, ...demoRooms, byId[ROOM_IDS.team]]),
       projects: [
         {
           project_id: PROJECTS.bordo.id,
@@ -722,9 +1003,28 @@ export const chatSidebar = {
           rooms: bordoRooms,
         },
         {
+          project_id: PROJECTS.demo.id,
+          project_name: PROJECTS.demo.name,
+          group_chat_room_id: ROOM_IDS.rehearsal,
+          unread_count: demoUnread,
+          has_important: markedIn(demoRooms),
+          rooms: demoRooms,
+        },
+      ],
+    },
+    {
+      team_id: TEAM_ACADEMY.id,
+      team_name: TEAM_ACADEMY.name,
+      // 이 팀에는 단체방이 아직 없다. 서버는 첫 조회 때 만들어 주지만,
+      // 안 만들어진 상태도 화면이 견뎌야 한다.
+      group_chat_room_id: null,
+      unread_count: academyUnread,
+      has_important: markedIn(academyRooms),
+      projects: [
+        {
           project_id: PROJECTS.academy.id,
           project_name: PROJECTS.academy.name,
-          group_chat_room_id: ROOM_IDS.academy,
+          group_chat_room_id: ROOM_IDS.academySubmit,
           unread_count: academyUnread,
           has_important: markedIn(academyRooms),
           rooms: academyRooms,
@@ -735,6 +1035,7 @@ export const chatSidebar = {
   direct_rooms: directRooms,
   total_unread:
     bordoUnread
+    + demoUnread
     + academyUnread
     + teamGroupUnread
     + unreadOf(directRooms)
@@ -765,20 +1066,33 @@ export const chatImportant = {
  * `has_agent` 가 false 인 사람을 하나 섞어 둔다. `동료의 AI 대리인` 방은 대리인이
  * 있는 사람에게만 걸 수 있어서, 전원이 true 면 걸러내는 화면이 한 번도 안 밟힌다.
  */
+function candidateMembers(names) {
+  return PEOPLE
+    .filter((who) => who.id !== ME.id && (!names || names.includes(who.name)))
+    .map((who) => ({
+      user_id: who.id,
+      name: who.name,
+      avatar_url: who.avatar_url,
+      has_agent: who.name !== '강다은',
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ko'))
+}
+
 export const chatCandidates = {
   teams: [
     {
       team_id: TEAM.id,
       team_name: TEAM.name,
-      members: PEOPLE
-        .filter((who) => who.id !== ME.id)
-        .map((who) => ({
-          user_id: who.id,
-          name: who.name,
-          avatar_url: who.avatar_url,
-          has_agent: who.name !== '강다은',
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
+      members: candidateMembers(null),
+    },
+    /*
+      두 팀에 같은 사람이 겹친다. 실제로도 그렇고, **겹칠 때 목록이 어떻게
+      보이는지**는 팀이 하나면 확인할 수 없다.
+    */
+    {
+      team_id: TEAM_ACADEMY.id,
+      team_name: TEAM_ACADEMY.name,
+      members: candidateMembers(['강다은', '임수연', '서재민']),
     },
   ],
 }

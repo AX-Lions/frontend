@@ -25,16 +25,23 @@ function readableSize(bytes) {
  *
  * 두 버튼에 서버가 실제로 받는 일을 하나씩 맡겼다.
  * - `+` 는 파일 올리기(`POST /chat/rooms/{id}/attachments`)
- * - 깔때기는 `중요로 보내기`(`POST .../messages` 의 `is_important`)
+ * - 슬라이더는 `AI 대리인 설정` 을 연다
+ *
+ * 슬라이더는 원래 `중요로 보내기` 였다. 설정을 뜻하는 모양에 전혀 다른 일이
+ * 걸려 있어, 누른 사람은 설정을 기대하는데 보내는 방식이 바뀌었다. 시안이
+ * 가리키는 것도 대리인 설정이라 그쪽으로 맞춘다.
+ *
+ * 보낼 때 중요로 지정하는 길은 없앴지만 **기능이 사라진 것은 아니다.** 보낸 뒤
+ * 말풍선 메뉴에서 `중요 표시` 를 누르면 된다(`ChatMessageRow`). 좌측 `중요 채팅`
+ * 목록도 그 상태를 그대로 그린다.
  *
  * 첨부는 **보내기 전에 먼저 올라간다.** 서버가 그렇게 나눠 놨는데, 올려만 두고
  * 안 보내면 24시간 뒤 만료된다. 그래서 아직 안 보낸 첨부도 화면에 보여야 한다 —
  * 안 보이면 사용자는 파일이 사라진 줄 안다.
  */
-export function ChatComposer({ roomId, onSent }) {
+export function ChatComposer({ notice, roomId, onSent, onOpenAgentSettings }) {
   const [text, setText] = useState('')
   const [attachments, setAttachments] = useState([])
-  const [important, setImportant] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef(null)
@@ -91,12 +98,10 @@ export function ChatComposer({ roomId, onSent }) {
         body: text.trim(),
         clientMessageId: crypto.randomUUID(),
         attachmentIds: attachments.map((a) => a.id),
-        isImportant: important,
       })
       onSent(sent)
       setText('')
       setAttachments([])
-      setImportant(false)
     } catch (err) {
       // 입력한 것을 지우지 않는다. 지우면 다시 칠 수밖에 없다.
       setError(err?.message || '보내지 못했습니다.')
@@ -107,6 +112,15 @@ export function ChatComposer({ roomId, onSent }) {
 
   return (
     <div className="chat-composer-wrap">
+      {/*
+        입력칸 위에 얹는 안내(지금은 자리 비움 띠).
+
+        `.chat-composer-wrap` 이 `position: absolute` 라 **방의 흐름 위에 떠
+        있다.** 그래서 이 띠를 방 쪽에 형제로 두면 입력칸 밑에 깔려 안 보인다 —
+        실제로 그렇게 깔려 있었다. 안내는 이 상자 안에 들어와야 위로 쌓인다.
+      */}
+      {notice}
+
       {error ? <p className="chat-send-error" role="alert">{error}</p> : null}
 
       {attachments.length > 0 ? (
@@ -136,26 +150,23 @@ export function ChatComposer({ roomId, onSent }) {
         <button
           type="button"
           aria-label="파일 첨부"
-          title="파일 첨부"
+          data-tip="파일 첨부"
           disabled={!roomId || busy}
           onClick={() => fileRef.current?.click()}
         >
           <Icon src={icons.addSmall} />
         </button>
         <button
-          className={important ? 'composer-important on' : 'composer-important'}
           type="button"
-          aria-label="중요로 보내기"
-          aria-pressed={important}
-          title="중요로 보내면 받는 사람의 중요 채팅에 남습니다."
-          disabled={!roomId}
-          onClick={() => setImportant((on) => !on)}
+          aria-label="AI 대리인 설정"
+          title="AI 대리인 설정"
+          onClick={onOpenAgentSettings}
         >
           <Icon src={icons.filter} />
         </button>
         <input
           aria-label="채팅 입력"
-          placeholder={important ? '중요로 보냅니다…' : '채팅을 입력하세요...'}
+          placeholder="채팅을 입력하세요..."
           value={text}
           disabled={!roomId}
           onChange={(event) => setText(event.target.value)}

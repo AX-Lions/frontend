@@ -45,7 +45,15 @@ const icons = {
 const POLL_MS = 3000
 const POLL_TRIES = 10
 
-export function AgentDock() {
+/**
+ * `inline` 은 회의 화면의 `Bordo 브리핑` 패널 맨 아래에 박아 넣을 때 쓴다.
+ *
+ * 홈에서는 화면 오른쪽 아래에 떠 있는 알약이지만(`position: fixed`), 브리핑
+ * 패널에서는 **떠 있으면 안 된다** — 판을 덮고, 패널 너비가 줄어도 따라
+ * 줄지 않는다. 대화·전송·폴링은 똑같으므로 입력창을 하나 더 만들지 않고
+ * 자리만 바꾼다.
+ */
+export function AgentDock({ inline = false }) {
   const [open, setOpen] = useState(false)
   const [showList, setShowList] = useState(false)
   const [conversations, setConversations] = useState([])
@@ -57,6 +65,20 @@ export function AgentDock() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const streamRef = useRef(null)
+  const rootRef = useRef(null)
+  const inputRef = useRef(null)
+  /*
+    `+` 로 연 것인지.
+
+    판을 열면 목록을 읽고 **마지막 대화를 자동으로 잇는다**. 그 규칙이
+    `+` 에는 반대로 걸린다 — 새 대화를 비워 두고 판을 열면, 곧이어
+    도착한 목록이 그 빈자리를 마지막 대화로 도로 채운다. 누른 사람
+    입장에서는 `+` 가 그냥 이전 대화를 여는 버튼으로 보인다.
+
+    state 가 아니라 ref 인 이유는 이 값이 화면을 바꾸지 않기 때문이다.
+    state 로 두면 값을 세울 때마다 렌더가 한 번씩 더 돈다.
+  */
+  const wantsNewRef = useRef(false)
 
   // 열려 있을 때만 목록을 읽는다. 홈에 들어오자마자 부르면 첫 화면 요청이
   // 하나 더 늘어나는데, dock 을 열지 않는 사람이 더 많다.
@@ -75,6 +97,12 @@ export function AgentDock() {
         }
         const rows = body?.results ?? []
         setConversations(rows)
+        if (wantsNewRef.current) {
+          // `+` 가 연 판이다. 여기서 마지막 대화를 이으면 방금 비운
+          // 자리가 도로 채워진다.
+          wantsNewRef.current = false
+          return
+        }
         // 마지막으로 하던 대화를 이어서 연다. 매번 새 대화로 시작하면
         // 어제 물어본 것을 다시 찾을 방법이 없다.
         setConversationId((current) => current ?? rows[0]?.id ?? null)
@@ -90,6 +118,37 @@ export function AgentDock() {
       controller.abort()
     }
   }, [open])
+
+  /*
+    쓰던 글이 없으면 바깥을 눌렀을 때 도로 접는다.
+
+    입력칸에 초점이 닿기만 해도 펼쳐지는데(`onFocus`), 닫는 길은 `×` 하나뿐
+    이었다. 그래서 물어볼 생각 없이 스쳐 지나간 사람에게도 대화 상자가 열린
+    채 남는다 — 회의 화면에서는 그만큼 브리핑이 가려진다.
+
+    **쓰던 글이 있으면 접지 않는다.** 접으면서 초안을 감추면 다시 폈을 때
+    남아 있는지 확인할 방법이 없어, 사용자는 날아간 것으로 읽고 다시 친다.
+
+    `pointerdown` 으로 바깥을 가리는 이유는 `blur` 로는 **읽으려고 대화
+    안을 누른 것**과 나가는 것을 구별할 수 없어서다. 글자는 초점을 받지
+    않으므로 `relatedTarget` 이 비고, 읽는 도중에 접힌다.
+  */
+  useEffect(() => {
+    if (!open) {
+      return undefined
+    }
+
+    const closeIfIdle = (event) => {
+      if (draft.trim() || rootRef.current?.contains(event.target)) {
+        return
+      }
+      setOpen(false)
+      setShowList(false)
+    }
+
+    document.addEventListener('pointerdown', closeIfIdle)
+    return () => document.removeEventListener('pointerdown', closeIfIdle)
+  }, [draft, open])
 
   // 고른 대화의 메시지.
   //
@@ -185,6 +244,7 @@ export function AgentDock() {
         // 첫 질문이면 대화부터 만든다. 제목은 서버가 첫 메시지로 잡아 준다.
         const conversation = await createConversation()
         id = conversation.id
+        wantsNewRef.current = false
         setConversationId(id)
         setConversations((current) => [conversation, ...current])
       }
@@ -203,6 +263,18 @@ export function AgentDock() {
     }
   }
 
+  /**
+   * 새 대화.
+   *
+   * **판을 여는 것까지가 이 버튼의 일이다.** 접혀 있을 때 눌러도 안쪽
+   * 상태만 비우고 판은 그대로여서, 화면에는 아무 일도 일어나지 않았다 —
+   * 누른 사람은 고장 난 버튼과 구별할 수 없다. 홈에서 dock 은 기본이
+   * 접힌 상태이므로 `+` 를 누르는 거의 모든 경우가 그 상태였다.
+   *
+   * 여기서 서버에 대화를 미리 만들지는 않는다. 열어 놓고 물어볼 것을
+   * 정하지 못한 채 닫는 사람이 더 많은데, 그때마다 빈 대화가 목록에
+   * 쌓인다. 대화는 첫 메시지를 보내는 순간 `send()` 가 만든다.
+   */
   const startNew = () => {
     stopWaiting()
     setConversationId(null)
@@ -211,6 +283,11 @@ export function AgentDock() {
     setNotice('')
     setError('')
     setShowList(false)
+    wantsNewRef.current = true
+    setOpen(true)
+    // 새 대화 다음에 할 일은 언제나 묻는 것이다. 초점을 안 옮기면 빈
+    // 판만 뜨고 커서는 그대로라, 어디에 쳐야 하는지 다시 찾아야 한다.
+    inputRef.current?.focus()
   }
 
   const pick = (id) => {
@@ -218,6 +295,7 @@ export function AgentDock() {
     // 새 대화의 메시지가 도착하기 전까지 이전 대화가 남아 있으면, 잠깐이지만
     // **다른 대화 내용이 이 대화인 것처럼** 보인다.
     setMessages([])
+    wantsNewRef.current = false
     setConversationId(id)
     setWaiting(false)
     setNotice('')
@@ -225,12 +303,25 @@ export function AgentDock() {
   }
 
   return (
-    <div className={open ? 'chat-dock is-open' : 'chat-dock'} role="group" aria-label="Bordo 채팅">
+    <div
+      className={['chat-dock', inline ? 'is-inline' : '', open ? 'is-open' : ''].filter(Boolean).join(' ')}
+      ref={rootRef}
+      role="group"
+      aria-label="Bordo 채팅"
+    >
       {open ? (
         <div className="dock-panel">
           <div className="dock-panel-head">
             <strong>{showList ? '대화 목록' : 'Bordo 에게 물어보기'}</strong>
-            <button type="button" aria-label="접기" onClick={() => setOpen(false)}>×</button>
+            <button
+              className="dock-close"
+              type="button"
+              aria-label="접기"
+              data-tip="접기"
+              onClick={() => setOpen(false)}
+            >
+              ×
+            </button>
           </div>
 
           {showList ? (
@@ -283,13 +374,13 @@ export function AgentDock() {
 
       <div className="dock-bar">
         <div className="chat-tools">
-          <button type="button" aria-label="새 대화" title="새 대화" onClick={startNew}>
+          <button type="button" aria-label="새 대화" data-tip="새 대화" onClick={startNew}>
             <img src={icons.add} alt="" />
           </button>
           <button
             type="button"
             aria-label="대화 목록"
-            title="대화 목록"
+            data-tip="대화 목록"
             aria-expanded={open && showList}
             onClick={() => {
               setOpen(true)
@@ -302,6 +393,7 @@ export function AgentDock() {
 
         <input
           className="chat-input"
+          ref={inputRef}
           type="text"
           value={draft}
           aria-label="Bordo에게 물어보기"

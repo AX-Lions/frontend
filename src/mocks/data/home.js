@@ -28,7 +28,9 @@
  * 실제 시각이 따로 놀지 않게 한다.
  */
 
-import { ME, PEOPLE, PROJECTS, TEAM, daysAgo, minutesAgo, person, todayAt } from './people.js'
+import {
+  ME, PEOPLE, PROJECTS, TEAM, TEAM_ACADEMY, daysAgo, minutesAgo, person, teamOf, todayAt,
+} from './people.js'
 
 // ─────────────────────────────────────────── 표시 문자열
 //
@@ -93,12 +95,17 @@ const DESIGN_SYSTEM_PROJECT_ID = 'd58c1b74-3e29-4a06-b1f7-90ce4482ad61'
 const DISCORD_GUILD = '556677889900'
 const DISCORD_ACADEMY_CHANNEL = '556677889977'
 
-/** 프로젝트가 전부 같은 팀 아래에 있다. 팀 이름을 네 번 적지 않는다. */
-function project(id, name, progress, isFavorite, lastOpenedAt) {
+/**
+ * 홈 프로젝트 카드 한 장.
+ *
+ * 팀은 인자로 받는다. 예전에는 `TEAM` 을 그대로 박아 두었는데, 팀이 둘이
+ * 되면서 학술제 프로젝트에 해커톤 팀 이름이 붙는다.
+ */
+function project(id, name, progress, isFavorite, lastOpenedAt, team = TEAM) {
   return {
     id,
-    team_id: TEAM.id,
-    team_name: TEAM.name,
+    team_id: team.id,
+    team_name: team.name,
     name,
     progress,
     thumbnail_url: '',
@@ -108,7 +115,9 @@ function project(id, name, progress, isFavorite, lastOpenedAt) {
 }
 
 const bordoProject = project(PROJECTS.bordo.id, PROJECTS.bordo.name, 62, true, minutesAgo(12))
-const academyProject = project(PROJECTS.academy.id, PROJECTS.academy.name, 41, true, daysAgo(1, 21, 40))
+const academyProject = project(
+  PROJECTS.academy.id, PROJECTS.academy.name, 41, true, daysAgo(1, 21, 40), teamOf(PROJECTS.academy),
+)
 const paymentProject = project(PAYMENT_PROJECT_ID, '결제 모듈', 12, false, daysAgo(6, 11, 5))
 // 만들어만 두고 한 번도 안 연 프로젝트. 진행률 0 과 `last_opened_at: null` 이
 // 화면에서 어떻게 그려지는지 보려고 남긴다. 실제로 흔한 상태다.
@@ -362,13 +371,13 @@ export const me = {
 
 // ─────────────────────────────────────────── GET /teams
 //
-// 프로젝트 추가 팝업이 읽는다. **팀을 둘 둔 이유**는 그 팝업이 팀이 하나뿐일 때
-// 선택칸을 잠그기 때문이다 — 하나만 두면 고르는 화면을 못 본다. 둘째 팀에는
-// 프로젝트가 없다. 프로젝트 추가 버튼을 누르는 가장 흔한 이유가 바로 그
-// 상태라서, 빈 팀 하나는 있어야 한다.
+// 프로젝트 추가 팝업이 읽는다. **팀이 여럿이어야 하는 이유**는 그 팝업이 팀이
+// 하나뿐일 때 선택칸을 잠그기 때문이다 — 하나만 두면 고르는 화면을 못 본다.
+// 마지막 팀에는 프로젝트가 없다. 프로젝트 추가 버튼을 누르는 가장 흔한 이유가
+// 바로 그 상태라서, 빈 팀 하나는 있어야 한다.
 
 export const teams = {
-  count: 2,
+  count: 3,
   results: [
     {
       id: TEAM.id,
@@ -379,6 +388,16 @@ export const teams = {
       categories: ['backend', 'frontend', 'design'],
       member_count: PEOPLE.length,
       created_at: daysAgo(31, 10, 0),
+    },
+    {
+      id: TEAM_ACADEMY.id,
+      name: TEAM_ACADEMY.name,
+      description: TEAM_ACADEMY.description,
+      created_by: person('강다은').id,
+      my_role: 'MEMBER',
+      categories: ['design'],
+      member_count: 4,
+      created_at: daysAgo(20, 11, 0),
     },
     {
       id: '2f0a6c19-84be-4d7a-9f35-c1e07b6d4a58',

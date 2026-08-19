@@ -14,19 +14,26 @@ import { TeamSwitchDialog } from '../home/TeamSwitchDialog.jsx'
 import { icons, toneLabels } from './flowBoard.api'
 import { fetchBriefing, toneOf } from './flowBoard.data'
 import { buildFlowLayout } from './flowLayout'
+
+/**
+ * 판 위에 얹힌 회의 제목 줄의 높이.
+ * `.board-center-frame { min-height: calc(100% - 64px) }` 과 짝이다.
+ */
+const MEETING_TITLE_HEIGHT = 64
 import {
   MEETING_MODE,
   WORK_MODE,
   useEdgeDetails,
   useFlowBoardMeeting,
   useFlowGraph,
-  useFlowIndexes,
-  useFlowOptions,
+  useFlowTimeline,
   useMe,
   useProjectMeetings,
 } from './useFlowBoardData'
+import { FlowAgendaPanel } from './FlowAgendaPanel.jsx'
 import { useFlowBoard } from './useFlowBoard'
 import { useFlowBoardUi } from './useFlowBoardUi'
+import { useFlowPlayback } from './useFlowPlayback'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
 /**
@@ -36,14 +43,35 @@ import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx
  * 화면 라벨을 따른다 — 중앙 요약표 헤더가 `변동 사항` 이라 `changes` 를
  * `변동 사항` 으로 읽는다.
  */
+/*
+  한 칸은 문자열일 수도, 상세가 딸린 객체일 수도 있다.
+
+  **문자열을 계속 받는 것이 중요하다.** 상세(맥락·갈린 지점)는 이 화면이
+  먼저 요구한 것이라 서버는 당분간 지금처럼 문자열만 내려 준다. 객체만
+  받게 만들면 그날 요약표가 통째로 빈칸이 된다.
+
+  상세가 없는 칸은 `detail` 이 `null` 이고, 눌렀을 때 안건 패널 대신
+  브리핑이 열린다 — 열어 봐야 아무것도 없는 패널을 띄우지 않는다.
+*/
+function toSummaryItem(item) {
+  if (typeof item === 'string') {
+    return { text: item, detail: null }
+  }
+  const text = item?.text ?? ''
+  // `맥락도 갈린 지점도 결론도 없는 객체` 는 문자열과 다를 바 없다.
+  const hasDetail = Boolean(item?.context || item?.debates?.length || item?.resolution)
+  return { text, detail: hasDetail ? item : null }
+}
+
 function toSummaryColumns(summary) {
   if (!summary) {
     return []
   }
+  const column = (title, items) => ({ title, items: (items ?? []).map(toSummaryItem) })
   return [
-    { title: '발견한 문제', items: summary.discovered_issues ?? [] },
-    { title: '변동 사항', items: summary.changes ?? [] },
-    { title: '이후 계획', items: summary.next_plans ?? [] },
+    column('발견한 문제', summary.discovered_issues),
+    column('변동 사항', summary.changes),
+    column('이후 계획', summary.next_plans),
   ]
 }
 
@@ -87,7 +115,6 @@ export function FlowBoardPage() {
     골랐다"(빈 배열)를 구별해야 하고, 목록이 오는 순간 effect 로 초기화해야 한다.
     끈 것을 담으면 처음이 빈 배열 하나뿐이라 그 단계가 통째로 없어진다.
   */
-  const [excludedParticipants, setExcludedParticipants] = useState([])
   const [excludedContents, setExcludedContents] = useState([])
 
   const me = useMe()
@@ -122,35 +149,179 @@ export function FlowBoardPage() {
   }, [briefingOpen, meetingId])
 
   const ui = useFlowBoardUi()
-  const indexes = useFlowIndexes(meetingId, mode)
-  const options = useFlowOptions(mode, meetingId, projectId)
+  const timeline = useFlowTimeline(mode, meetingId, projectId)
   const meetingList = useProjectMeetings(projectId, ui.isMeetingMenuOpen)
 
-  const filterOptions = options.data?.filter_options
-  const allParticipants = useMemo(
-    () => (filterOptions?.participants ?? []).map((p) => p.id),
-    [filterOptions],
+  /*
+    회의 목록은 바깥을 눌러도 닫혀야 한다.
+
+    열린 목록이 판 왼쪽 위를 덮고 있어, 안 닫히면 그 아래에 있는 것을 대신
+    가로챈다 — 사용자는 왜 안 눌리는지 모른 채 같은 자리를 다시 누른다.
+    `Escape` 도 같은 이유로 받는다. 키보드로 연 사람에게는 그쪽이 먼저다.
+
+    `pages/home/Sidebar.jsx` 의 회의 드롭다운이 같은 모양을 쓴다.
+
+    판 드래그와는 부딪히지 않는다. `useFlowBoard` 의 `BOARD_INTERACTIVE` 에
+    `.meeting-menu` 와 `.meeting-title button` 이 들어 있어, 팝업 안을 누르는
+    것은 패닝으로 먹히지 않는다.
+  */
+  const meetingMenuRef = useRef(null)
+  // `ui` 를 통째로 의존성에 넣으면 `useFlowBoardUi` 가 렌더마다 새 객체를 주므로
+  // 리스너를 매 렌더 떼었다 다시 단다. 꺼내 쓰는 둘만 본다.
+  const { isMeetingMenuOpen, setIsMeetingMenuOpen } = ui
+  useEffect(() => {
+    if (!isMeetingMenuOpen) {
+      return undefined
+    }
+    const close = (event) => {
+      if (!meetingMenuRef.current?.contains(event.target)) {
+        setIsMeetingMenuOpen(false)
+      }
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        setIsMeetingMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [isMeetingMenuOpen, setIsMeetingMenuOpen])
+
+  /*
+    좌측 `시간순 인덱스`. 회의에서 오간 전달 내용을 한 건씩 시간 오름차순으로
+    세운 목록이고, **맥락 재생의 대본**이기도 하다.
+  */
+  const timelineItems = useMemo(() => timeline.data?.results ?? [], [timeline.data])
+
+  /*
+    조회는 **늘 거르지 않은 한 번**이다.
+
+    내용 종류 필터가 남아 있지만 조건으로 서버에 싣지 않고 화면에서 건다.
+    이유는 두 가지다.
+
+    ① 서버에 실으면 응답이 바뀌어 **노드가 사라지고 링이 다시 잡힌다.**
+       종류 하나를 껐다 켤 때마다 사람들이 자리를 바꿔 앉으면, 판이 무엇을
+       거른 것인지가 아니라 판이 통째로 바뀐 것으로 읽힌다.
+    ② 거른 응답에서 종류 목록을 뽑으면 `의견` 을 끄는 순간 `의견` 칸 자체가
+       사라져 **다시 켤 방법이 없다.** 예전에는 그것 때문에 거르지 않은 조회를
+       하나 더 두었는데(`useFlowOptions`), 화면에서 거르면 그 조회가 필요 없다.
+
+    맥락 재생과 장치도 하나로 합쳐진다 — 둘 다 "어느 엣지를 그릴지" 한 집합으로
+    말한다.
+  */
+  const flow = useFlowGraph({ mode, meetingId, projectId })
+
+  /*
+    내용 종류 필터.
+
+    목록은 **거르지 않은 조회**에서 받는다(위 주석 ①②). 판에 한 번도 안 나온
+    종류는 애초에 칸이 없다 — 서버가 그렇게 준다.
+  */
+  const allContents = useMemo(
+    () => flow.data?.filter_options?.content_types ?? [],
+    [flow.data],
   )
-  const allContents = useMemo(() => filterOptions?.content_types ?? [], [filterOptions])
+  const pickedContents = useMemo(
+    () => allContents.filter((value) => !excludedContents.includes(value)),
+    [allContents, excludedContents],
+  )
 
-  const pickedParticipants = allParticipants.filter((id) => !excludedParticipants.includes(id))
-  const pickedContents = allContents.filter((value) => !excludedContents.includes(value))
+  const contentRows = allContents.map((value) => ({
+    value,
+    name: toneLabels[toneOf(value)] ?? value,
+    tone: toneOf(value),
+    checked: !excludedContents.includes(value),
+  }))
 
-  // 전부 끄면 조회하지 않는다. 아무 조건에도 안 맞는 것을 보여 달라는 뜻이라
-  // 화면이 비는 것이 맞고, 빈 조건을 서버에 보내면 **거르지 않은 것으로 읽혀
-  // 전부 다시 나온다.**
-  const nothingPicked =
-    (allParticipants.length > 0 && pickedParticipants.length === 0) ||
-    (allContents.length > 0 && pickedContents.length === 0)
+  const toggleContent = (value) => setExcludedContents((current) => (
+    current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
+  ))
 
-  const flow = useFlowGraph({
-    mode,
-    meetingId,
-    projectId,
-    enabled: !nothingPicked,
-    participantIds: excludedParticipants.length ? pickedParticipants : [],
-    contentTypes: excludedContents.length ? pickedContents : [],
-  })
+  // 전부 끄면 그릴 것이 없다. 판이 비는 것이 맞고, 그때는 안내를 겹쳐 띄운다.
+  const nothingPicked = allContents.length > 0 && pickedContents.length === 0
+
+  /*
+    종류 필터를 통과한 줄.
+
+    `seq` 는 **거르기 전 회의 전반의 번호 그대로**다. 걸러 놓고 1부터 다시
+    매기면 우측 패널 카드의 번호와 갈리고, 무엇보다 `요청사항만 보기` 로
+    3번이었던 것이 1번이 되어 회의 어디쯤 이야기였는지가 사라진다.
+  */
+  const pickedTimeline = useMemo(
+    () => timelineItems
+      .filter((item) => !excludedContents.includes(item.content_type))
+      /*
+        `order` 는 **거른 뒤 목록에서 몇 번째 줄인지**다. 재생은 보이는 줄을
+        순서대로 짚으므로 진행 상태를 이 값으로 재야 한다. 화면에 찍히는 번호는
+        그대로 `seq`(회의 전반 순번)다 — 둘을 한 값으로 묶으면 필터를 거는 순간
+        둘 중 하나가 반드시 틀린다.
+      */
+      .map((item, index) => ({ ...item, order: index + 1 })),
+    [timelineItems, excludedContents],
+  )
+
+  /*
+    맥락 재생.
+
+    좌측 목록의 `총 몇 건` 만 알면 되므로 대본 자체는 넘기지 않는다 — 훅이
+    목록을 들고 있으면 회의를 바꿀 때마다 배열 신원이 바뀌어 타이머가 괜히
+    다시 걸린다. 거른 목록을 기준으로 센다 — 화면에 안 보이는 줄을 기다리며
+    판이 0.5초씩 멈춰 있으면 재생이 멎은 것으로 보인다.
+  */
+  const playback = useFlowPlayback(pickedTimeline.length)
+  const { stop: stopPlayback } = playback
+
+  /*
+    회의·모드가 바뀌면 재생을 끈다.
+
+    `총 건수` 만 보고 끄면 **건수가 우연히 같은 회의로 넘어갔을 때 안 꺼진다.**
+    그러면 새 판 위에서 남의 회의 순서대로 화살표가 돋아난다.
+  */
+  useEffect(() => {
+    stopPlayback()
+  }, [meetingId, mode, stopPlayback])
+
+  /*
+    지금 판에 보여야 하는 엣지. **종류 필터와 맥락 재생이 같은 집합에 실린다.**
+
+    둘을 따로 두면 "필터로 꺼진 것" 과 "아직 재생이 안 닿은 것" 을 판이 두 가지
+    방식으로 지우게 되고, 겹쳤을 때 어느 쪽이 이기는지가 코드 두 군데에 흩어진다.
+
+    아무것도 안 거르고 재생도 안 하면 `null` 이다 — 거르지 않는다는 뜻이라
+    배치가 예전과 한 글자도 다르지 않게 나온다. 재생이 **끝났을 때도** 필터만
+    남으므로 끝까지 누적된 판이 그대로 있다.
+
+    재생 중 `step` 이 0 이면 빈 `Set` 이다. 화살표가 하나도 없는 판에서 시작해야
+    "지워졌다가 하나씩 쌓인다" 가 눈에 보인다.
+  */
+  const visibleEdgeIds = useMemo(() => {
+    const script = playback.isPlaying
+      ? pickedTimeline.slice(0, playback.step)
+      : pickedTimeline
+    if (!playback.isPlaying && excludedContents.length === 0) {
+      return null
+    }
+    const shown = new Set()
+    script.forEach((item) => {
+      (item.related_edge_ids ?? [item.edge_id]).forEach((id) => shown.add(id))
+    })
+    return shown
+  }, [playback.isPlaying, playback.step, pickedTimeline, excludedContents])
+
+  /*
+    엣지 하나가 회의 전반에서 몇 번째인지.
+
+    좌측 목록과 우측 패널이 **같은 번호**를 써야 한 쪽에서 본 것을 다른 쪽에서
+    되찾을 수 있다. 번호를 매기는 곳이 둘이면 그날로 갈린다.
+  */
+  const seqOf = useMemo(() => {
+    const bySeq = new Map(timelineItems.map((item) => [item.edge_id, item.seq]))
+    return (edgeId) => bySeq.get(edgeId) ?? null
+  }, [timelineItems])
 
   const summaryColumns = useMemo(
     () => toSummaryColumns(meeting.data?.summary),
@@ -174,9 +345,34 @@ export function FlowBoardPage() {
     [mode, summaryColumns],
   )
 
+  /*
+    판이 실제로 차지할 수 있는 크기.
+
+    링 반지름을 여기 맞춰 벌려야 프로필이 판 모서리에 붙는다(`flowLayout` 의
+    `usableWidth` 주석 참고). 재는 대상은 **`.flow-board`(스크롤 상자)** 다 —
+    안쪽 `.board-center-frame` 은 `width: max-content` 라 내용이 커지면 같이
+    커진다. 그것을 재면 판이 커질 때마다 링이 또 커지는 **되먹임**이 된다.
+
+    `MEETING_TITLE_HEIGHT` 는 판 위에 얹힌 회의 제목 줄 몫이다
+    (`.board-center-frame { min-height: calc(100% - 64px) }` 과 짝).
+  */
+  const [boardSize, setBoardSize] = useState({ width: 0, height: 0 })
+
+
+  /*
+    `visibleEdgeIds` 는 **그린 것을 깎기만 한다.** 노드 자리·선 각도·무대 크기는
+    거르지 않은 전체로 계산된다(`flowLayout` 참고). 재생이 0.5초마다 다시
+    그리는데 그때 배치까지 다시 잡히면 판이 통째로 덜컹거려, 무엇이 늘어났는지
+    를 볼 수가 없다.
+  */
   const layout = useMemo(
-    () => buildFlowLayout(flow.data?.nodes ?? [], flow.data?.arrows ?? [], { summaryRows }),
-    [flow.data, summaryRows],
+    () => buildFlowLayout(flow.data?.nodes ?? [], flow.data?.arrows ?? [], {
+      summaryRows,
+      boardWidth: boardSize.width,
+      boardHeight: boardSize.height - MEETING_TITLE_HEIGHT,
+      visibleEdgeIds,
+    }),
+    [flow.data, summaryRows, boardSize.width, boardSize.height, visibleEdgeIds],
   )
 
   // 무대 크기를 배치에서 가져온다. 776×931 이 `BOARD_CONTENT_BOUNDS` · SVG
@@ -190,7 +386,6 @@ export function FlowBoardPage() {
     boardRef,
     handleBoardPointerDown,
     handleBoardPointerMove,
-    handleBoardWheel,
     isPanning,
     maxZoom,
     minZoom,
@@ -201,6 +396,38 @@ export function FlowBoardPage() {
     zoomOut,
     zoomPercent,
   } = useFlowBoard(contentBounds)
+
+  /*
+    판을 **콜백 ref 로** 잡는다.
+
+    `boardRef.current` 를 보는 effect 로는 안 된다. 이 화면은 회의를 읽는
+    동안 다른 것을 그리다가(위쪽 `if (meeting.loading …) return`) 나중에야
+    판을 붙이는데, ref 객체는 그때도 같은 객체라 **effect 가 다시 돌지
+    않는다.** 처음 한 번 `null` 을 보고 끝나서 판 크기가 영영 0 이었다.
+    콜백 ref 는 붙는 순간 불리므로 그 시점을 놓치지 않는다.
+  */
+  const [boardEl, setBoardEl] = useState(null)
+  const attachBoard = (node) => {
+    boardRef.current = node
+    setBoardEl(node)
+  }
+
+  useEffect(() => {
+    if (!boardEl) {
+      return undefined
+    }
+    const observer = new ResizeObserver(([entry]) => {
+      const box = entry.contentRect
+      setBoardSize((current) => (
+        // 소수점만 흔들려도 배치를 다시 계산하면 렌더가 끝없이 돈다.
+        Math.abs(current.width - box.width) < 1 && Math.abs(current.height - box.height) < 1
+          ? current
+          : { width: box.width, height: box.height }
+      ))
+    })
+    observer.observe(boardEl)
+    return () => observer.disconnect()
+  }, [boardEl])
 
   const edgeIds = panel?.kind === 'edge' ? panel.edgeIds : []
   const edgeDetails = useEdgeDetails(edgeIds)
@@ -223,13 +450,31 @@ export function FlowBoardPage() {
   /*
     강조할 화살표.
 
-    안건을 고르면 그 안건의 `related_edge_ids`, 브리핑 태그를 고르면 그 칩의
-    `edge_ids`. 둘을 교집합으로 묶지 않는 이유는, 겹치는 것이 없을 때 판 전체가
-    흐려져 **필터가 고장 난 것처럼 보이기** 때문이다.
+    시간순 인덱스 한 줄을 고르면 그 줄의 `related_edge_ids`, 브리핑 태그를
+    고르면 그 칩의 `edge_ids`. 둘을 교집합으로 묶지 않는 이유는, 겹치는 것이
+    없을 때 판 전체가 흐려져 **필터가 고장 난 것처럼 보이기** 때문이다.
+
+    재생 중에는 아무것도 강조하지 않는다. 안 그러면 강조가 걸린 채로 화살표가
+    돋아나 **누적되는 것이 아니라 하나만 켜지는 것처럼** 보인다.
   */
   const highlightedEdgeIds = useMemo(() => {
-    if (ui.activeIndex) {
-      return new Set(ui.activeIndex.related_edge_ids ?? [])
+    if (playback.isPlaying) {
+      return null
+    }
+    if (ui.activeTimelineItem) {
+      const item = ui.activeTimelineItem
+      return new Set(item.related_edge_ids ?? [item.edge_id])
+    }
+    /*
+      요약표에서 고른 칸도 인덱스와 같은 자격이다. 판이 안 따라 움직이면
+      **패널만 바뀌고 왼쪽은 그대로**라, 방금 읽은 이야기가 판 어디에서
+      오간 것인지 알 길이 없다.
+
+      인덱스보다 뒤에 두는 이유는 인덱스가 사용자가 명시적으로 켜 둔 필터라
+      서다 — 요약표를 누른다고 그 필터가 조용히 밀려나면 안 된다.
+    */
+    if (panel?.kind === 'agenda') {
+      return new Set(panel.item.related_edge_ids ?? [])
     }
     if (activeChip) {
       const chip = (meeting.data?.briefing?.location_chips ?? [])
@@ -237,48 +482,72 @@ export function FlowBoardPage() {
       return chip ? new Set(chip.edge_ids ?? []) : null
     }
     return null
-  }, [ui.activeIndex, activeChip, meeting.data])
-
-  const participantRows = (filterOptions?.participants ?? []).map((p) => ({
-    id: p.id,
-    label: p.label,
-    checked: !excludedParticipants.includes(p.id),
-  }))
-
-  const contentRows = allContents.map((value) => ({
-    value,
-    name: toneLabels[toneOf(value)] ?? value,
-    tone: toneOf(value),
-    checked: !excludedContents.includes(value),
-  }))
-
-  const toggleExcluded = (setter) => (value) => setter((current) => (
-    current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
-  ))
-
-  /*
-    검색 결과만 남긴다.
-
-    기본이 전체 체크라 "걸러진 결과를 켠다" 는 아무 변화도 만들지 못한다.
-    엔터는 **그 사람들만 보기**여야 한다. 그래서 보이는 사람을 뺀 나머지를
-    끈 목록에 넣는다.
-  */
-  const checkOnly = (ids) => {
-    const keep = new Set(ids)
-    setExcludedParticipants(allParticipants.filter((id) => !keep.has(id)))
-  }
+  }, [playback.isPlaying, ui.activeTimelineItem, activeChip, meeting.data, panel])
 
   const switchMode = (next) => {
     if (next === mode) {
       return
     }
-    // 종류 목록이 모드마다 통째로 다르다(회의 6종 ↔ 작업 5종). 끈 것을 들고
-    // 넘어가면 다른 모드에 없는 코드가 조건에 실려 **조회가 400 으로 죽는다.**
     setMode(next)
+    // 종류 목록이 모드마다 통째로 다르다(회의 6종 ↔ 작업 5종). 끈 것을 들고
+    // 넘어가면 **다른 모드에는 있지도 않은 코드가 조건에 남아**, 목록에서는
+    // 전부 켜져 보이는데 판은 걸러진 채로 그려진다.
     setExcludedContents([])
     setActiveSummaryItem(null)
-    ui.setActiveIndex(null)
+    ui.setActiveTimelineItem(null)
     setPanel(null)
+  }
+
+  /*
+    시간순 인덱스 한 줄을 눌렀다.
+
+    **오른쪽 패널에 그 줄을 편다.** 왼쪽에서 제목만 보고 마는 목록이면 순번을
+    매길 이유가 없다 — 순번은 "이걸 열어서 읽어라" 로 이어질 때 값이 생긴다.
+
+    `arrow` 를 손으로 만들어 넘긴다. 화살표 패널은 `counts` 로 무엇을 읽을지
+    정하는데, 여기서 열 것은 화살표 전체가 아니라 **그 한 건**이라 그렇게
+    생긴 화살표가 판에 없다. `id` 에 `timeline::` 을 붙여 판의 화살표 id 와
+    절대 겹치지 않게 한다 — 겹치면 엉뚱한 선이 골라진 것으로 그려진다.
+  */
+  const selectTimelineItem = (item) => {
+    const same = ui.activeTimelineItem?.edge_id === item.edge_id
+    ui.toggleTimelineItem(item)
+
+    if (same) {
+      setPanel(null)
+      return
+    }
+    setPanel({
+      kind: 'edge',
+      badgeId: null,
+      count: null,
+      arrow: {
+        id: `timeline::${item.edge_id}`,
+        direction_label: item.direction_label,
+        counts: [{
+          content_type: item.content_type,
+          label: item.label,
+          count: 1,
+          edge_ids: [item.edge_id],
+        }],
+      },
+      direction: item.direction_label,
+      edgeIds: [item.edge_id],
+    })
+  }
+
+  /*
+    재생을 시작할 때 켜져 있던 것을 끈다.
+
+    고른 줄·요약표 칸·열린 패널을 그대로 두면, 판이 비워지는 순간 오른쪽에는
+    아직 안 나타난 내용이 펼쳐져 있고 왼쪽에는 그 줄만 진하게 켜져 있다.
+    재생은 처음부터 다시 훑겠다는 뜻이므로 읽던 자리도 같이 접는다.
+  */
+  const startPlayback = () => {
+    ui.setActiveTimelineItem(null)
+    setActiveSummaryItem(null)
+    setPanel(null)
+    playback.start()
   }
 
   const selectNode = (node) => {
@@ -288,13 +557,44 @@ export function FlowBoardPage() {
       : { kind: 'node', nodeId: node.id, node })
   }
 
+  /*
+    화살표 뱃지 하나를 눌렀다.
+
+    누른 뱃지에 걸린 엣지만 읽지 않는다. 패널 머리에 `의견 3 · 요청사항 5 ·
+    변동사항 2` 가 나란히 서는 자리라(시안 `601:10010`), **그 화살표에 걸린
+    것 전부**를 읽어야 그 줄을 그릴 수 있다. 누른 뱃지는 어느 묶음을 가리켜
+    열었는지로만 쓴다.
+  */
   const selectBadge = (badgeId, count, arrow) => {
     setPanel({
       kind: 'edge',
       badgeId,
       count,
+      arrow,
       direction: arrow.direction_label,
-      edgeIds: count.edge_ids ?? [],
+      edgeIds: (arrow.counts ?? []).flatMap((entry) => entry.edge_ids ?? []),
+    })
+  }
+
+  /*
+    화살표(선)를 직접 눌렀다.
+
+    뱃지만 눌리던 자리였다. 그런데 뱃지는 종류마다 하나씩이라 **화살표 전체가
+    무엇을 날랐는지 보려면 아무 종류나 하나 눌러야** 했고, 종류가 하나뿐인
+    화살표에서는 그 하나가 곧 전체인지 알 수 없었다. 시안(`601:9343`)은 선을
+    눌러 그 화살표의 패널을 연다.
+
+    `count` 를 안 넘긴다 — 가리켜 열 묶음이 없으므로 알약이 아무것도 안 켜진
+    채로 뜬다. 뱃지로 열었을 때만 그 종류가 켜져 있는 것이 맞다.
+  */
+  const selectLink = (link) => {
+    setPanel({
+      kind: 'edge',
+      badgeId: null,
+      count: null,
+      arrow: link.arrow,
+      direction: link.arrow.direction_label,
+      edgeIds: (link.arrow.counts ?? []).flatMap((entry) => entry.edge_ids ?? []),
     })
   }
 
@@ -352,47 +652,73 @@ export function FlowBoardPage() {
 
       <FlowNavigationSidebar
         activeCategory={mode}
-        activeIndex={ui.activeIndex}
-        collapsedFilters={ui.collapsedFilters}
+        activeEdgeId={ui.activeTimelineItem?.edge_id ?? null}
         contentFilters={contentRows}
         icons={icons}
-        indexEmptyText={mode === WORK_MODE ? '묶인 문서가 없습니다.' : '잡힌 안건이 없습니다.'}
-        indexes={indexes.data?.results ?? []}
         isCollapsed={ui.isFlowSidebarCollapsed}
+        isContentCollapsed={ui.isContentCollapsed}
         isScrolled={ui.isSidebarScrolled}
-        isTimeOrdered={ui.isTimeOrdered}
+        isTimelineCollapsed={ui.isTimelineCollapsed}
         onCategorySelect={switchMode}
-        onContentToggle={toggleExcluded(setExcludedContents)}
-        onFilterCollapseToggle={ui.toggleFilterCollapse}
-        onIndexSelect={ui.toggleIndex}
-        onParticipantKeywordChange={ui.setParticipantKeyword}
-        onParticipantSearchSubmit={checkOnly}
-        onParticipantToggle={toggleExcluded(setExcludedParticipants)}
+        onContentCollapseToggle={ui.toggleContentCollapse}
+        onContentToggle={toggleContent}
         onScroll={(event) => ui.setIsSidebarScrolled(event.currentTarget.scrollTop > 0)}
         onSidebarToggle={ui.toggleFlowSidebar}
         onTeamSwitch={() => setSwitchingTeam(true)}
-        onTimeOrderToggle={ui.toggleTimeOrder}
-        participantKeyword={ui.participantKeyword}
-        participants={participantRows}
+        onTimelineCollapseToggle={ui.toggleTimelineCollapse}
+        onTimelineSelect={selectTimelineItem}
+        /*
+          `start` 만 갈아 끼운다. 재생을 시작할 때 읽던 자리를 접는 것은 판을
+          아는 이 화면의 몫이라 훅에 넣을 수 없고, 사이드바는 `playback.start`
+          하나만 부르므로 여기서 바꿔 주는 것이 가장 짧다.
+        */
+        playback={{ ...playback, start: startPlayback }}
         teamName={meeting.data?.detail?.project_name}
+        timeline={pickedTimeline}
+        /* 껐기 때문에 빈 것과 원래 없는 것은 다르다. 앞엣것을 `오간 내용이
+           없습니다` 로 말하면 사용자는 자기가 끈 것을 잊고 고장으로 읽는다. */
+        timelineEmptyText={nothingPicked
+          ? '내용 종류가 전부 꺼져 있습니다.'
+          : (mode === WORK_MODE ? '이 기간에 오간 작업이 없습니다.' : '이 회의에서 오간 내용이 없습니다.')}
       />
 
       <main className={panel ? 'flow-workspace has-record-panel' : 'flow-workspace'}>
         <section
           className={isPanning ? 'flow-board is-panning' : 'flow-board'}
           aria-label="회의 플로우보드"
-          ref={boardRef}
-          onWheel={handleBoardWheel}
+          ref={attachBoard}
           onPointerDown={handleBoardPointerDown}
           onPointerMove={handleBoardPointerMove}
           onPointerUp={stopBoardPan}
           onPointerCancel={stopBoardPan}
         >
-          <header className="meeting-title">
+          <header className="meeting-title" ref={meetingMenuRef}>
+            {/*
+              사이드바를 접으면 여는 단추가 여기로 온다.
+
+              예전에는 접힌 사이드바의 머리(`team-header`)가 화면 왼쪽 위에
+              **떠 있는 흰 카드**로 남아 그 안의 `«` 로만 다시 펼 수 있었다.
+              접었는데 왼쪽에 카드가 하나 떠 있으면 접은 것으로 보이지 않고,
+              카드가 판 위를 덮기도 했다. 접힌 뒤 왼쪽 끝에 남는 것은 회의
+              제목 줄 하나이므로, 여는 단추도 그 줄 맨 앞에 둔다.
+            */}
+            {ui.isFlowSidebarCollapsed ? (
+              <button
+                className="meeting-title-menu"
+                type="button"
+                aria-label="사이드바 펼치기"
+                data-tip="사이드바 펼치기"
+                aria-expanded="false"
+                onClick={ui.toggleFlowSidebar}
+              >
+                <img src={icons.menu} alt="" />
+              </button>
+            ) : null}
             <h1>{headerLabel}</h1>
             <button
               type="button"
               aria-label="회의 선택"
+              data-tip="다른 회의 보기"
               aria-expanded={ui.isMeetingMenuOpen}
               onClick={ui.toggleMeetingMenu}
             >
@@ -442,9 +768,10 @@ export function FlowBoardPage() {
                 layout={layout}
                 myNodeId={myNodeId}
                 onBadgeSelect={selectBadge}
+                onLinkSelect={selectLink}
                 onNodeSelect={selectNode}
+                selectedArrowId={panel?.kind === 'edge' ? panel.arrow?.id : null}
                 selectedNodeId={selectedNodeId}
-                showRecency={ui.isTimeOrdered}
                 style={{ transform: `scale(${renderedZoom})` }}
               >
                 <article
@@ -474,18 +801,34 @@ export function FlowBoardPage() {
                           // 하나가 사라지고, 누를 때도 둘이 같이 눌린다.
                           const itemKey = `${column.title}-${i}`
 
+                          /*
+                            말풍선은 붙이지 않는다. 안내 말풍선은 그림만 있는
+                            단추의 뜻을 알려 주는 자리인데, 여기는 글이 이미
+                            적혀 있어서 같은 글이 아래에 한 번 더 뜬다.
+
+                            상세가 있는 칸만 안건 패널을 연다. 없는 칸까지
+                            열면 맥락도 갈린 지점도 비어 있는 패널이 떠서,
+                            **그 안건에 논의가 없었던 것으로 읽힌다.**
+                          */
                           return (
                             <button
                               className={activeSummaryItem === itemKey ? 'is-active' : ''}
                               type="button"
                               key={itemKey}
-                              title={item}
+                              data-tip={item}
                               onClick={() => {
-                                setActiveSummaryItem((current) => (current === itemKey ? null : itemKey))
-                                setPanel({ kind: 'briefing' })
+                                const same = activeSummaryItem === itemKey
+                                setActiveSummaryItem(same ? null : itemKey)
+                                if (same) {
+                                  setPanel({ kind: 'briefing' })
+                                  return
+                                }
+                                setPanel(item.detail
+                                  ? { kind: 'agenda', column: column.title, item: item.detail }
+                                  : { kind: 'briefing' })
                               }}
                             >
-                              {item}
+                              {item.text}
                             </button>
                           )
                         })}
@@ -505,8 +848,10 @@ export function FlowBoardPage() {
               {flow.error && !flow.data ? (
                 <div className="board-status"><LoadError error={flow.error} onRetry={flow.reload} /></div>
               ) : null}
+              {/* 종류를 전부 끄면 그릴 것이 없다. 판이 빈 것과 조회가 실패한 것을
+                  구별해 주지 않으면 사용자는 자기가 끈 것을 잊고 고장으로 읽는다. */}
               {nothingPicked ? (
-                <div className="board-status"><Empty>필터가 전부 꺼져 있습니다. 하나 이상 켜 주세요.</Empty></div>
+                <div className="board-status"><Empty>내용 종류가 전부 꺼져 있습니다. 하나 이상 켜 주세요.</Empty></div>
               ) : null}
               {!flow.loading && !flow.error && !nothingPicked && layout.nodes.length === 0 ? (
                 <div className="board-status">
@@ -517,18 +862,30 @@ export function FlowBoardPage() {
           </div>
 
           {/*
-            `zoom > minZoom` 일 때만 그리던 탓에 기본 상태에서는 확대 버튼이
-            **화면에 아예 없었다.** 확대하려면 먼저 확대해야 하는 셈이었다.
+            확대한 동안에만 그린다(110% · 120%).
+
+            판이 이 화면의 전부라, 100% 로 보고 있을 때 그 위에 겹쳐 뜬 상자는
+            아무 일도 하지 않으면서 판만 가린다. 배율을 되돌릴 곳은 배율을
+            바꾼 뒤에 필요하다.
+
+            **대신 100% 에서 확대로 들어가는 길은 `Ctrl`(`Cmd`) + 휠 하나뿐이다.**
+            이건 알고 있는 사람만 쓰는 길이라, 확대를 처음 하려는 사람은 방법을
+            찾지 못한다. 예전에 같은 이유로 이 상자를 늘 그리도록 되돌린 적이
+            있다 — 그때와 달리 이번에는 판을 가리지 않는 쪽을 골랐다.
+
+            되돌릴 거리는 이 조건 하나다. `zoom > minZoom` 을 지우면 된다.
           */}
-          <div className="zoom-controls" aria-label="플로우보드 확대 축소">
-            <button type="button" aria-label="축소" onClick={zoomOut} disabled={zoom <= minZoom}>
-              -
-            </button>
-            <output aria-live="polite">{zoomPercent}%</output>
-            <button type="button" aria-label="확대" onClick={zoomIn} disabled={zoom >= maxZoom}>
-              +
-            </button>
-          </div>
+          {zoom > minZoom ? (
+            <div className="zoom-controls" aria-label="플로우보드 확대 축소">
+              <button type="button" aria-label="축소" data-tip="축소" onClick={zoomOut} disabled={zoom <= minZoom}>
+                -
+              </button>
+              <output aria-live="polite">{zoomPercent}%</output>
+              <button type="button" aria-label="확대" data-tip="확대" onClick={zoomIn} disabled={zoom >= maxZoom}>
+                +
+              </button>
+            </div>
+          ) : null}
         </section>
 
         {panel?.kind === 'briefing' ? (
@@ -546,7 +903,7 @@ export function FlowBoardPage() {
             <aside className="briefing-panel inspector-panel" aria-label="Bordo 브리핑">
               <header className="briefing-header">
                 <h2>Bordo 브리핑</h2>
-                <button className="panel-close" type="button" aria-label="패널 닫기" onClick={() => setPanel(null)}>
+                <button className="panel-close" type="button" aria-label="패널 닫기" data-tip="닫기" onClick={() => setPanel(null)}>
                   ×
                 </button>
               </header>
@@ -557,19 +914,57 @@ export function FlowBoardPage() {
           )
         ) : null}
 
+        {panel?.kind === 'agenda' ? (
+          <FlowAgendaPanel
+            column={panel.column}
+            icons={icons}
+            item={panel.item}
+            onBack={() => {
+              setPanel({ kind: 'briefing' })
+              // 켜진 칸도 같이 끈다. 남겨 두면 브리핑이 떠 있는데 요약표
+              // 한 칸만 진하게 켜져 있어, 그 칸을 보여 주는 중인 줄 안다.
+              setActiveSummaryItem(null)
+            }}
+            onClose={() => {
+              setPanel(null)
+              // 패널을 닫으면 요약표의 켜진 칸도 같이 끈다. 남겨 두면 판에는
+              // 아무것도 안 열렸는데 요약표 한 칸만 진하게 켜져 있다.
+              setActiveSummaryItem(null)
+            }}
+          />
+        ) : null}
+
         {panel?.kind === 'node' && selectedNode ? (
           <FlowNodePanel
+            meetingId={meetingId}
             node={selectedNode}
             participant={participantOf(selectedNode)}
+            seqOf={seqOf}
             onClose={() => setPanel(null)}
           />
         ) : null}
 
         {panel?.kind === 'edge' ? (
           <FlowEdgePanel
+            /*
+              화살표가 바뀌면 **패널을 새로 만든다.**
+
+              같은 컴포넌트를 그대로 두고 값만 갈아 끼우면 안에 들고 있던
+              검색어와 고른 알약이 그대로 남는다. 실제로 한 화살표에서 `토큰`
+              을 검색해 두고 다른 화살표를 누르면, 그쪽에는 그 낱말이 없어
+              **비어 있는 패널**이 떴다. 뱃지로 열어도 그 종류가 안 켜졌다 —
+              첫 상태는 처음 만들어질 때 한 번만 읽히기 때문이다.
+
+              `key` 를 바꿔 다시 만들게 하는 것이 리액트가 상태를 되돌리는
+              방법이다. effect 에서 되돌리면 렌더가 한 번 더 돌고, 그 사이
+              한 프레임 동안 남의 검색 결과가 비친다.
+            */
+            key={`${panel.arrow?.id}::${panel.badgeId ?? ''}`}
+            arrow={panel.arrow}
             count={panel.count}
             direction={panel.direction}
             edges={edgeDetails}
+            seqOf={seqOf}
             onClose={() => setPanel(null)}
           />
         ) : null}

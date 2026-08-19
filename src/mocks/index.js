@@ -32,7 +32,9 @@ import {
 import {
   meetingIndexes, meetings, projectMeetings, summaryTables, workIndexes,
 } from './data/meetings.js'
-import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
+import {
+  flowEdges, meetingFlows, meetingTimelines, participantFlows, projectFlows, projectTimelines,
+} from './data/flow.js'
 import { PREP_STATUS_LABEL, preps } from './data/prep.js'
 import { teamMembers } from './data/home.js'
 import { inbox } from './data/inbox.js'
@@ -40,7 +42,7 @@ import { TEAM } from './data/people.js'
 import { tasks } from './data/tasks.js'
 import { calendarEvents } from './data/calendar.js'
 import {
-  activeDates, chatCandidates, chatRooms,
+  activeDates, awayHandled, chatCandidates, chatRooms,
   dailySummaries, roomDetails, roomMessages,
 } from './data/chat.js'
 
@@ -48,6 +50,9 @@ import {
 const DELAY = 120
 
 const EMPTY = { count: 0, results: [] }
+
+/** 이번 방문에 `+` 로 만든 대리인 대화를 담아 두는 자리(`store.js`). */
+const FRESH_CONVERSATIONS = 'conversations'
 
 /** 화면 안내와 짝이 맞는 데모 Discord 연결 코드. */
 const DEMO_DISCORD_CODE = '4F2A91'
@@ -375,8 +380,24 @@ function resolve(path, method, body) {
     if (a === 'meetings' && b && !c) return meetings[b] ?? null
     if (a === 'meetings' && c === 'prep') return livePrep(b)
     if (a === 'meetings' && c === 'flow') return meetingFlows[b] ?? null
+    /*
+      판에서 사람·대리인을 눌렀을 때 열리는 우측 패널(시안 `601:9055`).
+      노드 id 는 대리인일 때 `{user_id}:agent` 라 `:` 가 들어간다 — 경로
+      조각 하나로 그대로 온다.
+    */
+    if (a === 'meetings' && c === 'participants' && s[4] === 'flow') {
+      return participantFlows[`${b}::${decodeURIComponent(s[3])}`] ?? null
+    }
     if (a === 'meetings' && c === 'summary-table') return summaryTables[b] ?? null
     if (a === 'meetings' && c === 'ai-briefing') return viewerBriefing(b)
+    /*
+      좌측 `시간순 인덱스`. 판과 같은 원장에서 나온다.
+
+      없는 회의에 `null` 이 아니라 빈 목록을 준다 — 좌측은 "아직 오간 것이
+      없습니다" 를 그릴 수 있으면 그만이고, `null` 로 내리면 화면이 그것을
+      조회 실패와 구별하지 못한다.
+    */
+    if (a === 'meetings' && c === 'timeline') return meetingTimelines[b] ?? EMPTY
     if (a === 'meetings' && c === 'indexes') {
       // 회의 안건과 작업 문서는 같은 주소에 `category` 로 갈린다.
       const work = /category=WORK/.test(path)
@@ -391,9 +412,24 @@ function resolve(path, method, body) {
       return projectCalendarEvents(b, query.get('from'), query.get('to'))
     }
     if (a === 'projects' && c === 'flow') return projectFlows[b] ?? null
+    if (a === 'projects' && c === 'timeline') return projectTimelines[b] ?? EMPTY
     if (a === 'projects' && c === 'meetings') return projectMeetings[b] ?? EMPTY
 
     if (a === 'flow-edges' && b) return flowEdges[b] ?? null
+
+    /*
+      내가 지금 자리에 있는지.
+
+      `patch` 저장소에 둔다 — 이번 방문 동안만 유지되고 새로고침하면 기본값
+      (`활동 중`)으로 돌아간다. 가짜 상태를 `localStorage` 에 눌러앉히면
+      나중에 "왜 계속 부재 중이지" 를 디버깅하게 된다.
+    */
+    if (path === '/me/presence') {
+      return { status: patchedOf('presence')?.status ?? 'ACTIVE' }
+    }
+
+    // 자리를 비운 사이 내 Bordo 가 대신 나눈 대화.
+    if (path === '/chat/away-handled') return awayHandled
 
     if (path === '/chat/sidebar') return applyReadPatches(viewerSidebar())
     if (path.startsWith('/chat/important')) return liveImportant()
@@ -423,7 +459,25 @@ function resolve(path, method, body) {
     if (path === '/me/inbox') return applyTaskPatches(inbox)
     if (a === 'tasks' && b && !c) return effectiveTask(b)
     if (path === '/me/agent/prompts') return viewerAgentPrompts()
-    if (path === '/me/agent/conversations') return viewerConversations()
+    if (path === '/me/agent/conversations') {
+      /*
+        이번에 만든 대화를 **맨 앞에** 잇는다.
+
+        `AgentDock` 은 판을 열 때마다 이 목록을 다시 읽는다. 안 이으면
+        방금 `+` 로 만들어 말까지 주고받은 대화가 접었다 펴는 순간
+        사라진다 — 오류도 안내도 없어서, 보는 사람은 저장이 안 된
+        것인지 목록이 고장 난 것인지 구별하지 못한다.
+
+        앞에 두는 이유는 서버가 최근 순으로 주기 때문이다. 뒤에 붙이면
+        가장 최근에 만든 대화가 목록 바닥에 깔린다.
+      */
+      const base = viewerConversations()
+      const fresh = [...withAppended(FRESH_CONVERSATIONS, [])].reverse()
+      if (!fresh.length) {
+        return base
+      }
+      return { count: (base.count ?? 0) + fresh.length, results: [...fresh, ...(base.results ?? [])] }
+    }
     if (a === 'me' && s[2] === 'conversations' && s[4] === 'messages') {
       const base = viewerConversationMessages(s[3]) ?? { results: [], next_before: null }
       /*
@@ -654,6 +708,28 @@ function resolve(path, method, body) {
     }
 
     /*
+      새 대화(`+`).
+
+      **여기가 비어 있어서 `+` 로 시작한 대화는 첫 마디에서 끊겼다** —
+      `가상 데이터에 없는 주소입니다: POST /me/agent/conversations`.
+      백엔드에는 처음부터 있던 주소다(`apps/agent/views.py`의
+      `conversations`), 가상 데이터만 몰랐다.
+
+      돌려주는 칸은 `AgentConversationSerializer` 그대로다 —
+      `id` · `title` · `last_message_preview` · `updated_at`. 제목 기본값
+      `새 대화` 도 서버와 같게 둔다. 여기서만 그럴듯한 제목을 지어 두면
+      실서버에 붙이는 순간 목록 모양이 달라진다.
+    */
+    if (path === '/me/agent/conversations') {
+      return appendTo(FRESH_CONVERSATIONS, {
+        id: `mock-conv-${nextId()}`,
+        title: body?.title || '새 대화',
+        last_message_preview: '',
+        updated_at: new Date().toISOString(),
+      })
+    }
+
+    /*
       대리인 대화.
 
       사용자 메시지를 담아 두고, **대리인 답도 만들어 둔다.** 화면이 3초마다
@@ -677,7 +753,35 @@ function resolve(path, method, body) {
         sent_at: new Date().toISOString(),
         run: { status: 'DONE', run_id: `mock-run-${nextId()}` },
       })
+      /*
+        서버는 첫 메시지로 임시 제목을 잡고 미리보기를 갱신한다
+        (`apps/agent/views.py`). 안 맞추면 `+` 로 만든 대화가 목록에
+        `새 대화 · 아직 주고받은 말이 없습니다` 로 남아, 방금 나눈
+        대화를 목록에서 다시 찾을 수가 없다.
+
+        미리 구운 대화에는 해당하지 않는다 — 그쪽은 `withAppended` 가
+        찾지 못하므로 그대로 둔다.
+      */
+      const row = withAppended(FRESH_CONVERSATIONS, []).find((c) => c.id === s[3])
+      if (row) {
+        row.last_message_preview = (body?.body ?? '').slice(0, 200)
+        if (row.title === '새 대화') {
+          row.title = (body?.body ?? '').slice(0, 40)
+        }
+        row.updated_at = new Date().toISOString()
+      }
       return { ...mine, run: { status: 'RECEIVED', run_id: null } }
+    }
+
+    /*
+      자리 비움 전환.
+
+      `ACTIVE` · `AWAY` 두 값뿐이다. 서버가 이 값을 알아야 하는 이유는
+      화면 표시가 아니라 **대리인이 대신 답할지**가 여기서 갈리기 때문이다 —
+      브라우저에만 두면 창을 닫는 순간 내 Bordo 가 다시 조용해진다.
+    */
+    if (path === '/me/presence') {
+      return patch('presence', { status: body?.status === 'AWAY' ? 'AWAY' : 'ACTIVE' })
     }
 
     // 대리인 설정. 부분 갱신이라 **보낸 것만** 얹는다 — 통째로 돌려주면

@@ -10,7 +10,10 @@ import { ChatSettingsPanel } from './ChatSettingsPanel.jsx'
 import {
   clearRoomUnread,
   confirmMessageImportant,
+  fetchAwayHandled,
   fetchImportant,
+  fetchPresence,
+  setPresence,
   fetchSidebar,
   markRead,
   toDirectRows,
@@ -33,7 +36,7 @@ function BordoSettingsPage({ onBack }) {
   return (
     <div className="settings-page">
       <GlobalSidebar active="chat" onNavigate={handleNavigate} />
-      <AgentSettingsPanel />
+      <AgentSettingsPanel onBack={onBack} />
       <main className="settings-brand" aria-label="설정 미리보기">
         <p>Bordo</p>
       </main>
@@ -76,12 +79,94 @@ export function ChatPage() {
   // 앞의 둘은 오른쪽 칸만 바뀌고, 대리인 설정만 화면을 통째로 덮는다.
   const [view, setView] = useState('chat')
   const [notice, setNotice] = useState('')
-  // 전체 화면 = 목록과 전역 메뉴를 접는 것. 대화창 안에 두면 목록을 접어도
-  // 목록이 그대로 남아 아무 일도 안 일어난다.
+  /*
+    전체 화면 = **채팅 목록만** 접는 것.
+
+    대화창 안에 두면 목록을 접어도 목록이 그대로 남아 아무 일도 안 일어나므로
+    여기서 다룬다.
+
+    맨 왼쪽 전역 메뉴는 접지 않는다. 그것까지 걷으면 홈 · 받은 항목 · 일정으로
+    가는 길이 통째로 사라져서, 대화를 크게 보려고 누른 버튼이 **화면을 빠져나갈
+    수 없는 상태**를 만든다. 접어서 얻는 64px 보다 잃는 것이 크다.
+  */
   const [fullscreen, setFullscreen] = useState(false)
 
   const sidebar = useResource((signal) => fetchSidebar(signal), [], { cacheKey: 'chat-sidebar' })
   const important = useResource((signal) => fetchImportant(signal), [], { cacheKey: 'chat-important' })
+
+  /*
+    자리 비움.
+
+    서버 값이라 화면이 혼자 들고 있지 않는다 — 창을 닫는 순간이 곧 자리를
+    비우는 순간이라, 브라우저에만 두면 내 Bordo 가 나설 일이 없어진다.
+
+    누르자마자 화면을 먼저 바꾸고(`pending`) 서버에 보낸다. 스위치는 눌린
+    티가 즉시 나야 하는 자리다 — 왕복을 기다리면 두 번 누른다.
+  */
+  const presence = useResource((signal) => fetchPresence(signal), [], { cacheKey: 'presence' })
+  const [pendingPresence, setPendingPresence] = useState(null)
+  const presenceStatus = pendingPresence ?? presence.data?.status ?? 'ACTIVE'
+
+  const awayHandled = useResource((signal) => fetchAwayHandled(signal), [], { cacheKey: 'chat-away' })
+
+  /**
+   * 자리 비움을 바꾼다.
+   *
+   * ## 스위치가 두 번 튀던 이유
+   *
+   * 예전에는 `pending` 을 내리는 것과 `presence` 를 **다시 읽는 것**이 따로
+   * 놀았다. `pending` 이 사라지는 순간 화면이 보는 값은 아직 안 바뀐 옛
+   * 응답이라, 한 번 누르면
+   *
+   *     자리 비움(pending) → 활동 중(옛 응답) → 자리 비움(새 응답)
+   *
+   * 이렇게 세 번 그려졌다. 가운데 한 칸이 왕복 시간만큼 떠 있어서, 스위치가
+   * 좌우로 튀는 것으로 보인다. 그 사이 버튼이 다시 눌리기까지 해서 두 번
+   * 누르면 요청이 엇갈려 상태가 뒤집힌 채로 남았다.
+   *
+   * 그래서 **서버가 돌려준 값을 그대로 가진 값에 얹는다.** 같은 렌더에서
+   * `pending` 이 내려가고 새 상태가 올라오므로 중간 칸이 아예 없다. 확인용
+   * 재조회도 없앤다 — `PATCH` 응답이 이미 서버가 정한 값이라, 한 번 더 읽는
+   * 것은 튈 자리를 한 칸 더 만드는 일일 뿐이다.
+   *
+   * 실패하면 `pending` 만 내려가고 가진 값이 그대로 남아 스위치가 원래
+   * 자리로 돌아간다 — 서버가 못 받은 것을 받은 것처럼 두지 않는다.
+   */
+  const changePresence = async (status) => {
+    if (status === presenceStatus || pendingPresence) {
+      return
+    }
+    setPendingPresence(status)
+    try {
+      const updated = await setPresence(status)
+      presence.setData((current) => ({ ...(current ?? {}), status: updated?.status ?? status }))
+      // 자리 비움을 풀면 그 사이 쌓인 것이 곧바로 목록에 와야 한다.
+      awayHandled.reload()
+    } catch {
+      // 가진 값이 그대로 남는다. 되돌리는 코드가 따로 필요 없다.
+    } finally {
+      setPendingPresence(null)
+    }
+  }
+
+  /*
+    자리를 비운 사이 Bordo 가 대신 나눈 대화.
+
+    서버가 방 기준으로 이미 묶어서 준다(`handled_count` 포함). 화면이 방마다
+    메시지를 받아 세게 두면 목록 하나 그리려고 방 수만큼 요청이 나간다.
+  */
+  const awayRooms = useMemo(
+    () => (awayHandled.data?.results ?? []).map((row) => ({
+      id: row.room_id,
+      name: row.title,
+      context: row.path_label || undefined,
+      message: row.last_reply.preview,
+      sentAt: row.last_reply.sent_at,
+      handledCount: row.handled_count,
+      avatars: row.avatar_urls ?? [],
+    })),
+    [awayHandled.data],
+  )
 
   const importantRooms = useMemo(
     // 중요 채팅은 **메시지 목록**으로 온다. 같은 방의 메시지가 여럿이면 방이
@@ -233,11 +318,14 @@ export function ChatPage() {
 
   return (
     <div className={fullscreen ? 'chat-page fullscreen' : 'chat-page'}>
-      {fullscreen ? null : <GlobalSidebar active="chat" />}
+      <GlobalSidebar active="chat" />
       {fullscreen ? null : <ChatListPanel
-        importantRooms={importantRooms}
+        awayRooms={awayRooms}
+        presence={presenceStatus}
+        presenceBusy={Boolean(pendingPresence)}
         selectedChatId={selectedChatId}
         sidebar={sidebar.data}
+        onPresenceChange={changePresence}
         onCreatedRoom={(room) => {
           // 만들자마자 연다. 목록에 새 줄이 생기기만 하면 사용자는 어느 것이
           // 방금 만든 것인지 찾아야 한다.
@@ -282,8 +370,11 @@ export function ChatPage() {
           fullscreen={fullscreen}
           room={openRoom}
           roomId={selectedChatId}
+          presence={presenceStatus}
           onClose={() => setSelectedChatId(null)}
+          onPresenceChange={changePresence}
           onImportantChanged={refreshImportant}
+          onOpenAgentSettings={() => setView('agent')}
           onOpenSettings={() => setView('room-settings')}
           onToggleFullscreen={() => setFullscreen((on) => !on)}
         />

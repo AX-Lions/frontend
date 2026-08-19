@@ -39,6 +39,13 @@ export function ChatDateCalendar({ roomId, initialMonth, selectedDate, onPick, o
       {/* 바깥을 눌러 닫는다. 키보드로도 닫을 수 있게 아래에 닫기 버튼을 둔다. */}
       <button className="chat-overlay-backdrop" type="button" aria-label="닫기" onClick={onClose} />
       <div className="chat-calendar">
+        {/*
+          머리 · 몸 · 발을 선으로 가른다.
+
+          예전에는 달 이름 · 날짜판 · 닫기가 여백만으로 붙어 있어서, 팝업
+          전체가 한 덩어리로 보였다. 이 팝업에서 고르는 것은 **날짜 하나**인데
+          그 판이 어디서 시작해 어디서 끝나는지가 안 잡힌다.
+        */}
         <header className="chat-calendar-header">
           <button
             type="button"
@@ -59,6 +66,7 @@ export function ChatDateCalendar({ roomId, initialMonth, selectedDate, onPick, o
           </button>
         </header>
 
+        <div className="chat-calendar-body">
         {loading && !data ? <Loading label="대화한 날짜를 확인하는 중입니다…" /> : null}
         {error && !data ? <LoadError error={error} /> : null}
 
@@ -85,7 +93,7 @@ export function ChatDateCalendar({ roomId, initialMonth, selectedDate, onPick, o
                     key={date}
                     type="button"
                     disabled={!hasChat}
-                    title={hasChat ? `${date} 대화 보기` : '이 날은 대화가 없습니다.'}
+                    data-tip={hasChat ? `${date} 대화 보기` : '이 날은 대화가 없습니다.'}
                     onClick={() => onPick(date)}
                   >
                     {day}
@@ -98,8 +106,15 @@ export function ChatDateCalendar({ roomId, initialMonth, selectedDate, onPick, o
             ) : null}
           </>
         ) : null}
+        </div>
 
         <footer className="chat-calendar-footer">
+          {/* 진한 날과 흐린 날이 무슨 뜻인지 적어 둔다. 색만으로 두면 흐린 날이
+              고를 수 없는 날인지 그냥 지난 날인지 알 수 없다. */}
+          <span className="chat-calendar-legend">
+            <i aria-hidden="true" />
+            대화가 있는 날만 고를 수 있습니다
+          </span>
           <button type="button" onClick={onClose}>닫기</button>
         </footer>
       </div>

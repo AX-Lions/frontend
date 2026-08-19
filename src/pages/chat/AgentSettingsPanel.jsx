@@ -8,6 +8,7 @@ import {
   patchAgentSettings,
   updatePrompt,
 } from './chat.data.js'
+import { icons } from './chat.icons.js'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
@@ -64,24 +65,31 @@ function SettingSwitch({ enabled, disabled = false, onToggle }) {
 }
 
 /**
- * 화면의 스위치 ↔ 서버의 설정 키.
+ * 화면의 스위치 ↔ 서버의 설정 키. **여섯씩 1:1 이다.**
  *
- * **화면은 6칸인데 서버는 4개다.** `작업 공개` · `계획 공개` · `생각 공개` 셋이
- * `disclose_work_plan_thought` 하나에 걸려 있어 **따로 끌 수 없다.**
+ * 전에는 공개 셋이 `disclose_work_plan_thought` 하나에 걸려 있어, 하나를 끄면
+ * 나머지 둘이 같이 꺼졌다. 화면은 셋을 따로 정할 수 있다고 말해 놓고 그러지
+ * 못했다 — **사용자는 껐다고 생각한 것이 계속 나갔다.**
  *
- * 셋을 각각 화면에서만 기억하게 두면, 끄고 새로고침했을 때 다시 켜져 있다.
- * 저장되지 않는 스위치는 저장된 척하는 스위치보다 낫다 — 그래서 같은 키에 묶어
- * 함께 움직이게 뒀다. 사용자는 셋이 하나라는 것을 눈으로 본다.
+ * 서버가 셋으로 갈렸다(backend #88). 옛 한 칸은 지난 실행의 스냅샷을 읽기 위한
+ * 호환용으로만 남아 있고, 지금 판정에 쓰이는 것은 낱개 셋이다.
  *
- * 쪼갤지 합칠지는 디자인 확인이 필요해 이슈로 남겼다(frontend #11).
+ * ## 왜 합치지 않고 나누는가
+ *
+ * 회의별로 「작업만 켜고 계획은 끄기」 가 실제로 저장된다(준비 화면의 자료 범위).
+ * 화면을 한 칸으로 합치면 그 상태를 **표현할 수 없다.**
+ *
+ * 옛 한 칸은 「하나라도 켜져 있으면 참」 이라 섞인 상태에서 ON 으로 보이는데,
+ * 그것을 껐다 켜면 셋을 전부 ON 으로 되돌린다. 꺼 뒀던 계획 공개가 조용히
+ * 켜지는 셈이라, 고치려던 문제와 같은 종류가 방향만 바뀌어 남는다.
  */
 const SETTING_KEY = {
   feasibility: 'mention_feasibility',
   schedule: 'allow_schedule_change',
   'meeting-question': 'allow_midmeeting_question',
-  'work-open': 'disclose_work_plan_thought',
-  'plan-open': 'disclose_work_plan_thought',
-  'thought-open': 'disclose_work_plan_thought',
+  'work-open': 'disclose_work',
+  'plan-open': 'disclose_plan',
+  'thought-open': 'disclose_thought',
 }
 
 function PromptCard({ prompt, selected, onSelect, onSave, onRemove }) {
@@ -151,7 +159,7 @@ function PromptCard({ prompt, selected, onSelect, onSave, onRemove }) {
   )
 }
 
-export function AgentSettingsPanel() {
+export function AgentSettingsPanel({ onBack }) {
   const settingsResource = useResource((signal) => fetchAgentSettings(signal), [], { cacheKey: 'agent-settings' })
   const promptsResource = useResource((signal) => fetchPrompts(signal), [], { cacheKey: 'agent-prompts' })
   const { data: serverSettings, setData: setServerSettings } = settingsResource
@@ -273,6 +281,17 @@ export function AgentSettingsPanel() {
   return (
     <aside className="settings-panel" aria-label="Bordo 설정">
       <header className="settings-header">
+        {/*
+          제목 왼쪽의 뒤로 가기(시안 `586:7774`).
+
+          이 화면은 채팅을 **통째로 덮는다.** 그런데 나갈 길이 왼쪽 레일의
+          `채팅` 아이콘 하나뿐이었다 — 설정에 들어온 사람은 그 아이콘이
+          "돌아가기" 라는 것을 알 수 없고, 아이콘 줄은 화면이 좁아지면
+          접히기까지 한다. 제목 옆이 나가는 자리다.
+        */}
+        <button className="settings-back" type="button" aria-label="뒤로 가기" data-tip="채팅으로" onClick={onBack}>
+          <img src={icons.expandLeft} alt="" />
+        </button>
         <h1>Bordo 설정</h1>
       </header>
 
