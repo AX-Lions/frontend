@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 
 import { getCurrentTeamId, onCurrentTeamChange } from '../../lib/currentTeam.js'
+import { navigate, useSearchParam } from '../../app/navigation.js'
 import { useResource } from '../../lib/useResource.js'
 import { Loading, LoadError } from '../../shared/components/LoadState.jsx'
 import { ConfirmedScheduleDialog } from '../home/ConfirmedScheduleDialog.jsx'
@@ -10,7 +11,7 @@ import { fetchHome, fetchTeamMembers } from '../home/home.api.js'
 // `Sidebar` 는 자기 스타일을 안 갖고 다닌다(`.sidebar` · `.home-layout` 이
 // 전부 `home.css` 에 있다) — 홈 화면이 부르는 대로 여기서도 함께 가져온다.
 import '../home/home.css'
-import { fetchCalendarEvents } from './meetingSchedule.data.js'
+import { NEW_EVENT_PARAM, fetchCalendarEvents } from './meetingSchedule.data.js'
 import { NewCalendarEventDialog } from './NewCalendarEventDialog.jsx'
 import './meetingSchedule.css'
 
@@ -55,7 +56,31 @@ export function MeetingSchedulePage() {
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()))
   const [eventsByProject, setEventsByProject] = useState({})
   const [addingProject, setAddingProject] = useState(false)
-  const [addingEvent, setAddingEvent] = useState(false)
+  /*
+    홈의 `+` 로 들어왔으면 들어오자마자 「일정 추가하기」를 연다.
+
+    첫 상태를 주소에서 **읽어서 만든다.** effect 안에서 `setAddingEvent(true)`
+    를 부르면 렌더가 한 번 더 돌고(React 19 린트도 막는다), 그 한 프레임 동안
+    팝업 없는 달력이 비쳤다 사라진다.
+  */
+  const [addingEvent, setAddingEvent] = useState(
+    () => new URLSearchParams(window.location.search).get(NEW_EVENT_PARAM) === '1',
+  )
+
+  /*
+    표시는 주소에서 **바로 지운다.**
+
+    안 지우면 팝업을 닫고 새로고침하거나 뒤로 갔다 돌아왔을 때 같은 팝업이
+    다시 뜬다 — 닫았다는 뜻이 주소에 남지 않기 때문이다. `replace` 로 지워야
+    뒤로 가기가 홈으로 곧장 간다(`push` 면 같은 화면이 히스토리에 한 칸 더
+    쌓여 한 번 헛돈다).
+  */
+  const newEventFlag = useSearchParam(NEW_EVENT_PARAM)
+  useEffect(() => {
+    if (newEventFlag) {
+      navigate('/meeting-schedule', { replace: true })
+    }
+  }, [newEventFlag])
   /*
     달력의 일정 한 칸을 눌렀을 때 뜨는 「확정된 일정 확인」 팝업(시안
     `697:9393`)이 보여 줄 일정.

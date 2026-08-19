@@ -3,10 +3,10 @@ import { Sidebar } from './Sidebar.jsx'
 import { AgentDock } from './AgentDock.jsx'
 import { BriefingPrompt } from './BriefingPrompt.jsx'
 import { ConfirmedScheduleDialog } from './ConfirmedScheduleDialog.jsx'
-import { NewMeetingDialog } from './NewMeetingDialog.jsx'
 import { NewProjectDialog } from './NewProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { navigate } from '../../app/navigation.js'
+import { NEW_EVENT_PARAM } from '../meetingSchedule/meetingSchedule.data.js'
 import { getCurrentTeamId, onCurrentTeamChange } from '../../lib/currentTeam.js'
 import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
@@ -52,7 +52,6 @@ export function HomePage() {
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
   const [pendingFavorites, setPendingFavorites] = useState([])
   const [addingProject, setAddingProject] = useState(false)
-  const [addingMeeting, setAddingMeeting] = useState(false)
   // 「오늘 일정」 한 줄을 눌렀을 때 뜨는 확정된 일정 확인 팝업의 대상 회의.
   const [confirmingMeetingId, setConfirmingMeetingId] = useState(null)
   /*
@@ -424,16 +423,20 @@ export function HomePage() {
               <div className="section-heading">
                 <h2>오늘 일정</h2>
                 {/*
-                  전체 일정 화면은 아직 없다 — 화살표는 안 둔다. `+` 는
-                  화면 하나로 안 가고 팝업을 여는 것이라 이 사정과 무관하다
-                  (시안 `692:8292`).
+                  `+` 는 회의 일정 화면으로 보내고 거기서 `일정 추가하기`
+                  팝업을 연다.
+
+                  홈에서 바로 팝업을 띄우던 자리였다. 그런데 만들고 나면
+                  **방금 잡은 일정이 어디에 놓였는지 볼 수 없었다** — 오늘이
+                  아닌 날로 잡으면 홈 「오늘 일정」에는 아예 안 나타난다.
+                  달력 위에서 만들면 만든 자리가 곧 결과라 그 자리에서 확인된다.
                 */}
                 <button
                   className="icon-button"
                   type="button"
                   aria-label="회의 일정 추가"
                   data-tip="회의 일정 추가"
-                  onClick={() => setAddingMeeting(true)}
+                  onClick={() => navigate(`/meeting-schedule?${NEW_EVENT_PARAM}=1`)}
                 >
                   <img src="/icons/AddIcon.svg" alt="" />
                 </button>
@@ -611,15 +614,6 @@ export function HomePage() {
             recent_projects: [project, ...(current.recent_projects ?? [])],
             project_progress: [project, ...(current.project_progress ?? [])],
           } : current))}
-        />
-      ) : null}
-
-      {addingMeeting ? (
-        <NewMeetingDialog
-          onClose={() => setAddingMeeting(false)}
-          // 새로 만든 회의가 오늘 일정·최근 회의 어디에 걸리는지는 서버
-          // 집계 규칙이다(시간대별 "오늘" 판정 등). 흉내 내지 않고 다시 읽는다.
-          onCreated={() => reload()}
         />
       ) : null}
 
