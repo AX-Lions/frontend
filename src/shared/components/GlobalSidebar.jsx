@@ -30,8 +30,10 @@ import './GlobalSidebar.css'
  *
  * `globalNavItems` 의 순서(홈·채팅·회의·요청함)는 홈 아이콘 줄(시안
  * `666:5059`)을 따른 것이다. 이 레일은 시안이 따로 있고(`576:4858` —
- * `채팅` 이 맨 아래) 회의 아이콘 그림도 다르다 — 홈 쪽은 마이크,
- * 이 레일은 클립보드다. `globalNavItems` 를 고치면 홈까지 같이 바뀌므로
+ * `채팅` 이 맨 아래) 회의 아이콘 그림도 다르다 — 홈 쪽은 책, 이 레일은
+ * 클립보드다. 마이크는 둘 다 아니다 — 마이크(`LiveMeetingIcon`)는 지금
+ * 진행 중인 회의가 있을 때만 이 자리에 잠깐 들어선다.
+ * `globalNavItems` 를 고치면 홈까지 같이 바뀌므로
  * 여기서만 순서를 다시 짜고 아이콘을 덮어쓴다.
  *
  * ## 홈에는 이 레일이 없다
@@ -83,17 +85,17 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
       >
         <nav className="global-sidebar-nav" aria-label="주요 화면">
           {railNavItems.map((item) => {
-            // 지금 진행 중인 회의가 있으면 `회의` 아이콘이 실시간 아이콘으로
-            // 바뀐다. 눌러도 이동하지 않는다 — 참여할지 대리인을 보낼지부터
-            // 팝업으로 묻는다.
+            // 지금 진행 중인 회의가 있으면 `회의` 아이콘이 마이크로 바뀐다.
+            // 눌러도 이동하지 않는다 — 참여할지 대리인을 보낼지부터 팝업으로
+            // 묻는다. 그래서 이름도 `회의` 가 아니라 그 행동을 적는다.
             if (item.id === 'meeting' && liveMeeting) {
               return (
                 <button
                   key={item.id}
                   type="button"
                   className="global-sidebar-link global-sidebar-live"
-                  aria-label="지금 진행 중인 회의"
-                  data-tip="지금 진행 중인 회의"
+                  aria-label="진행 중인 회의 참여하기"
+                  data-tip="진행 중인 회의 참여하기"
                   onClick={openPrompt}
                 >
                   <img src="/icons/LiveMeetingIcon.svg" alt="" />
@@ -106,9 +108,9 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
                 className={className(item.id, 'global-sidebar-link')}
                 href={item.href}
                 key={item.id}
-                aria-label={item.label}
+                aria-label={item.tip ?? item.label}
                 aria-current={current(item.id)}
-                data-tip={item.label}
+                data-tip={item.tip ?? item.label}
                 onClick={(event) => onNavigate?.(event, item)}
               >
                 <img src={RAIL_ICON_OVERRIDE[item.id] ?? item.icon} alt="" />

@@ -205,12 +205,13 @@ export function Sidebar({
       return <p className="project-nav-empty">{emptyLabel}</p>
     }
 
+    /* 이름이 옆에 적혀 있으므로 말풍선은 붙이지 않는다 — 같은 글이 아래에
+       한 번 더 뜰 뿐이다. 말풍선은 그림만 있는 단추의 몫이다. */
     return list.map((project) => (
       <a
         className="project-link"
         href={projectHref(project)}
         key={project.id}
-        data-tip={project.name}
         onClick={(event) => goInApp(event, projectHref(project))}
       >
         <img className="doc-icon" src={icons.folder} alt="" aria-hidden="true" />
@@ -265,8 +266,8 @@ export function Sidebar({
                       key={item.id}
                       type="button"
                       className="sidebar-icon-btn sidebar-icon-live"
-                      aria-label="지금 진행 중인 회의"
-                      data-tip="지금 진행 중인 회의"
+                      aria-label="진행 중인 회의 참여하기"
+                      data-tip="진행 중인 회의 참여하기"
                       onClick={openPrompt}
                     >
                       <img src="/icons/LiveMeetingIcon.svg" alt="" />
@@ -343,9 +344,9 @@ export function Sidebar({
                     key={item.id}
                     className={isActive ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
                     href={item.href}
-                    aria-label={item.label}
+                    aria-label={item.tip ?? item.label}
                     aria-current={isActive ? 'page' : undefined}
-                    data-tip={item.label}
+                    data-tip={item.tip ?? item.label}
                     onClick={(event) => goInApp(event, item.href)}
                   >
                     <img src={item.icon} alt="" />
