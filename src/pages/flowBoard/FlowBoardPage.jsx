@@ -229,7 +229,6 @@ export function FlowBoardPage() {
     boardRef,
     handleBoardPointerDown,
     handleBoardPointerMove,
-    handleBoardWheel,
     isPanning,
     maxZoom,
     minZoom,
@@ -421,7 +420,6 @@ export function FlowBoardPage() {
           className={isPanning ? 'flow-board is-panning' : 'flow-board'}
           aria-label="회의 플로우보드"
           ref={boardRef}
-          onWheel={handleBoardWheel}
           onPointerDown={handleBoardPointerDown}
           onPointerMove={handleBoardPointerMove}
           onPointerUp={stopBoardPan}
