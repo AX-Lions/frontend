@@ -1154,6 +1154,14 @@ h1 {
   background: #f3f4f6;
 }
 
+/*
+  대화 칸의 스크롤 막대.
+
+  운영체제 기본 막대는 폭이 17px 쯤 되는 회색 홈통이라, 375px 짜리 알약 안에
+  들어오면 **말풍선보다 막대가 먼저 눈에 띈다.** 없앨 수는 없다 — 이 칸은
+  글이 화면보다 길어지는 것이 정상이라 막대가 유일한 위치 단서다. 그래서
+  브리핑 패널과 같은 규격(폭 8px · 안쪽 여백 2px · 손잡이만 회색)으로 맞춘다.
+*/
 .dock-thread,
 .dock-list {
   display: flex;
@@ -1161,6 +1169,32 @@ h1 {
   gap: 8px;
   overflow-y: auto;
   padding: 0 16px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #d4d6da transparent;
+}
+
+.dock-thread::-webkit-scrollbar,
+.dock-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dock-thread::-webkit-scrollbar-thumb,
+.dock-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #d4d6da;
+  background-clip: content-box;
+}
+
+.dock-thread::-webkit-scrollbar-thumb:hover,
+.dock-list::-webkit-scrollbar-thumb:hover {
+  background: #b8bbc0;
+  background-clip: content-box;
+}
+
+.dock-thread::-webkit-scrollbar-track,
+.dock-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .dock-line {

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 
+import { AgentDock } from '../home/AgentDock.jsx'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
+import { icons } from './flowBoard.api'
 import { FlowMetricBadge } from './FlowMetricBadge'
 import { toneOf } from './flowBoard.data'
 import { useParticipantFlow } from './useFlowBoardData'
@@ -39,7 +41,15 @@ const SURFACE_LABEL = {
   DISCORD: 'Discord',
 }
 
-function PanelShell({ children, onClose, subtitle, title }) {
+/**
+ * 두 패널이 같이 쓰는 껍데기.
+ *
+ * `search` 를 주면 제목 밑에 검색 칸이 붙고, `composer` 를 켜면 맨 아래에
+ * Bordo 입력창이 붙는다. 둘 다 `Bordo 브리핑` 패널(`FlowBriefingSidebar`)이
+ * 이미 쓰는 것과 **같은 클래스**다 — 세 패널이 같은 자리에서 번갈아 뜨는데
+ * 머리와 발이 제각각이면 패널이 바뀔 때마다 화면이 덜컹거린다.
+ */
+function PanelShell({ children, composer = false, onClose, search, subtitle, title }) {
   return (
     <aside className="briefing-panel inspector-panel" aria-label={title}>
       <header className="briefing-header">
@@ -48,8 +58,28 @@ function PanelShell({ children, onClose, subtitle, title }) {
           ×
         </button>
         {subtitle ? <p className="inspector-subtitle">{subtitle}</p> : null}
+
+        {search ? (
+          <label className={search.value ? 'brief-search is-active' : 'brief-search'}>
+            <img src={icons.search} alt="" />
+            <input
+              type="search"
+              aria-label={search.label}
+              placeholder="검색어를 입력하세요..."
+              value={search.value}
+              onChange={(event) => search.onChange(event.currentTarget.value)}
+            />
+          </label>
+        ) : null}
       </header>
+
       <div className="briefing-scroll inspector-scroll">{children}</div>
+
+      {/*
+        패널 맨 아래에 붙는 Bordo 입력창. 스크롤 칸 **뒤에 형제로** 둔다 —
+        안에 넣으면 끝까지 내려야 나타나서 묻고 싶을 때마다 스크롤해야 한다.
+      */}
+      {composer ? <AgentDock inline /> : null}
     </aside>
   )
 }
@@ -172,7 +202,17 @@ export function FlowNodePanel({ meetingId, node, onClose, participant }) {
 
   return (
     <PanelShell
-      title={node.name}
+      /*
+        `서재민` 이 아니라 `서재민의 회의록`.
+
+        이름만 적혀 있으면 그 사람의 프로필처럼 보인다 — 실제 내용은 **이
+        회의에서** 그 사람이 주고받은 것이라, 회의가 바뀌면 통째로 달라진다.
+        제목이 그 범위를 말해야 패널만 보고도 무엇을 읽는지 안다.
+
+        대리인은 이름이 이미 `유수인의 Bordo` 라 `의` 를 한 번 더 붙이면
+        `유수인의 Bordo의 회의록` 이 된다. 그쪽은 조사를 뺀다.
+      */
+      title={isAgent ? `${node.name} 회의록` : `${node.name}의 회의록`}
       subtitle={isAgent ? 'AI 대리인' : (attendance ?? '참여자')}
       onClose={onClose}
     >
@@ -257,6 +297,8 @@ export function FlowNodePanel({ meetingId, node, onClose, participant }) {
  */
 export function FlowEdgePanel({ arrow, count, direction, edges, onClose }) {
   const [selected, setSelected] = useState(count?.content_type ?? null)
+  const [keyword, setKeyword] = useState('')
+  const trimmed = keyword.trim().toLowerCase()
 
   /*
     엣지 상세를 종류별로 묶는다.
@@ -281,22 +323,40 @@ export function FlowEdgePanel({ arrow, count, direction, edges, onClose }) {
             counterpart: edge.surface ? (SURFACE_LABEL[edge.surface] ?? edge.surface) : '',
             at_label: edge.at_label ?? '',
             source: edge.source_url ? { url: edge.source_url, label: edge.source || '원본' } : null,
-          })),
+          }))
+          // 제목과 인용문으로 거른다. 창구(`Discord`)·시각은 뺀다 — 그것까지
+          // 넣으면 `1` 한 글자에 시각이 걸려 아무 카드나 남는다.
+          .filter((item) => !trimmed
+            || `${item.title} ${item.quote}`.toLowerCase().includes(trimmed)),
       }))
       .filter((group) => group.items.length > 0)
-  }, [arrow, edges.data])
+  }, [arrow, edges.data, trimmed])
 
   return (
-    <PanelShell title="전달된 내용" subtitle={direction} onClose={onClose}>
+    <PanelShell
+      /*
+        제목이 **화살표의 방향**이다(시안 `601:9343` — `유수인 → 서재민`).
+        `전달된 내용` 은 그 아래 묶음의 이름으로 내려간다. 어느 화살표를
+        눌렀는지가 제목에 없으면, 선이 여럿 겹친 자리에서 방금 무엇을 열었는지
+        패널만 보고는 알 수 없다.
+      */
+      title={direction}
+      composer
+      search={{ label: '전달된 내용 검색', value: keyword, onChange: setKeyword }}
+      onClose={onClose}
+    >
       {edges.loading && !edges.data ? <Loading label="화살표를 여는 중입니다…" /> : null}
       {edges.error && !edges.data ? <LoadError error={edges.error} onRetry={edges.reload} /> : null}
 
       {edges.data ? (
         <section className="inspector-section">
+          <h3>전달된 내용</h3>
           <ContentChips counts={arrow?.counts ?? []} selected={selected} onSelect={setSelected} />
 
           {groups.length === 0 ? (
-            <Empty>이 화살표에 걸린 내용을 불러오지 못했습니다.</Empty>
+            trimmed
+              ? <Empty>「{keyword.trim()}」에 걸리는 내용이 없습니다.</Empty>
+              : <Empty>이 화살표에 걸린 내용을 불러오지 못했습니다.</Empty>
           ) : groups.map((group) => (
             <ContentGroup
               group={group}

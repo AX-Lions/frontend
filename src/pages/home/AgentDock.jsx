@@ -45,7 +45,15 @@ const icons = {
 const POLL_MS = 3000
 const POLL_TRIES = 10
 
-export function AgentDock() {
+/**
+ * `inline` 은 회의 화면의 `Bordo 브리핑` 패널 맨 아래에 박아 넣을 때 쓴다.
+ *
+ * 홈에서는 화면 오른쪽 아래에 떠 있는 알약이지만(`position: fixed`), 브리핑
+ * 패널에서는 **떠 있으면 안 된다** — 판을 덮고, 패널 너비가 줄어도 따라
+ * 줄지 않는다. 대화·전송·폴링은 똑같으므로 입력창을 하나 더 만들지 않고
+ * 자리만 바꾼다.
+ */
+export function AgentDock({ inline = false }) {
   const [open, setOpen] = useState(false)
   const [showList, setShowList] = useState(false)
   const [conversations, setConversations] = useState([])
@@ -57,6 +65,7 @@ export function AgentDock() {
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const streamRef = useRef(null)
+  const rootRef = useRef(null)
 
   // 열려 있을 때만 목록을 읽는다. 홈에 들어오자마자 부르면 첫 화면 요청이
   // 하나 더 늘어나는데, dock 을 열지 않는 사람이 더 많다.
@@ -90,6 +99,37 @@ export function AgentDock() {
       controller.abort()
     }
   }, [open])
+
+  /*
+    쓰던 글이 없으면 바깥을 눌렀을 때 도로 접는다.
+
+    입력칸에 초점이 닿기만 해도 펼쳐지는데(`onFocus`), 닫는 길은 `×` 하나뿐
+    이었다. 그래서 물어볼 생각 없이 스쳐 지나간 사람에게도 대화 상자가 열린
+    채 남는다 — 회의 화면에서는 그만큼 브리핑이 가려진다.
+
+    **쓰던 글이 있으면 접지 않는다.** 접으면서 초안을 감추면 다시 폈을 때
+    남아 있는지 확인할 방법이 없어, 사용자는 날아간 것으로 읽고 다시 친다.
+
+    `pointerdown` 으로 바깥을 가리는 이유는 `blur` 로는 **읽으려고 대화
+    안을 누른 것**과 나가는 것을 구별할 수 없어서다. 글자는 초점을 받지
+    않으므로 `relatedTarget` 이 비고, 읽는 도중에 접힌다.
+  */
+  useEffect(() => {
+    if (!open) {
+      return undefined
+    }
+
+    const closeIfIdle = (event) => {
+      if (draft.trim() || rootRef.current?.contains(event.target)) {
+        return
+      }
+      setOpen(false)
+      setShowList(false)
+    }
+
+    document.addEventListener('pointerdown', closeIfIdle)
+    return () => document.removeEventListener('pointerdown', closeIfIdle)
+  }, [draft, open])
 
   // 고른 대화의 메시지.
   //
@@ -225,7 +265,12 @@ export function AgentDock() {
   }
 
   return (
-    <div className={open ? 'chat-dock is-open' : 'chat-dock'} role="group" aria-label="Bordo 채팅">
+    <div
+      className={['chat-dock', inline ? 'is-inline' : '', open ? 'is-open' : ''].filter(Boolean).join(' ')}
+      ref={rootRef}
+      role="group"
+      aria-label="Bordo 채팅"
+    >
       {open ? (
         <div className="dock-panel">
           <div className="dock-panel-head">

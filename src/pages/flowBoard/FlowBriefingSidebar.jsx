@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 
+import { AgentDock } from '../home/AgentDock.jsx'
 import { Empty } from '../../shared/components/LoadState.jsx'
 
 /**
@@ -130,22 +131,7 @@ export function FlowBriefingSidebar({
         </section>
 
         <BriefSection
-          data-tip="확인이 필요해요"
-          cards={confirmations}
-          emptyText="확인할 변경이 없습니다."
-          renderCard={(card) => (
-            <article className="bordo-action-card" key={card.id}>
-              <span>
-                <strong>{card.title}</strong>
-                <small>{card.body}</small>
-              </span>
-              <img src={icons.expandRight} alt="" />
-            </article>
-          )}
-        />
-
-        <BriefSection
-          data-tip="나에게 요청한 내용"
+          title="나에게 요청한 내용"
           cards={requests}
           emptyText="나에게 온 요청이 없습니다."
           renderCard={(card) => (
@@ -158,7 +144,7 @@ export function FlowBriefingSidebar({
         />
 
         <BriefSection
-          data-tip="답변이 필요해요"
+          title="답변이 필요해요"
           cards={answers}
           emptyText="대리인이 유보한 질문이 없습니다."
           renderCard={(card) => (
@@ -171,7 +157,36 @@ export function FlowBriefingSidebar({
             </article>
           )}
         />
+
+        <BriefSection
+          title="확인이 필요해요"
+          cards={confirmations}
+          emptyText="확인할 변경이 없습니다."
+          renderCard={(card) => (
+            <article className="bordo-action-card" key={card.id}>
+              <span>
+                <strong>{card.title}</strong>
+                <small>{card.body}</small>
+              </span>
+              <img src={icons.expandRight} alt="" />
+            </article>
+          )}
+        />
       </div>
+
+      {/*
+        시안 `576:5781` — 패널 맨 아래에 붙는 Bordo 입력창.
+
+        스크롤 칸(`.briefing-scroll`) 뒤에 형제로 둔다. 안에 넣으면 브리핑을
+        끝까지 내려야 입력창이 나타나서, **묻고 싶을 때마다 스크롤해야 한다.**
+        `.briefing-panel` 이 세로 flex 라 이 자리에 두면 아래에 붙어 남고 위
+        칸만 줄어든다.
+
+        홈 화면의 그것과 같은 컴포넌트다 — 대화 목록·전송·답 기다리기가 이미
+        붙어 있어서, 여기서 껍데기 입력창을 새로 만들면 **누르면 아무 일도 안
+        나는 칸**이 하나 더 생긴다.
+      */}
+      <AgentDock inline />
     </aside>
   )
 }
