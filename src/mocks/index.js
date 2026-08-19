@@ -1,4 +1,3 @@
-import { isMockMode } from './enabled.js'
 import { appendTo, patch, patchedOf, withAppended } from './store.js'
 
 /**
@@ -441,10 +440,6 @@ function resolve(path, method, body) {
   }
 
   return undefined
-}
-
-export function shouldMock() {
-  return isMockMode()
 }
 
 /**
