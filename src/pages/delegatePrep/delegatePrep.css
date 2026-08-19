@@ -54,14 +54,49 @@
   text-decoration: none;
 }
 
+/*
+  돌아가기.
+
+  12px 회색 글씨뿐이라 누를 수 있는 것으로 안 보였다. 이 화면에서 밖으로
+  나가는 길이 여기 하나뿐인데, 로고 옆에 적힌 안내 문구처럼 읽혔다.
+
+  테두리를 둘러 눌리는 것임을 알린다. 색은 `--prep-tint` 계열로 둔다 —
+  이 화면의 주된 단추(`적용하기` · `설정 완료`)가 주황이라, 돌아가기까지
+  주황이면 무엇이 이 화면의 할 일인지가 흐려진다.
+*/
 .prep-back {
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 14px;
+  border: 1px solid var(--prep-line);
+  border-radius: 999px;
+  background: #ffffff;
   color: var(--prep-muted);
+  font-size: 12px;
+  font-weight: 600;
   text-decoration: none;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
 }
 
 .prep-back:hover {
-  color: var(--prep-ink);
+  border-color: var(--prep-navy);
+  background: var(--prep-tint);
+  color: var(--prep-navy);
+}
+
+/* 키보드로 온 사람에게도 지금 여기라는 것이 보여야 한다. */
+.prep-back:focus-visible {
+  outline: 2px solid var(--prep-navy);
+  outline-offset: 2px;
+}
+
+.prep-back:active {
+  background: var(--prep-tint);
+  transform: translateY(1px);
 }
 
 /* ─────────────────────────────────────────── 본문 틀 */

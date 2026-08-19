@@ -207,13 +207,23 @@ function PrepShell({ children }) {
 }
 
 /**
- * "설정을 완료했습니다" 모달.
+ * 맡기고 나면 뜨는 모달.
  *
- * 논쟁점에 전부 답하고 Bordo 활동 설정까지 적용했을 때만 뜬다 — 준비가
- * 실제로 끝났다는 확인이지, 저장 버튼을 눌렀다는 확인이 아니다. 하나만
+ * ## 두 얼굴이다
+ *
+ * 예전에는 논쟁점에 **전부** 답했을 때만 떴다. 저장은 됐는데 아무 일도
+ * 안 일어난 것처럼 보여, 눌린 것인지 아닌지를 화면 아래 알림 한 줄로만
+ * 알 수 있었다. 그래서 이제 누르면 항상 뜬다.
+ *
+ * 대신 **끝나지 않았는데 끝났다고 말하지 않는다.** 논쟁점이 남아 있으면
+ * 제목이 `완료` 가 아니라 `저장` 이고, 몇 개가 남았는지 적는다. 하나만
  * 됐는데 여기서 끝났다고 하면 사용자는 나머지를 잊고 회의로 넘어간다.
+ *
+ * 남은 것이 있을 때 홈으로 데려가지 않는 이유도 같다 — 돌아갈 곳은
+ * 남은 논쟁점이지 홈이 아니다.
  */
-function CompleteModal({ onClose }) {
+function CompleteModal({ remaining = 0, onClose }) {
+  const done = remaining === 0
   const homeButtonRef = useRef(null)
 
   useEffect(() => {
@@ -245,20 +255,26 @@ function CompleteModal({ onClose }) {
         <button className="prep-complete-close" type="button" aria-label="닫기" onClick={onClose}>
           ×
         </button>
-        <h2 id="prep-complete-title">설정을 완료했습니다</h2>
+        <h2 id="prep-complete-title">
+          {done ? '설정을 완료했습니다' : '설정을 저장했습니다'}
+        </h2>
         <p>
-          모든 논쟁점에 입장을 남기고 Bordo 활동 설정까지 마쳤습니다.
-          회의 시간이 되면 Bordo가 대신 참석해 처리합니다.
+          {done
+            ? '모든 논쟁점에 입장을 남기고 Bordo 활동 설정까지 마쳤습니다. 회의 시간이 되면 Bordo가 대신 참석해 처리합니다.'
+            : `Bordo 활동 설정을 적용했습니다. 논쟁점 ${remaining}개에 아직 입장이 없습니다.`}
         </p>
         {/* 닫기(×)는 이 화면에 남아 더 손보게 하고, 이 버튼은 준비가 끝났다는
-            사람의 판단을 그대로 따라 홈으로 데려간다. */}
+            사람의 판단을 그대로 따라 홈으로 데려간다.
+
+            남은 것이 있으면 홈으로 보내지 않는다. 이 모달을 닫는 것이 곧
+            남은 논쟁점으로 돌아가는 것이라 같은 일을 한다. */}
         <button
           ref={homeButtonRef}
           className="prep-complete-home"
           type="button"
-          onClick={() => navigate('/')}
+          onClick={done ? () => navigate('/') : onClose}
         >
-          홈으로 가기
+          {done ? '홈으로 가기' : '남은 논쟁점 보기'}
         </button>
       </div>
     </div>
@@ -403,13 +419,13 @@ export function DelegatePrepPage() {
     .sort((a, b) => (b.seq - a.seq) || (orderOf(a.rowId) - orderOf(b.rowId)))
 
   /*
-    "완료" 모달을 띄울지 판단하는 기준.
+    모달이 `완료` 라고 말해도 되는지 가르는 값.
 
     논쟁점 하나하나가 아니라 **전부** 답했는지를 본다. 하나라도 `답변필요` 로
     남아 있으면 회의에서 대리인이 그 쟁점에 대해 할 말이 없다 — 준비가 끝난
-    것이 아니다. 논쟁점이 하나도 없는 회의는 답할 것이 없으므로 통과시킨다.
+    것이 아니다. 논쟁점이 하나도 없는 회의는 답할 것이 없으므로 0 이 된다.
   */
-  const allAnswered = rows.length === 0 || rows.every((row) => Boolean(latestOf(row)))
+  const remainingPoints = rows.filter((row) => !latestOf(row)).length
 
   /*
     같은 논쟁점의 답은 **라벨 하나 아래로 묶는다.**
@@ -600,10 +616,14 @@ export function DelegatePrepPage() {
       setNotice(mode === 'current'
         ? '평소 설정으로 Bordo에게 맡겼습니다.'
         : '이번 회의에만 적용해 Bordo에게 맡겼습니다.')
-      // 이 적용으로 "논쟁점 전부 답변 + 설정 적용" 이 둘 다 갖춰졌을 때만 뜬다.
-      if (allAnswered) {
-        setShowComplete(true)
-      }
+      /*
+        맡겨졌다는 것을 눈에 보이게 말한다.
+
+        예전에는 논쟁점을 전부 답했을 때만 띄웠다. 그러지 않은 사람에게는
+        화면 아래 알림 한 줄이 전부라, 눌리긴 한 것인지 알기 어려웠다.
+        남은 것이 있으면 모달이 `완료` 대신 `저장` 이라고 말한다.
+      */
+      setShowComplete(true)
       return true
     } catch (caught) {
       setError(caught?.message || '적용하지 못했습니다.')
@@ -1226,7 +1246,9 @@ export function DelegatePrepPage() {
         ) : null}
       </section>
 
-      {showComplete ? <CompleteModal onClose={() => setShowComplete(false)} /> : null}
+      {showComplete ? (
+        <CompleteModal remaining={remainingPoints} onClose={() => setShowComplete(false)} />
+      ) : null}
     </PrepShell>
   )
 }
