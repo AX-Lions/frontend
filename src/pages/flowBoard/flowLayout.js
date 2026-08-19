@@ -64,11 +64,16 @@ const BADGE_HALF = 46
  */
 const BADGE_LINE_GAP = 2
 
-/** 가로로 누운 뱃지 묶음의 세로 두께 절반 (아이콘 28px + 숫자 여유). */
-const BADGE_ROW_HALF = 16
+/** 가로로 누운 뱃지 묶음의 세로 두께 절반. 아이콘 28px 이 곧 두께다. */
+const BADGE_ROW_HALF = 14
 
-/** 세로로 선 뱃지 묶음의 가로 폭 절반 (아이콘 + 숫자). */
-const BADGE_COLUMN_HALF = 24
+/**
+ * 세로로 선 뱃지 묶음의 가로 폭 절반.
+ *
+ * 실측 38px(아이콘 28 + 사이 4 + 숫자 한 자리)의 절반이다. 넉넉히 잡아 두면
+ * 그만큼 선에서 떨어져 **어느 선에 붙은 숫자인지 눈으로 안 이어진다.**
+ */
+const BADGE_COLUMN_HALF = 19
 
 /** 요약표 폭. */
 export const SUMMARY_WIDTH = 592

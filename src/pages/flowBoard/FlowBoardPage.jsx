@@ -363,6 +363,28 @@ export function FlowBoardPage() {
     })
   }
 
+  /*
+    화살표(선)를 직접 눌렀다.
+
+    뱃지만 눌리던 자리였다. 그런데 뱃지는 종류마다 하나씩이라 **화살표 전체가
+    무엇을 날랐는지 보려면 아무 종류나 하나 눌러야** 했고, 종류가 하나뿐인
+    화살표에서는 그 하나가 곧 전체인지 알 수 없었다. 시안(`601:9343`)은 선을
+    눌러 그 화살표의 패널을 연다.
+
+    `count` 를 안 넘긴다 — 가리켜 열 묶음이 없으므로 알약이 아무것도 안 켜진
+    채로 뜬다. 뱃지로 열었을 때만 그 종류가 켜져 있는 것이 맞다.
+  */
+  const selectLink = (link) => {
+    setPanel({
+      kind: 'edge',
+      badgeId: null,
+      count: null,
+      arrow: link.arrow,
+      direction: link.arrow.direction_label,
+      edgeIds: (link.arrow.counts ?? []).flatMap((entry) => entry.edge_ids ?? []),
+    })
+  }
+
   if (meeting.loading && !meeting.data) {
     return <div className="flow-board-page"><Loading label="회의를 불러오는 중입니다…" /></div>
   }
@@ -529,7 +551,9 @@ export function FlowBoardPage() {
                 layout={layout}
                 myNodeId={myNodeId}
                 onBadgeSelect={selectBadge}
+                onLinkSelect={selectLink}
                 onNodeSelect={selectNode}
+                selectedArrowId={panel?.kind === 'edge' ? panel.arrow?.id : null}
                 selectedNodeId={selectedNodeId}
                 showRecency={ui.isTimeOrdered}
                 style={{ transform: `scale(${renderedZoom})` }}
@@ -655,6 +679,20 @@ export function FlowBoardPage() {
 
         {panel?.kind === 'edge' ? (
           <FlowEdgePanel
+            /*
+              화살표가 바뀌면 **패널을 새로 만든다.**
+
+              같은 컴포넌트를 그대로 두고 값만 갈아 끼우면 안에 들고 있던
+              검색어와 고른 알약이 그대로 남는다. 실제로 한 화살표에서 `토큰`
+              을 검색해 두고 다른 화살표를 누르면, 그쪽에는 그 낱말이 없어
+              **비어 있는 패널**이 떴다. 뱃지로 열어도 그 종류가 안 켜졌다 —
+              첫 상태는 처음 만들어질 때 한 번만 읽히기 때문이다.
+
+              `key` 를 바꿔 다시 만들게 하는 것이 리액트가 상태를 되돌리는
+              방법이다. effect 에서 되돌리면 렌더가 한 번 더 돌고, 그 사이
+              한 프레임 동안 남의 검색 결과가 비친다.
+            */
+            key={`${panel.arrow?.id}::${panel.badgeId ?? ''}`}
             arrow={panel.arrow}
             count={panel.count}
             direction={panel.direction}

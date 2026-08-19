@@ -1,3 +1,5 @@
+import { Fragment } from 'react'
+
 import { FlowMetricBadge } from './FlowMetricBadge'
 import { toneOf } from './flowBoard.data'
 
@@ -9,19 +11,37 @@ import { toneOf } from './flowBoard.data'
  * 자리는 CSS 절대좌표, 선은 그 좌표에 맞춰 손으로 계산한 값이었다. 이제
  * 모양은 전부 `flowLayout` 이 계산하고 여기는 **그리기만 한다.**
  *
- * ## 선 모양은 시안 하나로 통일했다 (`576:4990`)
+ * ## 선 모양 (`576:4990`)
  *
- * 한때 선 색이 「AI 가 나른 것(주황) · 사람끼리(진회색)」를 갈랐다. 시안의
- * 화살표는 굵기·색·양 끝 모양이 **하나뿐**이라 그 구분을 색에서 뺐다:
- * 1px `#9CA3AF` 실선, 출발 쪽에 작은 점, 도착 쪽에 속 빈 화살촉.
+ * 굵기와 양 끝은 하나다 — 1px 실선, 출발 쪽에 작은 점, 도착 쪽에 속 빈
+ * 화살촉. 색만 **한쪽이라도 대리인·서버가 낀 선**을 갈라 준다.
  *
- * AI 가 낀 흐름은 여전히 읽혀야 한다. 그 말은 이제 뱃지 쪽이 한다 —
- * 자기 대리인과 오간 뱃지 묶음의 주황 테두리(`.flow-badge-group.is-self`)가
- * 남아 있고, 판에서 대리인 노드를 접는 규칙도 그대로다.
+ *     주황 `#FF9D42`  AI 가 나른 것 (시안 토큰 `AI/포인트컬러`)
+ *     회색 `#9CA3AF`  사람과 사람 사이 (시안 토큰 `테두리/플로우화살표`)
+ *
+ * 이 서비스가 파는 것이 "내가 없는 동안 대리인이 대신 움직였다" 라, 그 구분이
+ * 판에서 한눈에 잡혀야 한다. 대리인 노드의 주황 테두리(`576:5990`)와 같은
+ * 색이라 선과 노드가 같은 이야기를 한다.
  */
 
-/** 시안 토큰 `테두리/플로우화살표`. 모든 선이 이 색 하나를 쓴다. */
-const LINK_STROKE = '#9ca3af'
+/**
+ * 선 색.
+ *
+ * `on` 은 고른 선이다. 같은 색을 그대로 쓰면 무엇을 골랐는지 굵기 0.6px 로만
+ * 말하게 되므로 한 단계 진하게 내린다 — **색조는 안 바꾼다.** 바꾸면 고른
+ * 순간 사람 선이 AI 선처럼 보인다.
+ */
+const LINK_TONES = {
+  human: { base: '#9ca3af', on: '#4b5563' },
+  ai: { base: '#ff9d42', on: '#d97a16' },
+}
+
+const toneOfLink = (link) => (link.isAi ? 'ai' : 'human')
+
+/** 마커 id 꼬리표. `기본 사람` 만 꼬리표가 없다 — 가장 흔한 선이라 짧게 둔다. */
+function markerSuffix(tone, state) {
+  return `${tone === 'ai' ? '-ai' : ''}${state === 'on' ? '-on' : ''}`
+}
 
 /**
  * `임수연의 Bordo` → `임수연의`.
@@ -98,7 +118,9 @@ export function FlowCanvas({
   layout,
   myNodeId,
   onBadgeSelect,
+  onLinkSelect,
   onNodeSelect,
+  selectedArrowId,
   selectedNodeId,
   showRecency,
   style,
@@ -127,7 +149,7 @@ export function FlowCanvas({
       >
         <defs>
           {/*
-            시안(`576:4990`)의 양 끝.
+            선의 양 끝 (`576:4990`).
 
             출발 쪽은 지름 5.3px 짜리 점, 도착 쪽은 **속을 채우지 않은** 직각
             화살촉이다. 채운 삼각형을 쓰면 1px 선 끝에 검은 덩어리가 붙어
@@ -136,55 +158,105 @@ export function FlowCanvas({
             `markerUnits="userSpaceOnUse"` 가 필요하다. 기본값
             (`strokeWidth`)이면 촉 크기가 선 굵기를 따라가는데, 선이 1px 라
             촉이 시안의 1/4 로 쪼그라든다.
+
+            색깔별로 **네 벌**을 만든다(사람·AI × 기본·고름). 마커는 자기를
+            쓰는 선의 `stroke` 를 물려받지 않고 안에 적힌 색으로 그려지기
+            때문이다 — 한 벌로 두면 주황 선 끝에 회색 촉이 붙는다.
           */}
-          <marker
-            id="flow-arrow-tail"
-            markerUnits="userSpaceOnUse"
-            markerWidth="8"
-            markerHeight="8"
-            refX="4"
-            refY="4"
-            orient="auto"
-          >
-            <circle cx="4" cy="4" r="2.67" fill={LINK_STROKE} />
-          </marker>
-          <marker
-            id="flow-arrow-head"
-            markerUnits="userSpaceOnUse"
-            markerWidth="12"
-            markerHeight="12"
-            refX="10"
-            refY="6"
-            orient="auto"
-          >
-            <path
-              d="M6 2 L10 6 L6 10"
-              fill="none"
-              stroke={LINK_STROKE}
-              strokeWidth="1"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </marker>
+          {Object.entries(LINK_TONES).flatMap(([tone, colors]) =>
+            Object.entries(colors).map(([state, color]) => {
+              const suffix = markerSuffix(tone, state)
+              const on = state === 'on'
+
+              return (
+                <Fragment key={suffix}>
+                  <marker
+                    id={`flow-arrow-tail${suffix}`}
+                    markerUnits="userSpaceOnUse"
+                    markerWidth={on ? 10 : 8}
+                    markerHeight={on ? 10 : 8}
+                    refX={on ? 5 : 4}
+                    refY={on ? 5 : 4}
+                    orient="auto"
+                  >
+                    <circle
+                      cx={on ? 5 : 4}
+                      cy={on ? 5 : 4}
+                      r={on ? 3.2 : 2.67}
+                      fill={color}
+                    />
+                  </marker>
+                  <marker
+                    id={`flow-arrow-head${suffix}`}
+                    markerUnits="userSpaceOnUse"
+                    markerWidth={on ? 14 : 12}
+                    markerHeight={on ? 14 : 12}
+                    refX={on ? 11 : 10}
+                    refY={on ? 7 : 6}
+                    orient="auto"
+                  >
+                    <path
+                      d={on ? 'M6.5 2.5 L11 7 L6.5 11.5' : 'M6 2 L10 6 L6 10'}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth={on ? 1.4 : 1}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </marker>
+                </Fragment>
+              )
+            }))}
         </defs>
 
         {links.map((link) => {
           const lit = isHighlighted(link.arrow)
+          const picked = link.arrowId === selectedArrowId
+          const tone = toneOfLink(link)
+
           return (
-            <path
-              className={lit ? 'flow-link' : 'flow-link is-dimmed'}
-              key={link.id}
-              d={link.d}
-              stroke={LINK_STROKE}
-              markerStart="url(#flow-arrow-tail)"
-              markerEnd="url(#flow-arrow-head)"
-              /*
-                `시간순` 을 켰을 때만 진하기를 적용한다. 서버가 최근일수록 1 에
-                가까운 값을 주는데, 항상 걸면 오래된 선이 늘 흐려 **회의 초반에
-                오간 것을 못 보고 지나친다.**
-              */
-              opacity={lit ? (showRecency ? link.opacity : 1) : 0.14}
-            />
+            <g className="flow-link-group" key={link.id}>
+              {/*
+                눈에 안 보이는 굵은 선. 누를 자리를 넓힌다.
+
+                보이는 선이 1px 라 그것만 누르게 두면 **거의 못 누른다** —
+                포인터가 1px 위에 정확히 얹혀야 한다. 시안(`601:9343`)은
+                화살표를 눌러 오른쪽 패널을 여는 화면이므로, 눌리는 폭과
+                그려지는 폭을 따로 둔다.
+              */}
+              <path
+                className="flow-link-hit"
+                d={link.d}
+                onClick={() => onLinkSelect?.(link)}
+                onPointerDown={(event) => event.stopPropagation()}
+              />
+              <path
+                className={[
+                  'flow-link',
+                  lit ? '' : 'is-dimmed',
+                  picked ? 'is-selected' : '',
+                ].filter(Boolean).join(' ')}
+                d={link.d}
+                /*
+                  선 색을 여기서 준다. 마커(점·촉)는 CSS 의 `stroke` 를
+                  물려받지 않고 자기 안에 적힌 색으로 그려지므로, 색을 CSS 에
+                  두면 **선만 진해지고 양 끝은 회색으로 남는다.** 한 표를
+                  선과 마커 양쪽이 쓰는 편이 어긋날 자리가 없다.
+                */
+                stroke={LINK_TONES[tone][picked ? 'on' : 'base']}
+                markerStart={`url(#flow-arrow-tail${markerSuffix(tone, picked ? 'on' : 'base')})`}
+                markerEnd={`url(#flow-arrow-head${markerSuffix(tone, picked ? 'on' : 'base')})`}
+                /*
+                  `시간순` 을 켰을 때만 진하기를 적용한다. 서버가 최근일수록 1 에
+                  가까운 값을 주는데, 항상 걸면 오래된 선이 늘 흐려 **회의 초반에
+                  오간 것을 못 보고 지나친다.**
+
+                  고른 선은 그 규칙에서 뺀다 — 오래된 선을 골랐을 때 흐린 채로
+                  남으면 무엇을 골랐는지 안 보인다.
+                */
+                opacity={picked ? 1 : (lit ? (showRecency ? link.opacity : 1) : 0.14)}
+              />
+            </g>
           )
         })}
       </svg>
