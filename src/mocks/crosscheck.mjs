@@ -16,7 +16,9 @@ import { home } from './data/home.js'
 import {
   briefings, meetingIndexes, meetings, summaryTables, workIndexes,
 } from './data/meetings.js'
-import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
+import {
+  flowEdges, meetingFlows, meetingTimelines, projectFlows, projectTimelines,
+} from './data/flow.js'
 import { preps } from './data/prep.js'
 import { activeDates, chatSidebar, roomDetails, roomMessages } from './data/chat.js'
 import { agentConversations, conversationMessages } from './data/agent.js'
@@ -213,10 +215,66 @@ for (const [mid, prep] of Object.entries(preps)) {
     `${tag} 의 자료 범위가 배열도 null 도 아니다`)
 }
 
+/*
+  10. 시간순 인덱스.
+
+  좌측 목록이면서 **재생 대본**이다. 재생 버튼은 판의 화살표를 전부 지우고 이
+  목록 순서대로 하나씩 되살리므로, 목록과 판이 어긋나면 화면에서는 "재생했는데
+  화살표 하나가 끝까지 안 나온다" 로만 보인다. 목록이 빠뜨린 것인지 재생이 중간에
+  멈춘 것인지 구별할 방법이 없다.
+
+  seq 와 정렬까지 보는 이유도 같다. 번호가 건너뛰거나 시각이 뒤집혀 있으면 좌측
+  숫자는 멀쩡한데 되살아나는 순서만 이상해져서, 회의를 처음 보는 사람은 그것을
+  "실제로 그런 순서로 오갔다" 로 읽는다.
+*/
+const allTimelines = { ...meetingTimelines, ...projectTimelines }
+let timelineTotal = 0
+
+for (const [scope, flow] of allFlows) {
+  const tag = scope.slice(0, 8)
+  const timeline = allTimelines[scope]
+  if (!timeline) {
+    bad.push(`판은 있는데 시간순 인덱스가 없다: ${tag}`)
+    continue
+  }
+
+  const rows = timeline.results ?? []
+  timelineTotal += rows.length
+  ok(timeline.count === rows.length,
+    `${tag} 시간순 인덱스: count=${timeline.count} 인데 목록은 ${rows.length}`)
+
+  // 판의 화살표가 실제로 나르고 있는 엣지 전부.
+  const onBoard = new Set(
+    (flow.arrows ?? []).flatMap((a) => (a.counts ?? []).flatMap((c) => c.edge_ids ?? [])),
+  )
+  const listed = new Set(rows.map((r) => r.edge_id))
+
+  rows.forEach((row, i) => {
+    ok(row.seq === i + 1, `${tag} 시간순 ${i + 1}번째 줄의 seq 가 ${row.seq} 다 — 순번이 건너뛴다`)
+    ok(flowEdges[row.edge_id], `${tag} 시간순 "${row.title}" 의 엣지 상세 ${row.edge_id} 가 없다`)
+    // 5-0 과 같은 취지다. 판에 없는 엣지를 가리키면 눌러도 강조될 것이 없다.
+    ok(onBoard.has(row.edge_id),
+      `${tag} 시간순 "${row.title}" 이 가리키는 ${row.edge_id} 가 그 판에 없다`)
+    for (const e of row.related_edge_ids ?? []) {
+      ok(onBoard.has(e), `${tag} 시간순 "${row.title}" 의 강조 대상 ${e} 가 그 판에 없다`)
+    }
+    if (i > 0) {
+      ok(Date.parse(rows[i - 1].occurred_at) <= Date.parse(row.occurred_at),
+        `${tag} 시간순 ${i + 1}번째 줄이 앞줄보다 이르다 — 재생 순서가 뒤집힌다`)
+    }
+  })
+
+  // 판에 있는데 목록에 없는 화살표. **재생해도 영영 안 나타난다.**
+  for (const e of onBoard) {
+    ok(listed.has(e), `${tag} 판의 ${e} 가 시간순 인덱스에 없다 — 재생해도 안 나타난다`)
+  }
+}
+
 const msgCount = Object.values(roomMessages).reduce((s, r) => s + (r.results?.length ?? 0), 0)
 console.log('== 규모 ==')
 console.log(`  최근회의 ${(home.recent_meetings ?? []).length} · 오늘일정 ${(home.today_schedule ?? []).length} · 회의상세 ${Object.keys(meetings).length}`)
 console.log(`  플로우 ${allFlows.length} · 엣지상세 ${Object.keys(flowEdges).length} (화살표가 참조 ${edgeTotal})`)
+console.log(`  시간순 인덱스 ${Object.keys(allTimelines).length} · 줄 ${timelineTotal}`)
 console.log(`  브리핑 ${Object.keys(briefings).length} · 채팅방 ${uniq.length} · 메시지 ${msgCount}`)
 console.log(`  대리인 대화 ${(agentConversations.results ?? []).length}`)
 const pointCount = Object.values(preps)

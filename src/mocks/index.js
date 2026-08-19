@@ -32,7 +32,9 @@ import {
 import {
   meetingIndexes, meetings, projectMeetings, summaryTables, workIndexes,
 } from './data/meetings.js'
-import { flowEdges, meetingFlows, participantFlows, projectFlows } from './data/flow.js'
+import {
+  flowEdges, meetingFlows, meetingTimelines, participantFlows, projectFlows, projectTimelines,
+} from './data/flow.js'
 import { PREP_STATUS_LABEL, preps } from './data/prep.js'
 import { teamMembers } from './data/home.js'
 import { inbox } from './data/inbox.js'
@@ -385,6 +387,14 @@ function resolve(path, method, body) {
     }
     if (a === 'meetings' && c === 'summary-table') return summaryTables[b] ?? null
     if (a === 'meetings' && c === 'ai-briefing') return viewerBriefing(b)
+    /*
+      좌측 `시간순 인덱스`. 판과 같은 원장에서 나온다.
+
+      없는 회의에 `null` 이 아니라 빈 목록을 준다 — 좌측은 "아직 오간 것이
+      없습니다" 를 그릴 수 있으면 그만이고, `null` 로 내리면 화면이 그것을
+      조회 실패와 구별하지 못한다.
+    */
+    if (a === 'meetings' && c === 'timeline') return meetingTimelines[b] ?? EMPTY
     if (a === 'meetings' && c === 'indexes') {
       // 회의 안건과 작업 문서는 같은 주소에 `category` 로 갈린다.
       const work = /category=WORK/.test(path)
@@ -399,6 +409,7 @@ function resolve(path, method, body) {
       return projectCalendarEvents(b, query.get('from'), query.get('to'))
     }
     if (a === 'projects' && c === 'flow') return projectFlows[b] ?? null
+    if (a === 'projects' && c === 'timeline') return projectTimelines[b] ?? EMPTY
     if (a === 'projects' && c === 'meetings') return projectMeetings[b] ?? EMPTY
 
     if (a === 'flow-edges' && b) return flowEdges[b] ?? null
