@@ -85,6 +85,49 @@ function PanelShell({ children, composer = false, onClose, search, subtitle, tit
 }
 
 /**
+ * 필터 알약을 **그려 낼 묶음에서 직접 만든다.**
+ *
+ * 예전에는 서버가 준 `counts` 를 그대로 알약으로 그렸다. 그런데 사람 패널의
+ * `counts` 는 **보낸 것에서만** 세어져서, 받기만 한 종류는 알약이 아예 없었다.
+ * 서재민은 `의견`·`변동사항`·`기타` 를 받았는데 보낸 적이 없어 그 셋을 거를
+ * 단추가 없었고, 다른 알약을 하나라도 켜는 순간 **그 세 묶음이 화면에서 사라진
+ * 뒤 다시 부를 방법이 없었다.** 숫자도 어긋나서 `일정 1` 을 누르면 카드가 석
+ * 장 떴다.
+ *
+ * 서버 쪽 개수를 고치는 것만으로는 같은 결함이 다시 난다 — 세는 곳과 그리는
+ * 곳이 다르면 언젠가 또 갈린다. 그래서 **알약 목록과 숫자를 화면이 그릴 묶음
+ * 하나에서 뽑는다.** 이렇게 두면 "알약 하나 = 거를 수 있는 묶음 하나" 와
+ * "알약의 숫자 = 눌렀을 때 펼쳐지는 카드 수" 가 어긋날 자리가 없다.
+ *
+ * 순서는 서버가 정한 `counts` 순서를 따르고(판의 뱃지 순서와 같다), 거기 없는
+ * 종류는 뒤에 잇는다.
+ */
+function chipsFromGroups(counts, groups) {
+  const total = new Map()
+  const label = new Map()
+  groups.forEach((group) => {
+    total.set(group.content_type, (total.get(group.content_type) ?? 0) + group.items.length)
+    label.set(group.content_type, group.label)
+  })
+
+  const ordered = []
+  const push = (type) => {
+    if (total.has(type) && !ordered.includes(type)) {
+      ordered.push(type)
+    }
+  }
+  ;(counts ?? []).forEach((count) => push(count.content_type))
+  total.forEach((_, type) => push(type))
+
+  return ordered.map((type) => ({
+    key: type,
+    content_type: type,
+    label: label.get(type),
+    count: total.get(type),
+  }))
+}
+
+/**
  * 개수 알약 줄.
  *
  * 고른 알약은 남색으로 차고(시안 `622:7321`), **고른 종류의 카드 묶음만 남는다.**
@@ -97,33 +140,33 @@ function PanelShell({ children, composer = false, onClose, search, subtitle, tit
  * 여러 개를 같이 고를 수 있고 보이는 것은 그 **합집합**이다. `요청사항` 과
  * `변동사항` 을 나란히 놓고 읽는 것이 이 패널에서 가장 흔한 읽기라, 하나만
  * 고르게 하면 두 번 눌러 두 번 읽어야 한다.
+ *
+ * `stats` 는 거를 수 없는 통계(`발언`)다. 필터 알약과 한 줄에 서지만 하는 일이
+ * 다르므로 만드는 곳도 다르다.
  */
-function ContentChips({ counts, onToggle, selected }) {
-  if (!counts?.length) {
+function ContentChips({ chips = [], onToggle, selected, stats = [] }) {
+  if (!chips.length && !stats.length) {
     return null
   }
 
   return (
     <div className="inspector-chip-row">
-      {counts.map((count) => {
-        const key = count.key ?? count.content_type
-
+      {stats.map((count) => (
         /*
-          `발언` 알약에는 대응하는 카드 묶음이 없다 — 발언은 엣지가 아니라
-          엣지 **안에서** 입을 연 횟수라 `content_type` 자체가 붙지 않는다.
-          이것까지 필터로 만들면 누르는 순간 걸리는 묶음이 하나도 없어 패널이
-          통째로 빈다. 그래서 누를 수 없는 통계 표시로 그린다 — 버튼처럼
-          생겼는데 아무 일도 안 일어나는 것보다, 처음부터 버튼이 아닌 편이
-          정직하다.
+          `발언` 처럼 대응하는 카드 묶음이 없는 칸. 발언은 엣지가 아니라 엣지
+          **안에서** 입을 연 횟수라 `content_type` 자체가 붙지 않는다. 이것까지
+          필터로 만들면 누르는 순간 걸리는 묶음이 하나도 없어 패널이 통째로
+          빈다. 그래서 누를 수 없는 통계 표시로 그린다 — 버튼처럼 생겼는데 아무
+          일도 안 일어나는 것보다, 처음부터 버튼이 아닌 편이 정직하다.
         */
-        if (!count.content_type) {
-          return (
-            <span className="inspector-chip is-static" key={key}>
-              <span>{count.label}</span>
-              <b>{count.count}</b>
-            </span>
-          )
-        }
+        <span className="inspector-chip is-static" key={count.key ?? count.label}>
+          <span>{count.label}</span>
+          <b>{count.count}</b>
+        </span>
+      ))}
+
+      {chips.map((count) => {
+        const key = count.key ?? count.content_type
 
         const isOn = selected.has(count.content_type)
 
@@ -296,6 +339,23 @@ export function FlowNodePanel({ meetingId, node, onClose, participant, seqOf = (
   const [selected, setSelected] = useState(() => new Set())
   const toggle = (contentType) => setSelected((was) => toggleIn(was, contentType))
 
+  /*
+    알약은 **두 구역을 합쳐서** 만든다.
+
+    이 줄은 `전달한 내용` 과 `전달받은 내용` 을 함께 거르는 필터라, 한쪽에만
+    있는 종류를 빠뜨리면 그 묶음은 걸러 낼 수도 되돌릴 수도 없는 채로 화면에서
+    사라진다. 사용자가 이 패널에 요구한 것이 **"그 인물에게 전달된 내용이
+    버튼으로 뜨고, 누르면 그 종류만 보인다"** 인데, 받은 것에 단추가 없으면
+    그 말이 절반만 성립한다.
+  */
+  const allGroups = useMemo(
+    () => [...(body?.sent ?? []), ...(body?.received ?? [])],
+    [body],
+  )
+  const chips = useMemo(() => chipsFromGroups(body?.counts, allGroups), [body, allGroups])
+  // 거를 수 없는 통계(`발언`). 서버만 아는 값이라 여기서 만들어 낼 수 없다.
+  const stats = useMemo(() => (body?.counts ?? []).filter((c) => !c.content_type), [body])
+
   const sent = useMemo(() => filterGroups(body?.sent ?? [], selected), [body, selected])
   const received = useMemo(() => filterGroups(body?.received ?? [], selected), [body, selected])
 
@@ -345,7 +405,7 @@ export function FlowNodePanel({ meetingId, node, onClose, participant, seqOf = (
               // 질문("내가 없는 동안…")의 한 상태라, 빈 칸으로 두지 않는다.
               <Empty>이 회의에서 직접 한 발언이 없습니다.</Empty>
             )}
-            <ContentChips counts={body.counts} selected={selected} onToggle={toggle} />
+            <ContentChips chips={chips} stats={stats} selected={selected} onToggle={toggle} />
           </section>
 
           <section className="inspector-section">
@@ -459,6 +519,15 @@ export function FlowEdgePanel({ arrow, count, direction, edges, onClose, seqOf =
 
   const visible = useMemo(() => filterGroups(groups, selected), [groups, selected])
 
+  /*
+    알약도 **검색을 거친 묶음**에서 만든다.
+
+    화살표의 `counts` 를 그대로 그리면 `토큰` 을 검색해 카드가 한 장도 안 남은
+    종류의 알약이 `의견 3` 이라고 적힌 채 남는다. 눌러도 아무것도 안 나오는
+    단추라, 검색이 고장 난 것으로 읽힌다.
+  */
+  const chips = useMemo(() => chipsFromGroups(arrow?.counts, groups), [arrow, groups])
+
   return (
     <PanelShell
       /*
@@ -486,7 +555,7 @@ export function FlowEdgePanel({ arrow, count, direction, edges, onClose, seqOf =
       {edges.data ? (
         <section className="inspector-section">
           <h3>전달된 내용</h3>
-          <ContentChips counts={arrow?.counts ?? []} selected={selected} onToggle={toggle} />
+          <ContentChips chips={chips} stats={[]} selected={selected} onToggle={toggle} />
 
           {/*
             빈 이유를 셋으로 나눠 적는다. 검색어 · 고른 알약 · 정말 아무것도
