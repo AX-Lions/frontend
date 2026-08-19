@@ -79,8 +79,16 @@ export function ChatPage() {
   // 앞의 둘은 오른쪽 칸만 바뀌고, 대리인 설정만 화면을 통째로 덮는다.
   const [view, setView] = useState('chat')
   const [notice, setNotice] = useState('')
-  // 전체 화면 = 목록과 전역 메뉴를 접는 것. 대화창 안에 두면 목록을 접어도
-  // 목록이 그대로 남아 아무 일도 안 일어난다.
+  /*
+    전체 화면 = **채팅 목록만** 접는 것.
+
+    대화창 안에 두면 목록을 접어도 목록이 그대로 남아 아무 일도 안 일어나므로
+    여기서 다룬다.
+
+    맨 왼쪽 전역 메뉴는 접지 않는다. 그것까지 걷으면 홈 · 받은 항목 · 일정으로
+    가는 길이 통째로 사라져서, 대화를 크게 보려고 누른 버튼이 **화면을 빠져나갈
+    수 없는 상태**를 만든다. 접어서 얻는 64px 보다 잃는 것이 크다.
+  */
   const [fullscreen, setFullscreen] = useState(false)
 
   const sidebar = useResource((signal) => fetchSidebar(signal), [], { cacheKey: 'chat-sidebar' })
@@ -310,7 +318,7 @@ export function ChatPage() {
 
   return (
     <div className={fullscreen ? 'chat-page fullscreen' : 'chat-page'}>
-      {fullscreen ? null : <GlobalSidebar active="chat" />}
+      <GlobalSidebar active="chat" />
       {fullscreen ? null : <ChatListPanel
         awayRooms={awayRooms}
         presence={presenceStatus}

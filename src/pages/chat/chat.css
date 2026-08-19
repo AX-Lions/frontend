@@ -54,9 +54,10 @@
   font-size: var(--chat-fs-body);
 }
 
-/* 전체 화면. 목록과 전역 메뉴를 아예 안 그리므로 칸도 하나만 남긴다. */
+/* 전체 화면. 채팅 목록만 안 그리므로 전역 메뉴 칸은 그대로 둔다 — 이 화면을
+   빠져나가는 길이 거기에만 있다. */
 .chat-page.fullscreen {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: 64px minmax(0, 1fr);
 }
 
 .chat-page button,
