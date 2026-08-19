@@ -389,12 +389,17 @@ export function HomePage() {
                           있었지" 다. **그 질문에 해당하는 회의를 골라내는 표시가
                           이 뱃지**인데 서버(`recent_meetings[].missed`)만 주고
                           화면이 그리지 않았다. 다섯 장이 전부 똑같아 보였다.
+
+                          시각이 뱃지보다 **위**다. 카드 바닥에 붙는 두 줄
+                          중에서 아래쪽이 눈에 먼저 걸리는데, 다섯 장을 훑을 때
+                          찾는 것은 언제 열린 회의인지가 아니라 **어느 것이
+                          내가 빠진 회의인지**다.
                         */}
                         <span className="card-foot">
+                          <time>{meeting.displayed_at}</time>
                           {meeting.missed ? (
                             <span className="missed-badge">불참한 회의</span>
                           ) : null}
-                          <time>{meeting.displayed_at}</time>
                         </span>
                       </a>
                       <button
