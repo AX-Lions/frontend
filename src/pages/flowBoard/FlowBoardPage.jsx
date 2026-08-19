@@ -31,6 +31,7 @@ import {
   useMe,
   useProjectMeetings,
 } from './useFlowBoardData'
+import { FlowAgendaPanel } from './FlowAgendaPanel.jsx'
 import { useFlowBoard } from './useFlowBoard'
 import { useFlowBoardUi } from './useFlowBoardUi'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
@@ -42,14 +43,35 @@ import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx
  * 화면 라벨을 따른다 — 중앙 요약표 헤더가 `변동 사항` 이라 `changes` 를
  * `변동 사항` 으로 읽는다.
  */
+/*
+  한 칸은 문자열일 수도, 상세가 딸린 객체일 수도 있다.
+
+  **문자열을 계속 받는 것이 중요하다.** 상세(맥락·갈린 지점)는 이 화면이
+  먼저 요구한 것이라 서버는 당분간 지금처럼 문자열만 내려 준다. 객체만
+  받게 만들면 그날 요약표가 통째로 빈칸이 된다.
+
+  상세가 없는 칸은 `detail` 이 `null` 이고, 눌렀을 때 안건 패널 대신
+  브리핑이 열린다 — 열어 봐야 아무것도 없는 패널을 띄우지 않는다.
+*/
+function toSummaryItem(item) {
+  if (typeof item === 'string') {
+    return { text: item, detail: null }
+  }
+  const text = item?.text ?? ''
+  // `맥락도 갈린 지점도 결론도 없는 객체` 는 문자열과 다를 바 없다.
+  const hasDetail = Boolean(item?.context || item?.debates?.length || item?.resolution)
+  return { text, detail: hasDetail ? item : null }
+}
+
 function toSummaryColumns(summary) {
   if (!summary) {
     return []
   }
+  const column = (title, items) => ({ title, items: (items ?? []).map(toSummaryItem) })
   return [
-    { title: '발견한 문제', items: summary.discovered_issues ?? [] },
-    { title: '변동 사항', items: summary.changes ?? [] },
-    { title: '이후 계획', items: summary.next_plans ?? [] },
+    column('발견한 문제', summary.discovered_issues),
+    column('변동 사항', summary.changes),
+    column('이후 계획', summary.next_plans),
   ]
 }
 
@@ -325,13 +347,24 @@ export function FlowBoardPage() {
     if (ui.activeIndex) {
       return new Set(ui.activeIndex.related_edge_ids ?? [])
     }
+    /*
+      요약표에서 고른 칸도 인덱스와 같은 자격이다. 판이 안 따라 움직이면
+      **패널만 바뀌고 왼쪽은 그대로**라, 방금 읽은 이야기가 판 어디에서
+      오간 것인지 알 길이 없다.
+
+      인덱스보다 뒤에 두는 이유는 인덱스가 사용자가 명시적으로 켜 둔 필터라
+      서다 — 요약표를 누른다고 그 필터가 조용히 밀려나면 안 된다.
+    */
+    if (panel?.kind === 'agenda') {
+      return new Set(panel.item.related_edge_ids ?? [])
+    }
     if (activeChip) {
       const chip = (meeting.data?.briefing?.location_chips ?? [])
         .find((c) => c.content_type === activeChip)
       return chip ? new Set(chip.edge_ids ?? []) : null
     }
     return null
-  }, [ui.activeIndex, activeChip, meeting.data])
+  }, [ui.activeIndex, activeChip, meeting.data, panel])
 
   const participantRows = (filterOptions?.participants ?? []).map((p) => ({
     id: p.id,
@@ -622,6 +655,15 @@ export function FlowBoardPage() {
                           // 하나가 사라지고, 누를 때도 둘이 같이 눌린다.
                           const itemKey = `${column.title}-${i}`
 
+                          /*
+                            말풍선은 붙이지 않는다. 안내 말풍선은 그림만 있는
+                            단추의 뜻을 알려 주는 자리인데, 여기는 글이 이미
+                            적혀 있어서 같은 글이 아래에 한 번 더 뜬다.
+
+                            상세가 있는 칸만 안건 패널을 연다. 없는 칸까지
+                            열면 맥락도 갈린 지점도 비어 있는 패널이 떠서,
+                            **그 안건에 논의가 없었던 것으로 읽힌다.**
+                          */
                           return (
                             <button
                               className={activeSummaryItem === itemKey ? 'is-active' : ''}
@@ -629,11 +671,18 @@ export function FlowBoardPage() {
                               key={itemKey}
                               data-tip={item}
                               onClick={() => {
-                                setActiveSummaryItem((current) => (current === itemKey ? null : itemKey))
-                                setPanel({ kind: 'briefing' })
+                                const same = activeSummaryItem === itemKey
+                                setActiveSummaryItem(same ? null : itemKey)
+                                if (same) {
+                                  setPanel({ kind: 'briefing' })
+                                  return
+                                }
+                                setPanel(item.detail
+                                  ? { kind: 'agenda', column: column.title, item: item.detail }
+                                  : { kind: 'briefing' })
                               }}
                             >
-                              {item}
+                              {item.text}
                             </button>
                           )
                         })}
@@ -715,6 +764,26 @@ export function FlowBoardPage() {
               <Empty>이 회의에는 받을 브리핑이 없습니다.</Empty>
             </aside>
           )
+        ) : null}
+
+        {panel?.kind === 'agenda' ? (
+          <FlowAgendaPanel
+            column={panel.column}
+            icons={icons}
+            item={panel.item}
+            onBack={() => {
+              setPanel({ kind: 'briefing' })
+              // 켜진 칸도 같이 끈다. 남겨 두면 브리핑이 떠 있는데 요약표
+              // 한 칸만 진하게 켜져 있어, 그 칸을 보여 주는 중인 줄 안다.
+              setActiveSummaryItem(null)
+            }}
+            onClose={() => {
+              setPanel(null)
+              // 패널을 닫으면 요약표의 켜진 칸도 같이 끈다. 남겨 두면 판에는
+              // 아무것도 안 열렸는데 요약표 한 칸만 진하게 켜져 있다.
+              setActiveSummaryItem(null)
+            }}
+          />
         ) : null}
 
         {panel?.kind === 'node' && selectedNode ? (

@@ -15,6 +15,103 @@ const DAY = new Intl.DateTimeFormat('ko-KR', {
   year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
 })
 
+/**
+ * 그 사람이 있는 곳의 지금 시각. `14:32`
+ *
+ * 방 머리에 참여자별로 띄운다. **시간대가 갈리는 팀에서 "지금 말을 걸어도
+ * 되는 시간인가" 가 이 서비스의 첫 질문**이라, 이름 옆에 그곳 시각이 있어야
+ * 자리를 비운 사람에게 대리인을 보낼지 직접 물을지 판단할 수 있다.
+ *
+ * 24시간제로 찍는다. `오후 2:32` 는 다섯 사람을 한 줄에 늘어놓기엔 길고,
+ * 새벽인지 한밤인지를 읽는 데는 숫자가 더 빠르다.
+ *
+ * 시간대를 못 읽으면 빈 문자열이다 — `Intl` 은 모르는 시간대에 예외를 던진다.
+ * 서버가 프로필에 시간대를 안 채워 준 사람이 있으므로 그때는 조용히 뺀다.
+ */
+/*
+  시간대별 포맷터를 담아 둔다.
+
+  `Intl.DateTimeFormat` 을 만드는 것은 **싸지 않다.** 안 담아 두면 참여자
+  다섯 명짜리 방에서 1 분마다 열 개(시각용·시각용 시 추출) 를 새로 만들고,
+  같은 시각을 여러 화면에 걸면 그만큼 곱해진다. 시간대 문자열은 몇 개 안 되고
+  프로세스가 사는 동안 안 바뀐다.
+
+  못 만든 시간대는 `null` 로 기억한다 — 서버가 프로필에 이상한 값을 채워
+  두면 `try` 가 1 분마다 다시 던진다.
+*/
+const timeFormatters = new Map()
+const hourFormatters = new Map()
+
+function formatterFor(cache, timezone, options) {
+  if (cache.has(timezone)) {
+    return cache.get(timezone)
+  }
+  let made
+  try {
+    made = new Intl.DateTimeFormat(options.locale, { ...options.parts, timeZone: timezone })
+  } catch {
+    made = null
+  }
+  cache.set(timezone, made)
+  return made
+}
+
+export function zoneTime(timezone, now = new Date()) {
+  if (!timezone) {
+    return ''
+  }
+  const formatter = formatterFor(timeFormatters, timezone, {
+    locale: 'ko-KR',
+    parts: { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' },
+  })
+  return formatter ? formatter.format(now) : ''
+}
+
+/**
+ * 그곳이 지금 몇 시인가. 못 읽으면 `null`.
+ *
+ * `zoneTime` 이 만든 문자열을 다시 파싱하지 않는다 — 형식이 바뀌면 조용히
+ * 어긋난다. 숫자가 필요하면 숫자로 뽑는다.
+ */
+export function zoneHour(timezone, now = new Date()) {
+  if (!timezone) {
+    return null
+  }
+  const formatter = formatterFor(hourFormatters, timezone, {
+    locale: 'en-US',
+    parts: { hour: '2-digit', hourCycle: 'h23' },
+  })
+  return formatter ? Number(formatter.format(now)) : null
+}
+
+/**
+ * 지금 말을 걸어도 되는 시간인가.
+ *
+ * 08:00–22:00 을 깨어 있는 시간으로 본다. 정확한 근무 시간은 사람마다 다르지만,
+ * 이 표시가 답하려는 것은 "출근했나" 가 아니라 **"자고 있나"** 다 — 새벽에
+ * 보낸 말이 답을 못 받는 것과, 답을 받을 수 있는데 안 오는 것은 다른 상황이고
+ * 그때 할 일도 다르다(전자는 대리인에게 맡긴다).
+ */
+export function isAwakeHour(timezone, now = new Date()) {
+  const hour = zoneHour(timezone, now)
+  if (hour === null) {
+    return true
+  }
+  return hour >= 8 && hour < 22
+}
+
+/**
+ * 보는 사람과 시간대가 다른가.
+ *
+ * 같으면 그곳 시각이 내 시계와 똑같다. 다른 사람만 눈에 띄게 한다.
+ */
+export function inOtherZone(timezone) {
+  if (!timezone) {
+    return false
+  }
+  return timezone !== Intl.DateTimeFormat().resolvedOptions().timeZone
+}
+
 export function formatTime(iso) {
   if (!iso) {
     return ''

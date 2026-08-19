@@ -85,7 +85,7 @@ export function ChatDateCalendar({ roomId, initialMonth, selectedDate, onPick, o
                     key={date}
                     type="button"
                     disabled={!hasChat}
-                    title={hasChat ? `${date} 대화 보기` : '이 날은 대화가 없습니다.'}
+                    data-tip={hasChat ? `${date} 대화 보기` : '이 날은 대화가 없습니다.'}
                     onClick={() => onPick(date)}
                   >
                     {day}

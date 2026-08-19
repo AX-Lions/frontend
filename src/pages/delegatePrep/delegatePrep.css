@@ -175,6 +175,43 @@
   color: var(--prep-orange);
 }
 
+/*
+  맡긴 결과. `적용하기` 줄 바로 밑이다.
+
+  위쪽 알림(`.prep-notice`)과 달리 **눌린 자리에 붙는 확인**이라, 글자만
+  띄우지 않고 앞에 표식을 둔다 — 한 줄짜리 회색 글은 아래 `추가 설정` 의
+  설명문과 구별되지 않아 결과로 안 읽힌다.
+*/
+.prep-applied {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--prep-orange-bg);
+  color: var(--prep-orange);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 체크 표식. 글꼴에 기대지 않고 그린다 — 이모지는 기기마다 크기가 다르다. */
+.prep-applied-mark {
+  width: 14px;
+  height: 8px;
+  flex: none;
+  border-bottom: 2px solid currentcolor;
+  border-left: 2px solid currentcolor;
+  transform: translateY(-2px) rotate(-45deg);
+}
+
+/* `추가 설정` 옆의 (선택 사항). 제목보다 한 단계 물러나 보여야 한다. */
+.prep-optional {
+  color: var(--prep-muted, #92969d);
+  font-size: 13px;
+  font-weight: 400;
+}
+
 .prep-error {
   color: var(--accent);
 }
@@ -288,16 +325,28 @@
    시안(`685:7160`)은 면을 흰색 하나로 두고 **글자색만** 바꾼다. 흐릴수록 끝난
    것이고 진할수록 손이 남은 것이라, 색 자체가 무엇부터 봐야 하는지를 말한다.
    면을 칠해 강조하면 그 순서가 사라진다. */
+/*
+  **누르는 것이 아니라 상태다.**
+
+  단추였다. 생김새는 상태 표시인데 누르면 입장 칸이 열려서, 눌리는지 아닌지를
+  손을 대 봐야 알 수 있었다. 게다가 바로 옆 제목과 화살표가 이미 같은 일을
+  하고 있어 한 줄에 같은 동작이 셋이었다.
+
+  그래서 얹음·누름·초점 반응을 전부 뺀다. 반응이 남아 있으면 읽기만 하는 값에
+  손이 계속 간다.
+*/
 .prep-status {
   flex: none;
   padding: 6px 12px;
-  border: none;
   border-radius: 8px;
   background: #ffffff;
   font-size: 12px;
   font-weight: 400;
   line-height: 14px;
   white-space: nowrap;
+  /* 상태 글자를 끌어 선택하려는 사람은 없다. 드래그가 잡히면 줄을 펴려다
+     글자만 파랗게 칠해진다. */
+  user-select: none;
 }
 
 .prep-status.is-answered {

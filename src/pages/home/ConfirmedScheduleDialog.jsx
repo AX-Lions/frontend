@@ -14,8 +14,21 @@ import './confirmedSchedule.css'
  * `header`(`GET /meetings/{id}/prep`)와 참여자(`GET /meetings/{id}`)를 따로
  * 부른다. 팝업 하나에 쓸 값 전부를 주는 자리가 없어서다 — 준비 화면 전체를
  * 부르면 예상 논쟁점까지 함께 오는데 이 팝업은 헤더만 쓴다.
+ *
+ * ## 회의가 안 걸린 일정도 열려야 한다
+ *
+ * 달력(`회의 일정`)의 한 칸은 `CalendarEvent` 다. 거기 붙는 회의
+ * (`related_meeting`)는 **있을 수도 없을 수도 있다** — 지금 서버가 주는 것은
+ * 거의 전부 `null` 이다. 회의 id 로만 열게 두면 달력에서는 이 팝업이 아예
+ * 안 뜨고, 눌러도 아무 일이 없는 칸만 남는다. 그래서 회의가 없으면 부르는
+ * 쪽이 이미 들고 있는 값(`schedule`)으로 같은 화면을 그린다. 그때는 갈 회의가
+ * 없으므로 `회의 보기` 도 내리지 않는다.
+ *
+ * @param meetingId 회의 id. 없으면 요청을 보내지 않는다.
+ * @param schedule  회의가 없을 때 쓸 값
+ *                  `{ title, teamName, projectName, when, participantNames }`
  */
-export function ConfirmedScheduleDialog({ meetingId, onClose }) {
+export function ConfirmedScheduleDialog({ meetingId, schedule, onClose }) {
   const [header, setHeader] = useState(null)
   const [participants, setParticipants] = useState(null)
   const [error, setError] = useState('')
@@ -23,6 +36,9 @@ export function ConfirmedScheduleDialog({ meetingId, onClose }) {
   useEscapeToClose(onClose)
 
   useEffect(() => {
+    if (!meetingId) {
+      return undefined
+    }
     const controller = new AbortController()
     let alive = true
     Promise.all([
@@ -46,7 +62,23 @@ export function ConfirmedScheduleDialog({ meetingId, onClose }) {
     }
   }, [meetingId])
 
-  const names = (participants ?? []).map((p) => p.name)
+  /*
+    회의에서 온 값이 우선이고, 없으면 부른 쪽이 준 값이다. 둘을 한 모양으로
+    맞춰 두면 아래 그리는 코드가 어느 쪽인지 몰라도 된다.
+  */
+  const shown = meetingId
+    ? header
+    : (schedule ? {
+      title: schedule.title,
+      team_name: schedule.teamName,
+      project_name: schedule.projectName,
+      when: schedule.when,
+      delegated: false,
+    } : null)
+
+  const names = meetingId
+    ? (participants ?? []).map((p) => p.name)
+    : (schedule?.participantNames ?? [])
   const shownNames = names.slice(0, 3)
   const restCount = names.length - shownNames.length
 
@@ -59,22 +91,26 @@ export function ConfirmedScheduleDialog({ meetingId, onClose }) {
       <div className="cs-dialog" role="dialog" aria-modal="true" aria-labelledby="confirmed-schedule-title">
         {error ? (
           <p className="cs-error" role="alert">{error}</p>
-        ) : !header ? (
+        ) : !shown ? (
           <p className="cs-loading">불러오는 중…</p>
         ) : (
           <div className="cs-body">
             <div className="cs-head">
-              <h2 className="cs-title" id="confirmed-schedule-title">{header.title}</h2>
+              <h2 className="cs-title" id="confirmed-schedule-title">{shown.title}</h2>
               <img className="cs-edit" src="/icons/ChangeMark.svg" alt="" aria-hidden="true" />
             </div>
 
+            {/* 제목과 본문을 가르는 선. 홈 「오늘 일정」·요약 카드가 쓰는 것과
+                같은 선이라, 이 팝업이 그 줄에서 열렸다는 것이 이어져 읽힌다. */}
+            <hr className="summary-divider" />
+
             <div className="cs-info">
               <div className="cs-meta">
-                <strong>{header.team_name} · {header.project_name}</strong>
-                <span>{header.when}</span>
+                <strong>{shown.team_name} · {shown.project_name}</strong>
+                <span>{shown.when}</span>
               </div>
 
-              {shownNames.length > 0 || header.delegated ? (
+              {shownNames.length > 0 || shown.delegated ? (
                 <div className="cs-chips">
                   {shownNames.length > 0 ? (
                     <span className="cs-chip">
@@ -82,7 +118,7 @@ export function ConfirmedScheduleDialog({ meetingId, onClose }) {
                       {restCount > 0 ? <span>+ {restCount}</span> : null}
                     </span>
                   ) : null}
-                  {header.delegated ? <span className="cs-badge">{header.badge}</span> : null}
+                  {shown.delegated ? <span className="cs-badge">{shown.badge}</span> : null}
                 </div>
               ) : null}
             </div>
@@ -91,13 +127,17 @@ export function ConfirmedScheduleDialog({ meetingId, onClose }) {
 
         <div className="cs-actions">
           <button className="cs-cancel" type="button" onClick={onClose}>취소</button>
-          <button
-            className="cs-view"
-            type="button"
-            onClick={() => { navigate(`/flow-board?meeting=${meetingId}`); onClose() }}
-          >
-            회의 보기
-          </button>
+          {/* 갈 회의가 없으면 단추도 없다. 눌러도 아무 데도 안 가는 단추를
+              남기면 `회의 보기` 가 고장 난 것처럼 보인다. */}
+          {meetingId ? (
+            <button
+              className="cs-view"
+              type="button"
+              onClick={() => { navigate(`/flow-board?meeting=${meetingId}`); onClose() }}
+            >
+              회의 보기
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

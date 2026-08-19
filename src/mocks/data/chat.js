@@ -135,6 +135,17 @@ function message(roomId, sender, body, sentAt, extra = {}) {
     attachments: [],
     sent_at: sentAt,
     is_mine: sender.id === ME.id,
+    /*
+      **내 대리인이 내 대신 한 말.**
+
+      `is_mine` 과는 다르다. 화면에서 자리는 내 쪽(오른쪽)이지만 — 상대에게는
+      나에게서 온 말이므로 — **고치거나 지울 수는 없다.** 내가 쓴 문장이
+      아니기 때문이다. 둘을 한 필드로 합치면 대리인이 한 말에 `수정` 이
+      붙는데, 눌러 봐야 서버가 거절한다.
+
+      남의 대리인이 한 말은 여기서 거짓이다. 그건 상대 쪽 말풍선이다.
+    */
+    is_from_my_agent: sender.is_agent && sender.id === AGENT_IDS[ME.name],
     is_important: false,
     important_confirmed_at: null,
     read_count: 0,
@@ -480,6 +491,26 @@ const daeunMessages = [
   ),
   say(daeunRoom, '강다은', '고칠게요.', daysAgo(2, 21, 42)),
   say(daeunRoom, '강다은', '고쳤습니다. 다시 봐 주세요.', daysAgo(1, 9, 12)),
+  /*
+    자리를 비운 사이 내 대리인이 대신 답한 자리.
+
+    **이 서비스가 파는 장면이 정확히 이것**인데 목에 한 줄도 없었다. 대리인은
+    남의 방(`동료 대리인`)에서만 말했고, 내 대리인이 내 대신 팀원에게 답한
+    기록은 화면 어디에도 없었다 — `자리 비운 사이` 목록을 만들어도 늘 비어
+    있게 된다.
+
+    `answered_while_away` 로 표시한다. 대리인이 한 말이라고 다 부재 중 응답은
+    아니다(내가 옆에서 시켜서 한 것도 있다). 목록에 담을지 가르는 것은 서버가
+    아는 사실이라 필드로 온다.
+  */
+  bot(
+    daeunRoom,
+    '유수인',
+    '수인님이 자리를 비우셔서 제가 대신 답합니다. 공지 문구는 지난주에 정한 템플릿을 그대로 쓰기로 되어 있어, 마지막 줄만 빼면 확정입니다. 최종 확인은 수인님이 돌아오시면 남기겠습니다.',
+    daysAgo(1, 9, 30),
+    { answered_while_away: true },
+  ),
+  say(daeunRoom, '강다은', '네 알겠습니다. 그럼 그대로 올릴게요.', daysAgo(1, 9, 34)),
   // 지운 메시지. 자리는 남고 본문만 빈다 — 사이드바 미리보기도 `삭제된 메시지입니다` 가 된다.
   say(daeunRoom, '유수인', '', minutesAgo(320), { deleted_at: minutesAgo(319), read_count: 1 }),
 ]
@@ -502,6 +533,15 @@ const suyeonMessages = [
   say(suyeonRoom, '유수인', '2시까지 올릴게요.', minutesAgo(230), { read_count: 1 }),
   say(suyeonRoom, '임수연', '넵', minutesAgo(30)),
   say(suyeonRoom, '임수연', '그리고 아까 말한 색 이름 표는 정리해서 라운지에 올려 뒀습니다.', minutesAgo(28)),
+  say(suyeonRoom, '임수연', '수인님, 원형 프로필 시안 지금 올라왔나요? 리허설 10분 뒤예요.', minutesAgo(24)),
+  bot(
+    suyeonRoom,
+    '유수인',
+    '수인님은 지금 자리를 비우셨습니다. 원형 프로필 시안은 오늘 14:00 까지 올리기로 하신 것이 기록에 있고, 아직 올라오지 않았습니다. 리허설에는 직전 버전으로 진행해 주시면, 돌아오시는 대로 바로 전달하겠습니다.',
+    minutesAgo(23),
+    { answered_while_away: true },
+  ),
+  say(suyeonRoom, '임수연', '알겠습니다. 직전 버전으로 갈게요.', minutesAgo(22)),
 ]
 
 const biseongRoom = ROOM_IDS.biseong
@@ -519,6 +559,13 @@ const biseongMessages = [
     '최비성',
     '아바타 없는 계정은 빈 문자열로 내려갑니다. 화면에서 기본 아이콘 처리 부탁드려요.',
     minutesAgo(400),
+  ),
+  bot(
+    biseongRoom,
+    '유수인',
+    '수인님 대신 확인했습니다. 기본 아이콘 처리는 이미 들어가 있고(사진 없는 계정은 Bordo 아이콘), 경로 규칙이 바뀌면 화면 쪽은 손댈 곳이 없습니다. 이 내용은 수인님께 남겨 두겠습니다.',
+    minutesAgo(395),
+    { answered_while_away: true },
   ),
 ]
 
@@ -559,6 +606,37 @@ function buildRoom({ id, type, title, team = true, project = null, members, unre
     id,
     type,
     title,
+    /*
+      참여자. **시간대까지 같이 준다.**
+
+      방 머리에 각자의 그곳 시각을 띄우려면 필요하다. 화면이 사람 id 로
+      팀 구성원 목록을 다시 뒤지게 두면, 팀에 안 매인 1:1 방에서는 뒤질
+      목록조차 없다.
+
+      `is_me` 는 서버가 정한다 — 1:1 방에서 "상대"가 누구인지는 보는 사람에
+      따라 다르고, 그 판정을 화면이 하면 계정마다 다른 규칙이 생긴다.
+    */
+    members: members.map((name) => {
+      const who = person(name)
+      return {
+        id: who.id,
+        name: who.name,
+        avatar_url: who.avatar_url,
+        timezone: who.timezone,
+        // 나라 이름은 서버가 완성해 준다 — 시간대 문자열에서 화면이 유추하면
+        // 그 표를 화면마다 하나씩 들고 있게 된다.
+        country: who.country,
+        /*
+          지금 자리에 있는지. 자리를 비운 사람에게 보낸 말은 **그 사람의 Bordo
+          가 먼저 받는다** — 답이 늦는 것과, 사람이 아닌 대리인이 답하는 것은
+          받는 쪽이 알아야 하는 다른 사실이다.
+        */
+        presence: who.presence ?? 'ACTIVE',
+        agent_name: agentName(who.name),
+        is_me: who.id === ME.id,
+        is_agent: false,
+      }
+    }),
     team_id: team ? TEAM.id : null,
     team_name: team ? TEAM.name : '',
     project_id: project ? project.id : null,
@@ -669,6 +747,48 @@ export const chatRooms = {
     return right.localeCompare(left)
   }),
 }
+
+/**
+ * `GET /chat/away-handled` — 자리를 비운 사이 내 Bordo 가 대신 나눈 대화.
+ *
+ * ## 왜 「중요 채팅」 자리를 이것이 가져갔나
+ *
+ * 그 자리는 **내가 미리 별을 찍어 둔 것**만 모였다. 자리를 비우기 전에 무엇이
+ * 중요해질지 알 수 있으면 애초에 자리를 안 비웠을 것이다. 이 서비스가 파는
+ * 것은 "없는 동안에도 대화가 이어진다" 인데, 그 이어진 대화를 한 자리에서
+ * 보는 곳이 화면에 없었다 — 방을 하나씩 열어 봐야 알 수 있었다.
+ *
+ * 방마다 **대리인이 대신 답한 횟수**와 마지막 응답을 같이 준다. 화면이 방
+ * 메시지를 전부 받아 세게 두면, 목록 하나 그리려고 방 수만큼 요청이 나간다.
+ */
+export const awayHandled = (() => {
+  const rows = ALL
+    .map((room) => {
+      const handled = (roomMessages[room.id]?.results ?? [])
+        .filter((m) => m.answered_while_away && m.sender.id === AGENT_IDS[ME.name])
+      if (handled.length === 0) {
+        return null
+      }
+      const last = handled[handled.length - 1]
+      return {
+        room_id: room.id,
+        title: room.title,
+        path_label: room.path_label,
+        avatar_urls: room.avatar_urls,
+        // 상대가 누구였는지. 1:1 이면 한 사람, 단체방이면 물어본 사람들이다.
+        handled_count: handled.length,
+        last_reply: {
+          id: last.id,
+          preview: last.body.length > 60 ? `${last.body.slice(0, 60)}…` : last.body,
+          sent_at: last.sent_at,
+        },
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.last_reply.sent_at.localeCompare(a.last_reply.sent_at))
+
+  return { count: rows.length, results: rows }
+})()
 
 // ─────────────────────────────────────────── 사이드바
 /*

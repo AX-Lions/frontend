@@ -54,7 +54,7 @@ function PanelShell({ children, composer = false, onClose, search, subtitle, tit
     <aside className="briefing-panel inspector-panel" aria-label={title}>
       <header className="briefing-header">
         <h2>{title}</h2>
-        <button className="panel-close" type="button" aria-label="패널 닫기" onClick={onClose}>
+        <button className="panel-close" type="button" aria-label="패널 닫기" data-tip="닫기" onClick={onClose}>
           ×
         </button>
         {subtitle ? <p className="inspector-subtitle">{subtitle}</p> : null}

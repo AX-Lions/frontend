@@ -21,6 +21,33 @@ export function fetchSidebar(signal) {
   return api.get('/chat/sidebar', undefined, { signal })
 }
 
+/**
+ * 지금 자리에 있는지. `ACTIVE` · `AWAY`
+ *
+ * 서버 상태다. 브라우저에만 두면 창을 닫는 순간 내 Bordo 가 다시 조용해지는데,
+ * **자리를 비운다는 것은 브라우저를 닫는 일**이라 그러면 기능 자체가 성립하지
+ * 않는다.
+ */
+export function fetchPresence(signal) {
+  return api.get('/me/presence', undefined, { signal })
+}
+
+export function setPresence(status) {
+  return api.patch('/me/presence', { status })
+}
+
+/**
+ * 자리를 비운 사이 내 Bordo 가 대신 나눈 대화.
+ *
+ * 좌측 목록의 `중요 채팅` 자리를 이것이 가져갔다. 그쪽은 **내가 미리 별을 찍어
+ * 둔 것**만 모이는데, 자리를 비우기 전에 무엇이 중요해질지 알 수 있으면 애초에
+ * 자리를 안 비웠을 것이다. 돌아와서 가장 먼저 봐야 하는 것은 내가 없는 동안
+ * 오간 말이다.
+ */
+export function fetchAwayHandled(signal) {
+  return api.get('/chat/away-handled', undefined, { signal })
+}
+
 export function fetchImportant(signal) {
   return api.get('/chat/important', undefined, { signal })
 }
@@ -256,6 +283,9 @@ export function toPreview(room) {
     avatar: room.avatar_urls?.[0] ?? null,
     bordo: room.type === 'AI' || room.type === 'PEER_AGENT',
     stacked: room.type === 'PROJECT' || room.type === 'TEAM',
+    // 방 머리의 `그곳 시각` 줄이 쓴다. 없는 방(목록에만 있는 옛 응답)은
+    // 빈 배열이라 그 줄이 통째로 안 그려진다.
+    members: room.members ?? [],
   }
 }
 

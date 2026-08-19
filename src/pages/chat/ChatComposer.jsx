@@ -39,7 +39,7 @@ function readableSize(bytes) {
  * 안 보내면 24시간 뒤 만료된다. 그래서 아직 안 보낸 첨부도 화면에 보여야 한다 —
  * 안 보이면 사용자는 파일이 사라진 줄 안다.
  */
-export function ChatComposer({ roomId, onSent, onOpenAgentSettings }) {
+export function ChatComposer({ notice, roomId, onSent, onOpenAgentSettings }) {
   const [text, setText] = useState('')
   const [attachments, setAttachments] = useState([])
   const [busy, setBusy] = useState(false)
@@ -112,6 +112,15 @@ export function ChatComposer({ roomId, onSent, onOpenAgentSettings }) {
 
   return (
     <div className="chat-composer-wrap">
+      {/*
+        입력칸 위에 얹는 안내(지금은 자리 비움 띠).
+
+        `.chat-composer-wrap` 이 `position: absolute` 라 **방의 흐름 위에 떠
+        있다.** 그래서 이 띠를 방 쪽에 형제로 두면 입력칸 밑에 깔려 안 보인다 —
+        실제로 그렇게 깔려 있었다. 안내는 이 상자 안에 들어와야 위로 쌓인다.
+      */}
+      {notice}
+
       {error ? <p className="chat-send-error" role="alert">{error}</p> : null}
 
       {attachments.length > 0 ? (
@@ -141,7 +150,7 @@ export function ChatComposer({ roomId, onSent, onOpenAgentSettings }) {
         <button
           type="button"
           aria-label="파일 첨부"
-          title="파일 첨부"
+          data-tip="파일 첨부"
           disabled={!roomId || busy}
           onClick={() => fileRef.current?.click()}
         >

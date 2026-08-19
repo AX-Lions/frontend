@@ -1,6 +1,15 @@
 import { api } from '../../lib/api.js'
 
 /**
+ * 홈의 `+` 가 이 화면으로 넘길 때 다는 쿼리 이름.
+ *
+ * 홈에서 팝업을 직접 띄우지 않고 여기로 보내는 이유는 `HomePage` 쪽 주석에
+ * 적어 뒀다. 이름을 양쪽에 따로 적으면 한쪽만 고쳤을 때 **버튼을 눌러도 팝업이
+ * 안 뜨는데 주소는 바뀌어 있는** 상태가 된다.
+ */
+export const NEW_EVENT_PARAM = 'new'
+
+/**
  * 회의 일정(시안 `692:7910`)이 부르는 것.
  *
  * `GET /projects/{project_id}/calendar/events` 는 **프로젝트 하나**의 일정만

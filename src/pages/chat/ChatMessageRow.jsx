@@ -18,7 +18,7 @@ import { BordoAvatar, RequestIcon } from './chat.ui.jsx'
  *
  * 동작을 말풍선 옆 `⋮` 하나에 모은다. 버튼을 늘어놓으면 말풍선보다 도구가 커진다.
  */
-export function ChatMessageRow({ message, focused, onChanged, onImportantChanged }) {
+export function ChatMessageRow({ message, focused, myAgentRoom, onChanged, onImportantChanged }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.body)
@@ -27,6 +27,23 @@ export function ChatMessageRow({ message, focused, onChanged, onImportantChanged
 
   const deleted = Boolean(message.deleted_at)
   const time = formatTime(message.sent_at)
+
+  /*
+    내 쪽에 앉는 말.
+
+    내가 쓴 것과 **내 대리인이 나 대신 한 것**이 여기 함께 온다. 상대에게는
+    둘 다 나에게서 온 말이고, 내 화면에서만 왼쪽에 떨어져 있으면 "내가 없는
+    동안 내 쪽에서 무슨 말이 나갔는지" 가 남의 말과 섞여 안 읽힌다.
+
+    **내 Bordo 와 단둘이 있는 방만 예외다.** 거기서 내 Bordo 는 나를 대신하는
+    쪽이 아니라 내가 말을 거는 상대다. 규칙을 그대로 두면 물음과 답이 전부
+    오른쪽에 쌓여 대화가 아니라 혼잣말처럼 보인다.
+
+    고치고 지우는 것은 `is_mine` 만이다 — 대리인이 한 문장은 내가 쓴 것이
+    아니라 서버가 수정을 거절한다.
+  */
+  const byMyAgent = Boolean(message.is_from_my_agent) && !myAgentRoom
+  const onMySide = Boolean(message.is_mine) || byMyAgent
 
   /**
    * 서버가 돌려준 메시지로 갈아 끼운다.
@@ -188,7 +205,7 @@ export function ChatMessageRow({ message, focused, onChanged, onImportantChanged
       {message.is_important ? (
         <span
           className={message.important_confirmed_at ? 'message-mark confirmed' : 'message-mark'}
-          title={message.important_confirmed_at ? '확인한 중요 메시지' : '중요 메시지'}
+          data-tip={message.important_confirmed_at ? '확인한 중요 메시지' : '중요 메시지'}
         >
           <RequestIcon muted={Boolean(message.important_confirmed_at)} small />
         </span>
@@ -197,9 +214,15 @@ export function ChatMessageRow({ message, focused, onChanged, onImportantChanged
     </>
   )
 
-  if (message.is_mine) {
+  if (onMySide) {
+    const className = [
+      'message-row me',
+      byMyAgent ? 'by-agent' : '',
+      focused ? 'focused' : '',
+    ].filter(Boolean).join(' ')
+
     return (
-      <div className={focused ? 'message-row me focused' : 'message-row me'} data-message-id={message.id}>
+      <div className={className} data-message-id={message.id}>
         {menu}
         <span className="message-side">
           {marks}
@@ -209,7 +232,16 @@ export function ChatMessageRow({ message, focused, onChanged, onImportantChanged
           <time>{time}</time>
         </span>
         <span className="message-body">
-          {bubble('orange')}
+          {/*
+            누가 한 말인지 적는다.
+
+            내 쪽 말풍선에는 원래 이름이 없다 — 내가 쓴 것이 뻔해서다. 대리인이
+            대신 한 말은 그 전제가 깨지므로, **여기만** 이름을 붙인다. 색만으로
+            가르면 나중에 되짚어 읽을 때 "이걸 내가 썼던가" 를 매번 다시 판단하게
+            된다.
+          */}
+          {byMyAgent ? <em className="message-agent-caption">{message.sender?.name}</em> : null}
+          {bubble(byMyAgent ? 'agent' : 'orange')}
           {error ? <span className="message-error" role="alert">{error}</span> : null}
         </span>
       </div>
@@ -229,7 +261,17 @@ export function ChatMessageRow({ message, focused, onChanged, onImportantChanged
         <strong>{message.sender?.name ?? ''}</strong>
         <span>
           <span className="message-body">
-            {bubble('gray')}
+            {/*
+              대리인이 한 말은 **색이 다르다.**
+
+              `{이름}의 Bordo` 라는 이름과 아바타로만 갈라 두었는데, 대화가
+              길어지면 이름은 연속된 말풍선에서 한 번만 보이고 아바타는
+              작아서, 지나고 나서 읽을 때 **어느 말이 사람이 한 것이고 어느
+              말이 대리인이 대신 한 것인지** 구별되지 않았다. 자리를 비운 사이
+              오간 말을 되짚는 것이 이 화면의 일이라, 그 구별이 말풍선 자체에
+              있어야 한다. `sender.is_agent` 는 서버가 이미 주고 있었다.
+            */}
+            {bubble(message.sender?.is_agent ? 'agent' : 'gray')}
             {error ? <span className="message-error" role="alert">{error}</span> : null}
           </span>
           <span className="message-side">

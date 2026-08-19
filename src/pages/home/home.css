@@ -35,20 +35,32 @@ body,
   box-sizing: border-box;
 }
 
-.home-layout button,
-.home-layout input,
-.home-layout a {
+/*
+  홈 레이아웃 안의 기본값 지우기.
+  ── 반드시 `:where()` 안에 둔다 ──
+
+  예전에는 `.home-layout button { background: transparent }` 이었다. 선택자
+  점수가 `클래스+요소`(0,1,1)라 **홑클래스로 쓴 단추 규칙보다 세다.** 그래서
+  이 레이아웃을 빌려 쓰는 화면·팝업이 배경을 적어 놓고도 전부 투명해졌다 —
+  회의 일정의 `일정 추가하기` 와 달력 일정 카드, 브리핑 팝업의 버튼 두 개가
+  그렇게 색을 잃고 있었다. 고칠 때마다 앞에 `.home-layout` 을 덧붙이는 것은
+  같은 사고를 계속 낳는다.
+
+  `:where()` 안의 것은 점수가 0 이다. 셋 다 감싸면 이 블록 전체가 0,0,0 이
+  되어 **어떤 클래스 규칙이든 이긴다** — 초기화가 원래 해야 하는 일이다.
+*/
+:where(.home-layout) :where(button, input, a) {
   font: inherit;
 }
 
-.home-layout button {
+:where(.home-layout) :where(button) {
   border: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
 }
 
-.home-layout a {
+:where(.home-layout) :where(a) {
   color: inherit;
   text-decoration: none;
 }
@@ -607,27 +619,36 @@ h1 {
   height: 24px;
 }
 
-/* 카드 다섯 장이 가로로 늘어선다. 좁아지거나 확대하면 뒤쪽이 잘리는데
-   `overflow: hidden` 이라 **닿을 방법이 없었다.** 넘치면 밀어서 볼 수 있게 한다 —
-   잘린 것과 스크롤되는 것은 사용자에게 전혀 다르다. */
+/*
+  카드 다섯 장이 가로로 늘어선다.
+
+  ## 정사각형이 바닥이다
+
+  예전에는 폭이 `calc((100% - 64px) / 5)` 였다 — 창을 줄이면 다섯 장이 끝까지
+  같이 홀쭉해져서, 시안(`576:4425`)의 180×169 카드가 세로로 긴 조각이 되고
+  제목 두 줄이 들어갈 자리가 사라졌다. 이제 **높이(= 정사각형)까지만 줄고**
+  그 아래로는 안 줄어든다. 더 좁아지면 뒤쪽 카드는 잘리는 대신 가로로 밀린다 —
+  잘린 것과 스크롤되는 것은 사용자에게 전혀 다르다.
+
+  높이는 세로가 짧은 화면에서 함께 줄기 때문에(아래 `@media (max-height: …)`)
+  변수로 들고 다닌다. 그래야 "정사각형" 의 기준이 늘 지금 카드 높이다.
+*/
 .project-strip {
+  --card-height: 169px;
+
   display: grid;
-  grid-auto-columns: 180px;
+  grid-auto-columns: clamp(var(--card-height), calc((100% - 64px) / 5), 180px);
   grid-auto-flow: column;
   gap: 16px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 2px;
+  /* 스크롤바와 카드 사이의 틈. `2px` 이라 막대가 카드에 붙어 있었다. */
+  padding-bottom: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: #e5e7eb transparent;
 }
 
-/*
-  가로 스크롤바 — **화살표 없이 막대만.**
-
-  Chromium 계열은 `scrollbar-width` · `scrollbar-color` 를 적어 두면 그쪽을
-  쓰고 `::-webkit-` 규칙을 통째로 무시한다. 그런데 **양 끝 화살표를 없애는
-  표준 속성이 없다** — 그래서 표준 속성은 그쪽을 모르는 브라우저(Firefox)에만
-  주고, Chromium 에는 아래 규칙이 닿게 둔다.
-*/
+/* WebKit 은 `scrollbar-color` 를 안 읽는다. 같은 연회색을 따로 적어 준다. */
 .project-strip::-webkit-scrollbar {
   height: 8px;
 }
@@ -645,27 +666,19 @@ h1 {
 
 .project-strip::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: #25272b;
+  background: #e5e7eb;
 }
 
-/* `::-webkit-scrollbar` 를 모르는 브라우저(Firefox)만 여기로 온다. 그쪽은
-   화살표를 애초에 안 그리므로 색과 굵기만 주면 된다. */
-@supports not selector(::-webkit-scrollbar) {
-  .project-strip {
-    scrollbar-width: thin;
-    scrollbar-color: #25272b transparent;
-  }
+.project-strip::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
 }
 
 .project-card {
   display: grid;
   grid-template-rows: auto 1fr;
   position: relative;
-  /* 폭을 넘기지 않는다. 그리드 자식의 `min-width` 기본값이 `auto` 라, 이것이
-     없으면 이름이 긴 카드 한 장이 제 칸을 넘겨 줄 전체를 늘린다. */
-  min-width: 0;
-  width: 180px;
-  height: 169px;
+  width: 100%;
+  height: var(--card-height, 169px);
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #ffffff;
@@ -699,7 +712,29 @@ h1 {
   outline-offset: 2px;
 }
 
-/* 시각과 뱃지가 카드 바닥에 함께 앉는다. */
+/*
+  시각과 뱃지가 카드 바닥에 함께 앉는다.
+
+  `margin-top: auto` 로 밀어 두었는데, 부모(`.project-card-link`)가 flex 가
+  아니라 블록 흐름이라 **아무 일도 안 하고 있었다**(제목 두 줄 말줄임을
+  살리려고 일부러 블록으로 둔 것이다 — 그쪽 주석 참고). 제목이 한 줄이면
+  이 줄이 카드 중간에 떠 있었고, 카드가 정사각형까지 좁아지자 뱃지와 시각이
+  한 줄에 안 들어가 서로 밀어냈다. 바닥에 붙여 놓고, 안 들어가면 줄을
+  바꾸게 둔다.
+*/
+.card-foot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  /* 시각이 위, `불참한 회의` 뱃지가 아래다. 한 줄에 나란히 두면 카드가
+     정사각형까지 좁아졌을 때 둘이 서로를 밀어냈다. */
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
 /*
   `불참한 회의` 뱃지.
 
@@ -755,8 +790,8 @@ h1 {
   같다 — 그 줄이 사라지면 위가 다시 밀린다.
 */
 .project-card-link {
-  display: grid;
-  grid-template-rows: auto auto 1fr;
+  position: relative;
+  display: block;
   height: 100%;
 }
 
@@ -800,8 +835,10 @@ h1 {
 }
 
 .project-card .meeting-company {
-  flex: 1;
-  min-width: 0;
+  /* 별(24px)과 그 왼쪽 여백만큼 비워 둔다. 108px 고정이면 카드가 정사각형
+     까지 좁아졌을 때 이름이 별 밑으로 들어간다. */
+  max-width: calc(100% - 32px);
+  margin-bottom: 18px;
   overflow: hidden;
   color: #1f1f1f;
   font-size: 13px;
@@ -822,9 +859,8 @@ h1 {
 */
 .project-card strong {
   display: -webkit-box;
-  max-width: 100%;
-  /* 두 줄. `line-height: 1.2` 와 짝이라 한쪽만 고치면 세 번째 줄이 반쯤 보인다. */
-  max-height: 2.4em;
+  width: 100%;
+  min-height: 40px;
   overflow: hidden;
   font-size: 16px;
   font-weight: 600;
@@ -890,8 +926,18 @@ h1 {
   container-name: schedule;
 }
 
+/*
+  머리글의 `+` · `>` 는 **글자 바로 옆**이다.
+
+  `space-between` 이라 아이콘이 카드 오른쪽 끝까지 밀려나 있었다. 넓은 카드
+  에서는 `오늘 일정` 과 `+` 가 400px 넘게 떨어져, 그 `+` 가 이 카드의 것인지
+  옆 카드의 것인지 눈으로 이어지지 않았다. 문구 오른쪽에 붙여 한 덩이로
+  읽히게 한다.
+*/
 .schedule-panel .section-heading,
 .summary-panel .section-heading {
+  justify-content: flex-start;
+  gap: 4px;
   margin-bottom: 0;
 }
 
@@ -1061,9 +1107,34 @@ h1 {
   gap: 24px;
 }
 
+/*
+  제목과 상태 뱃지가 자리를 나누는 방식.
+  ── 좁아질 때 **누가 먼저 줄을 내리는지**가 규칙이다 ──
+
+  둘 다 폭이 못 박혀 있었다(제목 217px · 상태 83px). 카드가 아무리 넓어도
+  제목은 217px 안에서 줄을 내렸고, `불참한 회의` 는 83px 이 모자라 여섯
+  글자가 두 줄로 갈렸다 — 양쪽 다 남는 자리를 못 쓰고 있었다.
+
+  이제 둘 다 **내용만큼** 차지하고 남는 자리는 제목이 가져간다. 그리고 좁아질
+  때는 이 순서로 준다.
+
+      1. 제목이 먼저 줄어든다 (`flex-shrink: 1000`)
+      2. 제목이 `min-width` 에 닿으면 더는 못 줄어든다
+      3. 그때부터 남은 몫이 상태 칸으로 넘어가 뱃지가 줄을 내린다
+
+  `flex-shrink` 를 1000 대 1 로 벌려 놓는 것이 2번을 만든다. flex 는 줄어드는
+  양을 **비율로 나누므로**, 같은 값이면 둘이 동시에 조금씩 줄어 제목이 두 줄이
+  되기도 전에 뱃지부터 갈라진다. 뱃지가 먼저 갈라지면 안 되는 이유는, 그것이
+  이 카드에서 **가장 먼저 읽혀야 하는 한 마디**이기 때문이다 — 제목은 두 줄이
+  되어도 읽히지만 `불참한 / 회의` 는 한 덩이로 안 읽힌다.
+*/
 .summary-title-stack {
   display: grid;
-  width: 217px;
+  /* 남는 자리를 가져가고, 좁아지면 여기부터 준다. */
+  flex: 1 1 auto;
+  flex-shrink: 1000;
+  /* 제목이 더는 못 줄어드는 바닥. 여기 닿은 뒤에야 뱃지가 줄을 내린다. */
+  min-width: 120px;
   gap: 12px;
 }
 
@@ -1072,12 +1143,15 @@ h1 {
   font-size: 16px;
   font-weight: 600;
   line-height: 1.35;
+  /* 아주 좁아졌을 때 긴 낱말 하나가 칸을 밀어내지 않게. */
+  overflow-wrap: anywhere;
 }
 
 .summary-state {
   display: flex;
-  width: 83px;
-  flex: 0 0 83px;
+  /* 내용만큼만. 제목이 바닥에 닿기 전까지는 사실상 안 줄어든다. */
+  flex: 0 1 auto;
+  min-width: 0;
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
@@ -1086,13 +1160,16 @@ h1 {
 .summary-badge {
   display: inline-flex;
   justify-content: center;
-  width: 100%;
+  /* 100% 였다. 상태 칸이 83px 로 묶여 있어 여섯 글자가 두 줄로 갈렸다. */
+  width: auto;
   border-radius: 8px;
   background: #ffe6e6;
   padding: 4px 11px;
   color: #ff3333;
   font-size: 12px;
   line-height: 1.35;
+  /* 낱말 안에서는 안 자른다. `불참한 회의` 가 갈린다면 띄어쓰기에서만. */
+  word-break: keep-all;
 }
 
 /* 참석한 회의까지 붉게 칠하면 뱃지가 경고로 읽혀 `불참` 이 눈에 안 들어온다. */
@@ -1107,6 +1184,17 @@ h1 {
   margin: 16px 0 14px;
   border: 0;
   border-top: 1px solid #e5e7eb;
+}
+
+/*
+  오늘 일정 줄 사이의 같은 구분선.
+
+  바깥 여백은 지운다 — `.schedule-content` 가 이미 `gap: 16px` 로 줄을
+  벌려 놓아서, 요약 카드용 여백(16/14px)이 그대로 붙으면 선 하나가 줄
+  하나만큼의 자리를 차지한다.
+*/
+.schedule-content .summary-divider {
+  margin: 0;
 }
 
 .summary-block {
@@ -1198,28 +1286,46 @@ h1 {
 }
 
 /*
-  과녁을 손가락 크기로 둔다.
+  접기(×).
 
-  24px 상자에 16px 글자였다. 제목(13px)보다 겨우 세 단계 큰 글리프라 **표시로
-  안 읽히고**, 과녁도 손가락보다 작아 몇 번 빗나간다. 접는 것이 이 패널에서
-  가장 자주 하는 일인데 제일 누르기 어려웠다.
+  24px 상자에 16px 글자였다. 제목(13px)보다 겨우 세 단계 큰 글리프라 **표시가
+  아니라 먼지처럼** 보였고, 과녁도 손가락보다 작았다. 28px 로 넓히고 글자를
+  키운다.
+
+  `line-height: 1` 만으로는 `×` 가 상자 가운데 안 온다 — 글꼴이 이 글리프를
+  기준선 위로 올려 그린다. flex 로 가운데를 잡는다.
+
+  **클래스로 잡는다.** `.dock-panel-head button`(0,1,1) 은 플로우 화면의
+  `.flow-board-page button { font: inherit }`(같은 0,1,1) 와 점수가 같아서,
+  나중에 실리는 그쪽이 이겨 글자 크기가 제목 크기(13px)로 되돌아갔다. 상자만
+  커지고 글리프는 그대로라 더 초라해 보였다.
 */
-.dock-panel-head button {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  margin-right: -6px;
+.dock-panel-head .dock-close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
   color: #60646c;
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1;
+  transition: background 120ms ease;
 }
 
-.dock-panel-head button:hover {
+.dock-panel-head .dock-close:hover {
   background: #f3f4f6;
 }
 
+/*
+  대화 칸의 스크롤 막대.
+
+  운영체제 기본 막대는 폭이 17px 쯤 되는 회색 홈통이라, 375px 짜리 알약 안에
+  들어오면 **말풍선보다 막대가 먼저 눈에 띈다.** 없앨 수는 없다 — 이 칸은
+  글이 화면보다 길어지는 것이 정상이라 막대가 유일한 위치 단서다. 그래서
+  브리핑 패널과 같은 규격(폭 8px · 안쪽 여백 2px · 손잡이만 회색)으로 맞춘다.
+*/
 .dock-thread,
 .dock-list {
   display: flex;
@@ -1227,6 +1333,32 @@ h1 {
   gap: 8px;
   overflow-y: auto;
   padding: 0 16px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #d4d6da transparent;
+}
+
+.dock-thread::-webkit-scrollbar,
+.dock-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dock-thread::-webkit-scrollbar-thumb,
+.dock-list::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #d4d6da;
+  background-clip: content-box;
+}
+
+.dock-thread::-webkit-scrollbar-thumb:hover,
+.dock-list::-webkit-scrollbar-thumb:hover {
+  background: #b8bbc0;
+  background-clip: content-box;
+}
+
+.dock-thread::-webkit-scrollbar-track,
+.dock-list::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .dock-line {
@@ -1377,14 +1509,6 @@ h1 {
     width: 100%;
   }
 
-  .project-strip {
-    grid-auto-columns: calc((100% - 64px) / 5);
-  }
-
-  .project-card {
-    width: 100%;
-  }
-
   .dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1409,21 +1533,30 @@ h1 {
     margin-top: 64px;
   }
 
-  .project-strip {
-    grid-auto-columns: 180px;
-    overflow-x: auto;
-  }
-
-  .dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .chat-dock {
     width: min(375px, calc(100vw - 32px));
   }
 
   .chat-dock.is-open {
     width: min(420px, calc(100vw - 32px));
+  }
+}
+
+/*
+  「오늘 일정」·「최근 회의」를 한 열로 내리는 지점.
+
+  1360px 아래로는 두 패널이 절반씩 나눠 가지는데, 창이 1180px 밑으로 가면
+  한 패널이 320px 도 안 된다. 그 안에서 시각(74px) · 제목 · 참여 단추(126px)
+  가 한 줄에 앉으려다 **제목 칸이 0 이 되어 글자가 한 자씩 세로로 떨어졌다.**
+  나란히 두는 것보다 한 열로 내리는 편이 읽힌다.
+*/
+@media (max-width: 1180px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .schedule-info {
+    max-width: none;
   }
 }
 
@@ -1505,8 +1638,11 @@ h1 {
     font-size: 18px;
   }
 
+  .project-strip {
+    --card-height: 132px;
+  }
+
   .project-card {
-    height: 132px;
     padding: 14px;
   }
 
@@ -1629,8 +1765,11 @@ h1 {
     margin-top: 34px;
   }
 
+  .project-strip {
+    --card-height: 112px;
+  }
+
   .project-card {
-    height: 112px;
     padding: 10px 12px;
   }
 
@@ -1698,8 +1837,15 @@ h1 {
 }
 
 @media (max-width: 860px) {
+  /*
+    두 열 선언이 여기 남아 있었다.
+
+    위쪽 `@media (max-width: 1180px)` 이 한 열로 내려 놓은 것을, **더 좁은**
+    이 블록이 뒤에 와서 다시 두 열로 되돌리고 있었다. 그래서 창을 줄이면
+    한 열로 잘 내려가다가 860px 을 지나는 순간 다시 반으로 갈라져, 한 패널이
+    200px 짜리로 쪼그라들었다. 폭 규칙은 1180px 블록 하나가 맡는다.
+  */
   .dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-top: 18px;
   }
 
