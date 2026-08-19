@@ -45,6 +45,15 @@ export const ME = {
   avatar_url: '/flowchart/profile-2.jpeg',
   locale: 'ko',
   timezone: 'Asia/Seoul',
+  /*
+    나라 이름. 서버가 문자열로 완성해 준다.
+
+    시간대(`Asia/Seoul`)에서 화면이 유추하지 않는다. `Europe/Berlin` → `독일`
+    은 표를 들고 있어야 하는 변환이고, 그 표를 화면마다 하나씩 두면 같은
+    사람이 화면에 따라 다른 나라에 있게 된다.
+  */
+  country: '대한민국',
+  presence: 'ACTIVE',
 }
 
 export const PEOPLE = [
@@ -56,6 +65,8 @@ export const PEOPLE = [
     avatar_url: '/flowchart/profile-1.jpeg',
     locale: 'ko',
     timezone: 'Asia/Seoul',
+    country: '대한민국',
+    presence: 'ACTIVE',
   },
   {
     id: 'a78a912a-a174-406d-9487-34b96176fd0f',
@@ -64,6 +75,8 @@ export const PEOPLE = [
     avatar_url: '/flowchart/profile-3.jpeg',
     locale: 'ko',
     timezone: 'Asia/Seoul',
+    country: '대한민국',
+    presence: 'ACTIVE',
   },
   {
     id: '3c1f8a02-9d44-4f57-a1b6-5e2c7d0913aa',
@@ -72,6 +85,14 @@ export const PEOPLE = [
     avatar_url: '/flowchart/profile-4.jpeg',
     locale: 'ko',
     timezone: 'Asia/Seoul',
+    country: '대한민국',
+    /*
+      한 명은 자리를 비워 둔다.
+
+      `상대가 자리를 비웠고 그 사람의 Bordo 가 대신 받는 중` 이 이 서비스의
+      핵심 장면인데, 전원이 `ACTIVE` 면 그 표시가 화면에서 한 번도 안 그려진다.
+    */
+    presence: 'AWAY',
   },
   {
     id: '9b7d4e61-2af8-4c03-8e15-6d90b3c47f22',
@@ -83,6 +104,8 @@ export const PEOPLE = [
     // 다르다는 것이 이 서비스의 전제인데, 전원이 서울이면 그 코드가 한 번도
     // 안 밟힌다.
     timezone: 'Europe/Berlin',
+    country: '독일',
+    presence: 'ACTIVE',
   },
 ]
 

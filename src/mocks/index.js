@@ -40,7 +40,7 @@ import { TEAM } from './data/people.js'
 import { tasks } from './data/tasks.js'
 import { calendarEvents } from './data/calendar.js'
 import {
-  activeDates, chatCandidates, chatRooms,
+  activeDates, awayHandled, chatCandidates, chatRooms,
   dailySummaries, roomDetails, roomMessages,
 } from './data/chat.js'
 
@@ -330,6 +330,20 @@ function resolve(path, method, body) {
 
     if (a === 'flow-edges' && b) return flowEdges[b] ?? null
 
+    /*
+      내가 지금 자리에 있는지.
+
+      `patch` 저장소에 둔다 — 이번 방문 동안만 유지되고 새로고침하면 기본값
+      (`활동 중`)으로 돌아간다. 가짜 상태를 `localStorage` 에 눌러앉히면
+      나중에 "왜 계속 부재 중이지" 를 디버깅하게 된다.
+    */
+    if (path === '/me/presence') {
+      return { status: patchedOf('presence')?.status ?? 'ACTIVE' }
+    }
+
+    // 자리를 비운 사이 내 Bordo 가 대신 나눈 대화.
+    if (path === '/chat/away-handled') return awayHandled
+
     if (path === '/chat/sidebar') return applyReadPatches(viewerSidebar())
     if (path.startsWith('/chat/important')) return liveImportant()
     if (path.startsWith('/chat/candidates')) return chatCandidates
@@ -499,6 +513,17 @@ function resolve(path, method, body) {
         run: { status: 'DONE', run_id: `mock-run-${nextId()}` },
       })
       return { ...mine, run: { status: 'RECEIVED', run_id: null } }
+    }
+
+    /*
+      자리 비움 전환.
+
+      `ACTIVE` · `AWAY` 두 값뿐이다. 서버가 이 값을 알아야 하는 이유는
+      화면 표시가 아니라 **대리인이 대신 답할지**가 여기서 갈리기 때문이다 —
+      브라우저에만 두면 창을 닫는 순간 내 Bordo 가 다시 조용해진다.
+    */
+    if (path === '/me/presence') {
+      return patch('presence', { status: body?.status === 'AWAY' ? 'AWAY' : 'ACTIVE' })
     }
 
     // 대리인 설정. 부분 갱신이라 **보낸 것만** 얹는다 — 통째로 돌려주면

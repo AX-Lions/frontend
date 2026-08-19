@@ -6,8 +6,11 @@ import { ChatDateCalendar } from './ChatDateCalendar.jsx'
 import { ChatMessageRow } from './ChatMessageRow.jsx'
 import { ChatRoomSearch } from './ChatRoomSearch.jsx'
 import { fetchDailySummary, fetchMessages, fetchRoom, toPreview } from './chat.data.js'
-import { localDate, localMonth, withDayDividers } from './chat.format.js'
+import {
+  inOtherZone, isAwakeHour, localDate, localMonth, withDayDividers, zoneTime,
+} from './chat.format.js'
 import { Icon, IconButton } from './chat.ui.jsx'
+import { useMinuteTick } from '../../lib/minuteClock.js'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
@@ -73,13 +76,111 @@ function DailySummary({ roomId, date }) {
   )
 }
 
+/**
+ * 방 머리의 참여자 줄.
+ *
+ * ## 왜 방 머리인가
+ *
+ * 이 서비스가 답하는 질문이 "내가 없는 동안 무슨 일이 있었지" 인데, 그 반대편
+ * 질문이 **"지금 이 사람한테 말을 걸어도 되나"** 다. 상대가 새벽 3시거나 자리를
+ * 비웠으면 답을 기다릴 것이 아니라 대리인에게 맡길 일이고, 그 판단은 말을 걸기
+ * **전에** 서야 한다. 그래서 입력칸이 아니라 방 머리에 둔다.
+ *
+ * ## 할 말이 있는 사람만 나온다
+ *
+ * 처음에는 참여자 전원의 시각을 늘어놓았다. 팀이 대부분 같은 시간대라
+ * **같은 숫자가 다섯 번 반복되고**, 정작 다른 나라에 있는 한 사람이 그 줄에
+ * 묻혔다. 지금은 둘 중 하나에 걸리는 사람만 남긴다.
+ *
+ *     나와 시간대가 다르다   나라와 그곳 시각을 적는다
+ *     자리를 비웠다          그 사람의 Bordo 가 받는 중이라고 적는다
+ *
+ * 같은 시간대에 자리도 지키는 사람은 아무 말도 할 것이 없다 — 내 시계가 곧
+ * 그 사람 시계이고, 보내면 본인이 받는다.
+ *
+ * ## 1:1 에서는 나를 뺀다
+ *
+ * 내 시각은 내 시계에 이미 있고, 두 칸 중 한 칸이 늘 나 자신이면 줄이 낭비된다.
+ */
+function MemberClocks({ members, type }) {
+  /*
+    1 분마다 다시 그린다. 방에 오래 머무는 화면이라, 안 고치면 열었을 때의
+    시각이 그대로 굳어 **틀린 시각을 근거로 판단하게 된다.**
+
+    `setInterval(…, 60_000)` 을 직접 걸지 않는다 — 분 경계와 어긋나고, 탭이
+    뒤로 가면 멈추고, 시계가 여럿이면 각자 다른 초에 바뀐다. 셋 다 왜 문제인지는
+    `lib/minuteClock.js` 에 적어 뒀다.
+  */
+  const now = new Date(useMinuteTick())
+
+  const direct = type === 'DIRECT' || type === 'PEER_AGENT'
+  const shown = (members ?? [])
+    .filter((member) => !member.is_me)
+    .map((member) => ({
+      ...member,
+      clock: zoneTime(member.timezone, now),
+      awake: isAwakeHour(member.timezone, now),
+      elsewhere: inOtherZone(member.timezone),
+      away: member.presence === 'AWAY',
+    }))
+    // 1:1 은 상대 한 사람뿐이라 늘 보여준다 — 그 사람이 곧 이 방이다.
+    // 단체방은 말할 것이 있는 사람만 남긴다.
+    .filter((member) => direct || member.away || (member.elsewhere && member.clock))
+
+  if (shown.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="member-clocks" aria-label="참여자 상태">
+      {shown.map((member) => (
+        <span
+          className={[
+            'member-clock',
+            member.away ? 'is-away' : '',
+            member.awake ? '' : 'is-resting',
+          ].filter(Boolean).join(' ')}
+          key={member.id}
+          data-tip={member.away
+            ? `${member.name}님은 자리를 비웠습니다 · ${member.agent_name}가 받는 중`
+            : `${member.name} · ${member.timezone}${member.awake ? '' : ' · 쉬는 시간대'}`}
+        >
+          <i aria-hidden="true" />
+          <b>{member.name}</b>
+          {/*
+            나라는 **나와 시간대가 다를 때만** 적는다. 같은 나라 사람 옆에
+            `대한민국` 이 붙어 있으면 그 글자가 줄의 절반을 먹으면서 아무것도
+            알려 주지 않는다.
+          */}
+          {member.elsewhere && member.clock ? (
+            <span className="member-where">{member.country}</span>
+          ) : null}
+          {/*
+            시각은 시간대가 다르거나, 1:1 이면 적는다.
+
+            1:1 에서 같은 시간대라도 남기는 이유 — 그 칸이 비면 알약에 이름만
+            남아 방 제목을 한 번 더 쓴 꼴이 된다. 상대가 지금 몇 시인지가
+            이 방에서 유일하게 새로운 사실이다.
+          */}
+          {(member.elsewhere || direct) && member.clock ? <time>{member.clock}</time> : null}
+          {/* 자리를 비웠으면 누가 대신 받는지까지 적는다. `자리 비움` 만으로는
+              말을 걸지 말라는 뜻인지, 걸어도 되는지 알 수 없다. */}
+          {member.away ? <span className="member-away-by">{member.agent_name} 응답 중</span> : null}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export function ChatRoom({
   room,
   roomId,
   fullscreen,
+  presence,
   onClose,
   onImportantChanged,
   onOpenSettings,
+  onPresenceChange,
   onToggleFullscreen,
 }) {
   /*
@@ -246,6 +347,7 @@ export function ChatRoom({
         <div className="chat-room-title">
           <strong>{header?.name ?? ''}</strong>
           <span>{header?.context ?? ''}</span>
+          <MemberClocks members={header?.members} type={header?.type} />
         </div>
         <div className="chat-room-actions">
           <IconButton
@@ -356,6 +458,16 @@ export function ChatRoom({
                 focused={row.message.id === focusMessageId}
                 key={row.id}
                 message={row.message}
+                /*
+                  **내 Bordo 와 단둘이 있는 방**인가.
+
+                  다른 방에서 내 Bordo 가 한 말은 내가 없는 동안 나 대신 나간
+                  말이라 내 쪽(오른쪽)에 앉는다. 그런데 이 방에서는 내 Bordo 가
+                  대신 말하는 상대가 아니라 **말을 주고받는 상대 그 자체**다.
+                  같은 규칙을 그대로 두면 나와 내 Bordo 의 말이 전부 오른쪽에
+                  쌓여, 누가 물었고 누가 답했는지가 사라진다.
+                */
+                myAgentRoom={header?.type === 'AI'}
                 onChanged={replaceMessage}
                 onImportantChanged={onImportantChanged}
               />
@@ -365,7 +477,29 @@ export function ChatRoom({
       </div>
       )}
 
-      <ChatComposer roomId={roomId} onSent={appendSent} />
+      <ChatComposer
+        roomId={roomId}
+        /*
+          자리를 비운 동안은 입력칸 바로 위에서 그 사실을 말한다.
+
+          목록 맨 위의 스위치만으로는 부족하다. 전체 화면으로 보거나 목록을
+          접으면 스위치가 화면에서 사라지는데, **말이 오는 자리는 여기**라
+          내가 답하지 않아도 되는 이유가 여기 있어야 한다. 돌아오는 단추도
+          같이 둔다 — 알아차린 자리에서 바로 풀 수 있어야 목록까지 되짚지 않는다.
+
+          입력칸 컴포넌트 **안으로** 넘긴다. 바깥에 형제로 두면 입력칸이
+          `position: absolute` 라 그 밑에 깔려 안 보인다.
+        */
+        notice={presence === 'AWAY' ? (
+          <div className="room-away-note">
+            <span>자리 비움 — 오는 말은 Bordo가 먼저 받습니다.</span>
+            <button type="button" onClick={() => onPresenceChange?.('ACTIVE')}>
+              돌아왔어요
+            </button>
+          </div>
+        ) : null}
+        onSent={appendSent}
+      />
 
       {calendarMonth && roomId ? (
         <ChatDateCalendar

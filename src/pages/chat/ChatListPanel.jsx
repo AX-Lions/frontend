@@ -117,11 +117,68 @@ function matchesRoom(room, needle) {
     .includes(needle)
 }
 
+/**
+ * 자리에 있는지 없는지를 켜고 끄는 스위치.
+ *
+ * ## 왜 채팅 목록 맨 위인가
+ *
+ * 자리를 비우는 순간이 곧 **채팅을 닫는 순간**이다. 설정 화면 안쪽에 두면
+ * 비우기 전에 거기까지 들어갈 사람이 없고, 그러면 대리인은 영영 안 나선다.
+ * 나갈 때 반드시 지나는 자리에 둬야 눌린다.
+ *
+ * ## 두 값뿐이다
+ *
+ * `활동 중` 은 내가 직접 답한다. `자리 비움` 은 오는 말을 내 Bordo 가 먼저
+ * 받는다. 「바쁨」 같은 중간값은 두지 않는다 — 대리인이 나설지 말지는 예·아니오
+ * 라서, 중간값을 만들면 그 상태에서 대리인이 어떻게 행동하는지 아무도 모른다.
+ */
+function PresenceToggle({ busy, status, onChange }) {
+  const away = status === 'AWAY'
+
+  return (
+    <div className={away ? 'presence-toggle is-away' : 'presence-toggle'}>
+      <div className="presence-switch" role="radiogroup" aria-label="내 상태">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={!away}
+          disabled={busy}
+          onClick={() => onChange('ACTIVE')}
+        >
+          활동 중
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={away}
+          disabled={busy}
+          onClick={() => onChange('AWAY')}
+        >
+          자리 비움
+        </button>
+      </div>
+      {/*
+        지금 무슨 일이 일어나는지 한 줄로 말한다. 스위치만 두면 `자리 비움` 이
+        남에게 보이는 표시인지, 내 Bordo 가 실제로 답을 하는 것인지 알 수 없다 —
+        후자라는 것이 이 제품의 값이다.
+      */}
+      <p>
+        {away
+          ? '오는 말을 Bordo가 먼저 받습니다. 돌아오면 아래에 모아 둡니다.'
+          : '오는 말을 직접 받습니다.'}
+      </p>
+    </div>
+  )
+}
+
 export function ChatListPanel({
   sidebar,
-  importantRooms,
+  awayRooms,
+  presence,
+  presenceBusy,
   selectedChatId,
   onCreatedRoom,
+  onPresenceChange,
   onSelectChat,
   onOpenAgentSettings,
   onOpenChatSettings,
@@ -129,7 +186,7 @@ export function ChatListPanel({
   const [promptVisible, setPromptVisible] = useState(true)
   const [tool, setTool] = useState('')
   const [query, setQuery] = useState('')
-  const [importantOpen, setImportantOpen] = useState(true)
+  const [awayOpen, setAwayOpen] = useState(true)
   const groups = useCollapsed()
 
   const needle = tool === 'search' ? query.trim().toLowerCase() : ''
@@ -148,7 +205,7 @@ export function ChatListPanel({
     .filter((team) => !needle
       || team.projects.length > 0
       || team.name.toLowerCase().includes(needle))
-  const visibleImportant = importantRooms.filter((room) => matchesRoom(room, needle))
+  const visibleAway = (awayRooms ?? []).filter((room) => matchesRoom(room, needle))
 
   const toggleTool = (nextTool) => {
     setTool((current) => (current === nextTool ? '' : nextTool))
@@ -180,19 +237,13 @@ export function ChatListPanel({
         </div>
       </header>
 
-      {promptVisible ? (
-        <div className="chat-tip">
-          <p>
-            당신의 Bordo를 입맛에 맞게
-            <br />
-            조정해보세요!
-          </p>
-          <button type="button" aria-label="닫기" onClick={() => setPromptVisible(false)}>
-            ×
-          </button>
-        </div>
-      ) : null}
+      {/*
+        검색칸은 **머리 바로 밑**이다.
 
+        자리 비움 스위치 아래에 있었다. 검색은 아래 목록을 좁히는 일이라 그
+        목록 바로 위에 있어야 손이 짧고, 스위치는 목록과 상관없는 내 상태라
+        사이에 끼면 두 가지가 한 덩이로 보인다.
+      */}
       {tool === 'search' ? (
         <div className="chat-list-search">
           <input
@@ -209,6 +260,33 @@ export function ChatListPanel({
           <p>불러온 목록 안에서만 찾습니다.</p>
         </div>
       ) : null}
+
+      {/*
+        말풍선과 검색칸은 **같은 자리를 쓴다.**
+
+        말풍선은 머리 밑에 떠 있는(`position: absolute`) 안내라, 검색칸이 그
+        자리에 들어오면 글자 위에 글자가 겹친다. 검색을 여는 동안은 안내를
+        내린다 — 지금 하려는 일이 검색인데 그 위에 다른 권유가 떠 있을 이유가
+        없다. 닫으면 다시 뜬다(닫기 `×` 를 누른 것과는 다르다).
+      */}
+      {promptVisible && tool !== 'search' ? (
+        <div className="chat-tip">
+          <p>
+            당신의 Bordo를 입맛에 맞게
+            <br />
+            조정해보세요!
+          </p>
+          <button type="button" aria-label="닫기" onClick={() => setPromptVisible(false)}>
+            ×
+          </button>
+        </div>
+      ) : null}
+
+      <PresenceToggle
+        busy={presenceBusy}
+        status={presence}
+        onChange={onPresenceChange}
+      />
 
       <div className="chat-list-scroll">
         {primaryChat ? (
@@ -230,29 +308,50 @@ export function ChatListPanel({
           </button>
         ) : null}
 
-        <section className="chat-list-section">
+        {/*
+          자리를 비운 사이 오간 말.
+
+          예전에는 이 자리가 `중요 채팅` 이었다 — **내가 미리 별을 찍어 둔
+          것**만 모이는 목록이다. 자리를 비우기 전에 무엇이 중요해질지 알 수
+          있으면 애초에 자리를 안 비웠을 것이라, 정작 돌아왔을 때 가장 먼저
+          봐야 하는 것(없는 동안 오간 말)은 방을 하나씩 열어야 찾을 수 있었다.
+        */}
+        <section className="chat-list-section away-section">
           <button
             className="section-heading interactive"
             type="button"
-            aria-expanded={importantOpen}
-            onClick={() => setImportantOpen((open) => !open)}
+            aria-expanded={awayOpen}
+            onClick={() => setAwayOpen((open) => !open)}
           >
             <h2>
-              중요 채팅 <RequestIcon small />
+              자리 비운 사이 Bordo가 나눈 대화
+              {visibleAway.length > 0 ? <b>{visibleAway.length}</b> : null}
             </h2>
-            <Icon className={importantOpen ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
+            <Icon className={awayOpen ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
           </button>
-          {importantOpen && visibleImportant.length === 0 ? (
-            <p className="chat-list-empty">중요 표시된 채팅이 없습니다.</p>
+          {awayOpen && visibleAway.length === 0 ? (
+            <p className="chat-list-empty">
+              아직 Bordo가 대신 받은 대화가 없습니다.
+            </p>
           ) : null}
-          {importantOpen
-            ? visibleImportant.map((chat) => (
-                <ChatPreview
-                  chat={chat}
+          {awayOpen
+            ? visibleAway.map((chat) => (
+                <button
+                  className={selectedChatId === chat.id ? 'away-preview selected' : 'away-preview'}
+                  type="button"
                   key={chat.id}
-                  selected={selectedChatId === chat.id}
-                  onSelect={() => onSelectChat(chat.id)}
-                />
+                  onClick={() => onSelectChat(chat.id)}
+                >
+                  <div className="away-preview-head">
+                    <strong>{chat.name}</strong>
+                    {/* 몇 번 대신 답했는지. 방 이름만으로는 한 마디 받아넘긴
+                        것과 열 번 오간 것이 같아 보인다. */}
+                    <span className="away-count">{`대신 답함 ${chat.handledCount}`}</span>
+                    <time>{formatTime(chat.sentAt)}</time>
+                  </div>
+                  {chat.context ? <span className="away-path">{chat.context}</span> : null}
+                  <p>{chat.message}</p>
+                </button>
               ))
             : null}
         </section>
