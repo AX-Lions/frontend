@@ -1563,6 +1563,66 @@ function buildParticipantFlows(edges, agendas) {
   return out
 }
 
+/* ────────────────────────────────────────────────────────────
+   시간순 인덱스 — 좌측 목록이자 재생 대본
+   ──────────────────────────────────────────────────────────── */
+
+/**
+ * 회의에서 오간 전달을 **한 건씩** 시간 오름차순으로 편다.
+ *
+ * 안건 인덱스가 「무엇에 대한 이야기였나」 로 묶은 목록이라면 이쪽은 묶지 않은
+ * 목록이다. 둘 다 있어야 하는 이유는, 안건에는 결론만 남지만 순서에는 **결론이
+ * 어떻게 뒤집혔는지**가 남기 때문이다. 자리를 비웠던 사람이 알고 싶은 것은
+ * 대개 후자다.
+ *
+ * ## 정렬이 흔들리면 안 되는 이유
+ *
+ * 이 목록은 재생 기능의 대본이기도 하다 — 재생을 누르면 판의 화살표를 전부
+ * 지우고 이 순서대로 0.5초 간격으로 하나씩 되살린다. 같은 시각이 둘이면
+ * `edge_id` 로 한 번 더 갈라 **매번 같은 순서**가 나오게 한다. 정렬의 안정성에
+ * 기대면 원장에 줄을 하나 끼워 넣는 것만으로 재생 순서가 조용히 바뀐다.
+ *
+ * ## `seq` 는 정렬한 뒤에 붙인다
+ *
+ * 원장의 번호(`meeting-edge-7`)는 회의에서 오간 순서가 아니라 **적은 순서**다.
+ * 그것을 좌측 순번으로 쓰면 7번 줄이 3번 줄보다 이른 시각을 달게 된다.
+ */
+function buildTimeline(edges, agendas) {
+  return [...edges]
+    .sort((a, b) => (
+      Date.parse(a.at) - Date.parse(b.at) || String(a.id).localeCompare(String(b.id))
+    ))
+    .map((spec, index) => {
+      const { from, to } = edgeNodes(spec)
+      return {
+        seq: index + 1,
+        edge_id: spec.id,
+        // 우측 패널 카드와 **같은 함수**로 만든다. 여기서 손으로 다시 적으면
+        // 같은 화살표를 좌측과 우측이 다른 이름으로 부르게 된다.
+        title: cardTitle(spec, agendas),
+        content_type: spec.type,
+        label: CONTENT_LABEL[spec.type],
+        direction_label: directionLabel(from, to),
+        from_node_id: from.id,
+        to_node_ids: to.map((node) => node.id),
+        surface: spec.surface,
+        occurred_at: spec.at,
+        // 화면이 `occurred_at` 을 직접 찍으면 브라우저 시간대로 나가 같은
+        // 전달을 사람마다 다른 시각으로 본다. 엣지 상세와 같은 이유다.
+        at_label: clockLabel(spec.at),
+        /*
+          줄을 눌렀을 때 판에서 강조할 화살표.
+
+          지금은 전달 한 건이 화살표 한 개라 자기 자신 하나뿐이다. 그래도
+          배열로 둔다 — 안건 인덱스의 `related_edge_ids` 와 모양이 같으면
+          강조 로직을 하나로 쓸 수 있고, 나중에 서버가 이어진 전달을 묶어
+          내려 주더라도 화면은 그대로다.
+        */
+        related_edge_ids: [spec.id],
+      }
+    })
+}
+
 /**
  * 원장 하나를 조회 응답과 엣지 상세로 편다.
  *
@@ -1583,6 +1643,10 @@ function flowFor({ head, nodeNames, edges }) {
     details[spec.id] = edgeDetail(spec, { agendas, opacityAt })
   })
 
+  // 판과 **같은 원장**에서 만든다. 따로 적으면 판에는 있는데 좌측 목록에 없는
+  // 화살표가 생기고, 그건 재생해도 영영 나타나지 않는 화살표가 된다.
+  const timeline = buildTimeline(edges, agendas)
+
   return {
     flow: {
       ...head,
@@ -1593,6 +1657,8 @@ function flowFor({ head, nodeNames, edges }) {
     details,
     agendas,
     participants: buildParticipantFlows(edges, agendas),
+    // `count` 는 목록 길이에서 뽑는다. 손으로 적으면 목록과 숫자가 따로 논다.
+    timeline: { count: timeline.length, results: timeline },
   }
 }
 
@@ -1743,6 +1809,36 @@ export const meetingFlows = {
 export const projectFlows = {
   [PROJECTS.bordo.id]: bordoWork.flow,
   [PROJECTS.academy.id]: academyWork.flow,
+}
+
+/**
+ * `GET /meetings/{meeting_id}/timeline` — 좌측 `시간순 인덱스`.
+ *
+ * 판이 있는 회의에는 **전부** 있다. 안건 인덱스(`meetingAgendas`)와 달리
+ * 회의를 골라 담지 않는다 — 안건은 없는 회의가 있을 수 있지만(아무 안건에도
+ * 안 걸린 잡담만 오간 회의), 오간 것이 있는데 시간순 목록이 없는 회의는 없다.
+ * 판이 있다는 말이 곧 전달이 하나 이상 있었다는 뜻이기 때문이다.
+ */
+export const meetingTimelines = {
+  [MEETING_GLOBAL]: globalMeeting.timeline,
+  [MEETING_DESIGN]: designMeeting.timeline,
+  [MEETING_REGULAR]: regularMeeting.timeline,
+  [MEETING_SYNC]: syncMeeting.timeline,
+  [MEETING_BOOTH]: boothMeeting.timeline,
+  [MEETING_POSTER]: posterMeeting.timeline,
+  [MEETING_REHEARSAL]: rehearsalMeeting.timeline,
+}
+
+/**
+ * `GET /projects/{project_id}/timeline`
+ *
+ * 작업 모드에도 같은 목록이 필요하다. 작업 엣지에는 안건이 없어 좌측 제목이
+ * 문서 이름이나 종류 이름으로 떨어지는데, 그것까지 포함해 `cardTitle` 한
+ * 곳에서 정한다.
+ */
+export const projectTimelines = {
+  [PROJECTS.bordo.id]: bordoWork.timeline,
+  [PROJECTS.academy.id]: academyWork.timeline,
 }
 
 /**

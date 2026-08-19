@@ -87,11 +87,18 @@ function PanelShell({ children, composer = false, onClose, search, subtitle, tit
 /**
  * 개수 알약 줄.
  *
- * 고른 알약은 남색으로 차고(시안 `622:7321`), 그 종류의 카드 묶음에 테두리가
- * 생긴다. 지우는 필터가 아니라 **가리키는 표시**다 — 나머지를 감추면 이
- * 화살표에 무엇이 함께 오갔는지가 화면에서 사라진다.
+ * 고른 알약은 남색으로 차고(시안 `622:7321`), **고른 종류의 카드 묶음만 남는다.**
+ *
+ * 예전에는 고른 종류에 테두리만 둘렀다. 나머지를 감추면 이 화살표에 무엇이
+ * 함께 오갔는지가 화면에서 사라진다는 이유였는데, 그 자리는 이미 이 알약 줄이
+ * 지키고 있다 — 걸러도 알약은 그대로 남아 개수를 말한다. 반대로 눌러도 목록이
+ * 그대로인 버튼은 고장 난 것으로 읽힌다.
+ *
+ * 여러 개를 같이 고를 수 있고 보이는 것은 그 **합집합**이다. `요청사항` 과
+ * `변동사항` 을 나란히 놓고 읽는 것이 이 패널에서 가장 흔한 읽기라, 하나만
+ * 고르게 하면 두 번 눌러 두 번 읽어야 한다.
  */
-function ContentChips({ counts, onSelect, selected }) {
+function ContentChips({ counts, onToggle, selected }) {
   if (!counts?.length) {
     return null
   }
@@ -100,7 +107,25 @@ function ContentChips({ counts, onSelect, selected }) {
     <div className="inspector-chip-row">
       {counts.map((count) => {
         const key = count.key ?? count.content_type
-        const isOn = selected === key
+
+        /*
+          `발언` 알약에는 대응하는 카드 묶음이 없다 — 발언은 엣지가 아니라
+          엣지 **안에서** 입을 연 횟수라 `content_type` 자체가 붙지 않는다.
+          이것까지 필터로 만들면 누르는 순간 걸리는 묶음이 하나도 없어 패널이
+          통째로 빈다. 그래서 누를 수 없는 통계 표시로 그린다 — 버튼처럼
+          생겼는데 아무 일도 안 일어나는 것보다, 처음부터 버튼이 아닌 편이
+          정직하다.
+        */
+        if (!count.content_type) {
+          return (
+            <span className="inspector-chip is-static" key={key}>
+              <span>{count.label}</span>
+              <b>{count.count}</b>
+            </span>
+          )
+        }
+
+        const isOn = selected.has(count.content_type)
 
         return (
           <button
@@ -108,7 +133,7 @@ function ContentChips({ counts, onSelect, selected }) {
             type="button"
             key={key}
             aria-pressed={isOn}
-            onClick={() => onSelect(isOn ? null : key)}
+            onClick={() => onToggle(count.content_type)}
           >
             <span>{count.label}</span>
             <b>{count.count}</b>
@@ -119,18 +144,86 @@ function ContentChips({ counts, onSelect, selected }) {
   )
 }
 
-/** 종류 하나의 카드 묶음. 머리에 그 종류의 아이콘과 이름이 붙는다. */
-function ContentGroup({ group, isSelected }) {
+/**
+ * 고른 알약에 걸리는 묶음만 남긴다. 아무것도 안 골랐으면 전부 남는다.
+ *
+ * 흐리게 하지 않고 아예 빼는 이유는 자리 때문이다. 흐린 카드도 높이를
+ * 차지해서, 다섯 종류가 오간 화살표에서는 고른 것을 보려고 여전히 스크롤해야
+ * 한다. 그러면 거른 보람이 없다.
+ */
+function filterGroups(groups, selected) {
+  if (selected.size === 0) {
+    return groups
+  }
+  return groups.filter((group) => selected.has(group.content_type))
+}
+
+/**
+ * 알약 하나를 켜고 끈다.
+ *
+ * `Set` 을 제자리에서 고치지 않고 **새로 만든다.** 같은 객체를 돌려주면
+ * 리액트는 상태가 그대로인 줄 알고 다시 그리지 않아, 눌러도 화면이 안 바뀐다.
+ */
+function toggleIn(selected, contentType) {
+  const next = new Set(selected)
+  if (!next.delete(contentType)) {
+    next.add(contentType)
+  }
+  return next
+}
+
+/**
+ * 카드에 **회의 전반 순번**을 붙이고 그 순서로 세운다.
+ *
+ * 좌측 `시간순 인덱스` 의 몇 번이 이 카드인지가 번호로 이어진다. 두 자리가
+ * 같은 번호를 쓰지 않으면 목록에서 찾은 것을 패널에서 다시 눈으로 훑어야 해서,
+ * 목록이 목차 노릇을 못 한다.
+ *
+ * 번호를 모르는 항목(`seq` 가 null)은 뒤로 보내되 **들어온 차례를 유지한다** —
+ * 서버가 준 순서가 그나마 근거 있는 순서다. `sort` 가 안정 정렬이라 같은
+ * 값끼리는 원래 순서가 그대로 남는다.
+ */
+function orderBySeq(items, seqOf) {
+  return items
+    .map((item) => ({ ...item, seq: seqOf(item.edge_id) ?? null }))
+    .sort((a, b) => {
+      if (a.seq === null || b.seq === null) {
+        return (a.seq === null ? 1 : 0) - (b.seq === null ? 1 : 0)
+      }
+      return a.seq - b.seq
+    })
+}
+
+/**
+ * 종류 하나의 카드 묶음. 머리에 그 종류의 아이콘과 이름이 붙는다.
+ *
+ * 예전에는 고른 알약에 걸리면 `is-selected` 테두리를 둘렀다. 이제 고른 것만
+ * 보이므로 그 테두리가 가리킬 대상이 없다 — **보이는 것이 곧 고른 것**이고,
+ * 전부 보일 때는 아무것도 안 고른 것이다. 어느 쪽이든 화면의 모든 묶음이
+ * 같은 상태라, 테두리는 정보를 하나도 싣지 못한 채 선만 하나 더 그린다.
+ */
+function ContentGroup({ group, seqOf }) {
+  const items = useMemo(() => orderBySeq(group.items, seqOf), [group.items, seqOf])
+
   return (
-    <section className={isSelected ? 'inspector-group is-selected' : 'inspector-group'}>
+    <section className="inspector-group">
       <header className="inspector-group-head">
         <FlowMetricBadge tone={toneOf(group.content_type)} />
         <span>{group.label}</span>
       </header>
 
-      {group.items.map((item) => (
+      {items.map((item) => (
         <article className="inspector-item" key={item.id}>
-          <strong>{item.title}</strong>
+          {/*
+            번호와 제목은 **같은 줄**에 선다. 번호를 윗줄에 따로 두면 카드마다
+            줄이 하나씩 늘어 열 장짜리 묶음이 화면 두 배가 된다. 순번을 모르는
+            항목은 번호 없이 제목만 그린다 — 없는 번호를 지어내면 좌측 목록과
+            어긋나고, 그 어긋남은 눈으로 잡히지 않는다.
+          */}
+          <span className="inspector-item-head">
+            {item.seq ? <b className="inspector-item-seq">{item.seq}</b> : null}
+            <strong>{item.title}</strong>
+          </span>
           {item.quote ? <p className="inspector-quote">“{item.quote}”</p> : null}
           <small>
             {item.counterpart ? <span className="inspector-who">{item.counterpart}</span> : null}
@@ -192,13 +285,19 @@ function AgentTrace({ trace }) {
  * 응답에서 온다. 둘을 합치지 않는 이유는 앞의 것이 **회의에 속한 사실**이고
  * 뒤의 것이 **이 판(필터 포함)에 속한 사실**이라 갱신 시점이 다르기 때문이다.
  */
-export function FlowNodePanel({ meetingId, node, onClose, participant }) {
+export function FlowNodePanel({ meetingId, node, onClose, participant, seqOf = () => null }) {
   const isAgent = node.kind === 'AGENT'
   const attendance = participant ? ATTENDANCE_LABEL[participant.attendance] : null
   const detail = useParticipantFlow(meetingId, node.id)
   const body = detail.data
 
-  const [selected, setSelected] = useState(null)
+  // 사람 패널은 판에서 사람을 눌러 연다 — 어느 종류를 보러 왔는지 알 길이
+  // 없으므로 빈 채로 시작한다. 화살표 패널만 뱃지라는 단서를 갖는다.
+  const [selected, setSelected] = useState(() => new Set())
+  const toggle = (contentType) => setSelected((was) => toggleIn(was, contentType))
+
+  const sent = useMemo(() => filterGroups(body?.sent ?? [], selected), [body, selected])
+  const received = useMemo(() => filterGroups(body?.received ?? [], selected), [body, selected])
 
   return (
     <PanelShell
@@ -246,17 +345,25 @@ export function FlowNodePanel({ meetingId, node, onClose, participant }) {
               // 질문("내가 없는 동안…")의 한 상태라, 빈 칸으로 두지 않는다.
               <Empty>이 회의에서 직접 한 발언이 없습니다.</Empty>
             )}
-            <ContentChips counts={body.counts} selected={selected} onSelect={setSelected} />
+            <ContentChips counts={body.counts} selected={selected} onToggle={toggle} />
           </section>
 
           <section className="inspector-section">
             <h3>전달한 내용</h3>
-            {body.sent.length === 0 ? (
-              <Empty>전달한 내용이 없습니다.</Empty>
-            ) : body.sent.map((group) => (
+            {/*
+              걸러서 빈 것과 애초에 없는 것을 다른 말로 적는다. 알약을 고른
+              채로 `전달한 내용이 없습니다` 를 보면, 이 사람이 아무것도 안
+              보낸 줄 안다 — 알약을 끄면 다시 나타나는데도.
+
+              알약 개수는 **보낸 것**에서만 세므로, 고른 종류가 받은 쪽에는
+              하나도 없는 일이 흔하다. 그 자리에서 특히 잘 헷갈린다.
+            */}
+            {sent.length === 0 ? (
+              <Empty>{selected.size ? '고른 종류로 전달한 내용이 없습니다.' : '전달한 내용이 없습니다.'}</Empty>
+            ) : sent.map((group) => (
               <ContentGroup
                 group={group}
-                isSelected={selected === group.content_type}
+                seqOf={seqOf}
                 key={`sent-${group.content_type}`}
               />
             ))}
@@ -264,12 +371,12 @@ export function FlowNodePanel({ meetingId, node, onClose, participant }) {
 
           <section className="inspector-section">
             <h3>전달받은 내용</h3>
-            {body.received.length === 0 ? (
-              <Empty>전달받은 내용이 없습니다.</Empty>
-            ) : body.received.map((group) => (
+            {received.length === 0 ? (
+              <Empty>{selected.size ? '고른 종류로 전달받은 내용이 없습니다.' : '전달받은 내용이 없습니다.'}</Empty>
+            ) : received.map((group) => (
               <ContentGroup
                 group={group}
-                isSelected={selected === group.content_type}
+                seqOf={seqOf}
                 key={`received-${group.content_type}`}
               />
             ))}
@@ -295,8 +402,20 @@ export function FlowNodePanel({ meetingId, node, onClose, participant }) {
  * 옆 뱃지를 보려면 패널을 닫았다 다시 열어야 했다. 이제 화살표에 걸린 것을
  * 전부 읽고, 누른 뱃지는 **어느 묶음을 가리켜 열었는지**로만 쓴다.
  */
-export function FlowEdgePanel({ arrow, count, direction, edges, onClose }) {
-  const [selected, setSelected] = useState(count?.content_type ?? null)
+export function FlowEdgePanel({ arrow, count, direction, edges, onClose, seqOf = () => null }) {
+  /*
+    뱃지를 눌러 열었으면 **그 종류 하나가 켜진 채로** 시작한다 — 누른 것을
+    보러 온 것이 분명한데 전부 펼쳐 놓으면 다시 한 번 눌러야 한다. 선을 눌러
+    열었으면 단서가 없으므로 빈 `Set` 이고, 그때는 전부 보인다.
+
+    첫 상태는 처음 만들어질 때 한 번만 읽힌다. 화살표가 바뀌어도 이 값이
+    다시 반영되지 않는 것은 `FlowBoardPage` 가 `key` 로 패널을 새로 만들어
+    해결한다 — 그쪽 주석 참고.
+  */
+  const [selected, setSelected] = useState(
+    () => new Set(count?.content_type ? [count.content_type] : []),
+  )
+  const toggle = (contentType) => setSelected((was) => toggleIn(was, contentType))
   const [keyword, setKeyword] = useState('')
   const trimmed = keyword.trim().toLowerCase()
 
@@ -316,6 +435,12 @@ export function FlowEdgePanel({ arrow, count, direction, edges, onClose }) {
           .filter(({ edge }) => edge.content_type === entry.content_type)
           .map(({ edge, agenda, document, delivery_context: says }) => ({
             id: edge.id,
+            // 여기서는 `id` 가 곧 엣지 id 지만 `edge_id` 로도 적어 둔다.
+            // 사람 패널 쪽 항목은 `{엣지}::{보냄|받음}` 이라 `id` 가 엣지 id 가
+            // 아니고, 순번을 찾는 `seqOf` 는 두 경로에 하나뿐이다. 이름이
+            // 갈리면 한쪽만 번호가 붙는데, 그 상태가 화면에서는 "번호를 모르는
+            // 항목" 과 똑같이 보여 눈으로 잡히지 않는다.
+            edge_id: edge.id,
             // 카드 제목은 "무엇에 대한 이야기였나" 다. 안건이 그 자리이고,
             // 안건이 없는 엣지는 붙은 문서가 대신한다.
             title: agenda?.title ?? document?.title ?? edge.label,
@@ -332,6 +457,8 @@ export function FlowEdgePanel({ arrow, count, direction, edges, onClose }) {
       .filter((group) => group.items.length > 0)
   }, [arrow, edges.data, trimmed])
 
+  const visible = useMemo(() => filterGroups(groups, selected), [groups, selected])
+
   return (
     <PanelShell
       /*
@@ -341,6 +468,14 @@ export function FlowEdgePanel({ arrow, count, direction, edges, onClose }) {
         패널만 보고는 알 수 없다.
       */
       title={direction}
+      /*
+        선 하나가 한 쌍의 모든 전달을 뭉뚱그리던 것을 `flowLayout` 이 쌍마다
+        최대 둘로 — 사람이 직접 나른 회색, 대리인이 나른 주황 — 갈랐다. 판이
+        그 둘을 색으로 구분하는데 패널 제목이 똑같으면, 주황 선을 눌러 놓고도
+        지금 보는 것이 대리인이 나른 쪽인지 알 수 없다. 판과 패널이 같은
+        이야기를 해야 한다는 것이 이 화면의 원칙이다(`FlowCanvas.jsx` 위 주석).
+      */
+      subtitle={arrow?.via_agent ? 'AI 대리인이 전달' : null}
       composer
       search={{ label: '전달된 내용 검색', value: keyword, onChange: setKeyword }}
       onClose={onClose}
@@ -351,16 +486,25 @@ export function FlowEdgePanel({ arrow, count, direction, edges, onClose }) {
       {edges.data ? (
         <section className="inspector-section">
           <h3>전달된 내용</h3>
-          <ContentChips counts={arrow?.counts ?? []} selected={selected} onSelect={setSelected} />
+          <ContentChips counts={arrow?.counts ?? []} selected={selected} onToggle={toggle} />
 
-          {groups.length === 0 ? (
-            trimmed
-              ? <Empty>「{keyword.trim()}」에 걸리는 내용이 없습니다.</Empty>
-              : <Empty>이 화살표에 걸린 내용을 불러오지 못했습니다.</Empty>
-          ) : groups.map((group) => (
+          {/*
+            빈 이유를 셋으로 나눠 적는다. 검색어 · 고른 알약 · 정말 아무것도
+            없음은 사용자가 할 일이 다르다 — 앞의 둘은 지우면 되지만 마지막은
+            지울 것이 없다. 한 문구로 뭉치면 지울 것을 못 찾는다.
+          */}
+          {visible.length === 0 ? (
+            <Empty>
+              {trimmed
+                ? `「${keyword.trim()}」에 걸리는 내용이 없습니다.`
+                : selected.size
+                  ? '고른 종류에 걸리는 내용이 없습니다.'
+                  : '이 화살표에 걸린 내용을 불러오지 못했습니다.'}
+            </Empty>
+          ) : visible.map((group) => (
             <ContentGroup
               group={group}
-              isSelected={selected === group.content_type}
+              seqOf={seqOf}
               key={group.content_type}
             />
           ))}

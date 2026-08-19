@@ -79,8 +79,29 @@ export function fetchMeeting(meetingId, signal) {
   return api.get(`/meetings/${meetingId}`, undefined, { signal })
 }
 
-export function fetchIndexes(meetingId, category, signal) {
-  return api.get(`/meetings/${meetingId}/indexes`, { category }, { signal })
+/**
+ * 좌측 `시간순 인덱스`.
+ *
+ * ## 판과 같은 스코프를 같은 방식으로 가른다
+ *
+ *     회의   GET /meetings/{id}/timeline
+ *     작업   GET /projects/{id}/timeline
+ *
+ * 안건 인덱스(`/meetings/{id}/indexes?category=`)처럼 한 주소에 `category` 를
+ * 붙여 가르지 않는다. 작업 타임라인의 스코프는 회의가 아니라 **프로젝트**라,
+ * 회의 id 로 물으면 작업 엣지는 한 건도 안 걸린다 — 예전에 작업 모드 좌측이
+ * 늘 비어 있던 원인이 정확히 그것이었다. 플로우 조회가 두 경로로 갈려 있는
+ * 것과 같은 이유이므로 여기서도 경로를 갈라 둔다.
+ *
+ * 응답 모양은 두 모드가 같다(`{ count, results }`). 좌측 목록 컴포넌트는
+ * 하나면 된다.
+ */
+export function fetchMeetingTimeline(meetingId, signal) {
+  return api.get(`/meetings/${meetingId}/timeline`, undefined, { signal })
+}
+
+export function fetchProjectTimeline(projectId, signal) {
+  return api.get(`/projects/${projectId}/timeline`, undefined, { signal })
 }
 
 export function fetchSummaryTable(meetingId, signal) {
