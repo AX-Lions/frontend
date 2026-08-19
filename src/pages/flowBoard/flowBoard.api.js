@@ -20,6 +20,12 @@ export const icons = {
   /* 접힌 사이드바를 다시 여는 단추. 홈 사이드바(`Sidebar.jsx`)가 쓰는 것과
      같은 그림이라 두 화면에서 같은 동작으로 읽힌다. */
   menu: '/icons/menuIcon.svg',
+  /* 맥락 재생(`시간순 인덱스` 머리의 말린 화살표).
+
+     새 그림을 그리지 않고 이미 있는 것을 쓴다 — 디자인 산출물은 디자이너가
+     직접 커밋하는 규칙이라 개발자가 아이콘 파일을 대신 만들어 넣지 않는다.
+     원을 따라 도는 화살표라 `처음부터 다시 훑는다` 는 뜻이 그대로 읽힌다. */
+  replay: '/icons/Refresh.svg',
   search: '/icons/Search.svg',
   teamSwitch: '/icons/TeamSwitch.svg',
   unchecked: '/icons/unchecked.svg',
