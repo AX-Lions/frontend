@@ -137,13 +137,24 @@ export function FlowCanvas({
 
   // 인덱스(안건)를 고르면 그 안건에 걸린 화살표만 남기지 않고 **나머지를
   // 흐린다.** 지우면 판의 모양이 바뀌어 "무엇이 강조됐는지" 를 비교할 수 없다.
-  const isHighlighted = (arrow) => {
-    if (!highlightedEdgeIds) {
-      return true
-    }
-    return (arrow.counts ?? []).some((count) => (count.edge_ids ?? [])
-      .some((edgeId) => highlightedEdgeIds.has(edgeId)))
-  }
+  //
+  // 판정은 **알약 하나 단위**로 내린다. 화살표 하나가 `의견 3 · 요청사항 5 ·
+  // 변동사항 2` 를 같이 나르는데 고른 줄이 그중 `요청사항` 한 건이면, 화살표째
+  // 진하게 두는 것은 "이 화살표가 강조됐다" 까지만 말하고 **무엇이 강조된
+  // 것인지는 말하지 않는다.** 인덱스를 고르는 이유가 그 "무엇" 이라, 거기서
+  // 멈추면 고른 보람이 없다.
+  const isCountHighlighted = (count) => !highlightedEdgeIds
+    || (count.edge_ids ?? []).some((edgeId) => highlightedEdgeIds.has(edgeId))
+
+  // 화살표 판정은 그 위에 얹는다 — **알약이 하나라도 걸리면** 걸린 화살표다.
+  // 결과는 예전과 같지만, 선 쪽과 뱃지 쪽이 같은 판정을 각자 내리고 있으면
+  // 나중에 한쪽만 고쳐져 선과 뱃지가 서로 다른 말을 한다. 걸림을 정하는 자리는
+  // 위의 `isCountHighlighted` 하나뿐이다.
+  //
+  // 앞의 `!highlightedEdgeIds` 는 판정이 아니라 빈 배열 대비다 — 알약이 하나도
+  // 없는 화살표도 아무것도 안 고른 평소에는 진해야 한다.
+  const isHighlighted = (arrow) => !highlightedEdgeIds
+    || (arrow.counts ?? []).some(isCountHighlighted)
 
   return (
     <div className={`board-stage ${className}`} style={{ ...style, width: stage.width, height: stage.height }}>
@@ -312,9 +323,34 @@ export function FlowCanvas({
           >
             {(badge.arrow.counts ?? []).map((count) => {
               const badgeId = `${badge.id}::${count.content_type}`
+              /*
+                안 걸린 알약은 **지우지 않고 흐리게 둔다.**
+
+                그 화살표가 원래 무엇을 나르는지가 계속 보여야 강조된 것이 전체
+                중 어느 하나인지 읽힌다 — 빼 버리면 `요청사항 5` 만 남아 마치 그
+                화살표가 요청사항만 나른 것처럼 보인다. 선을 지우지 않고 흐리기만
+                하는 것과 같은 이유다.
+
+                `is-dimmed` 를 돌려쓰지 않는다. 그쪽은 "이 화살표는 지금 이야기와
+                무관하다" 이고 이쪽은 "이 화살표에 같이 실렸지만 지금 고른 것은
+                아니다" 라, 말이 다르면 흐린 정도도 달라야 한다.
+
+                걸린 묶음 안에서만 쓴다. 묶음째 흐린(`is-dimmed`) 위에 또 얹으면
+                두 번 흐려져 그 화살표가 무엇을 나르던 것인지가 아예 안 읽힌다.
+              */
+              const muted = lit && !isCountHighlighted(count)
               return (
                 <button
-                  className={activeBadgeId === badgeId ? 'flow-badge is-active' : 'flow-badge'}
+                  /*
+                    `is-active`(누른 알약)와 `is-muted`(안 고른 알약)는 별개라
+                    동시에 붙을 수 있다. 삼항으로 이어 붙이면 하나가 다른 하나를
+                    지우므로 `flow-link` 와 같은 방식으로 모아 붙인다.
+                  */
+                  className={[
+                    'flow-badge',
+                    activeBadgeId === badgeId ? 'is-active' : '',
+                    muted ? 'is-muted' : '',
+                  ].filter(Boolean).join(' ')}
                   type="button"
                   key={badgeId}
                   // 서버가 만든 라벨(`의견`)과 개수를 그대로 읽어 준다.
