@@ -10,7 +10,7 @@
  * 플로우 화면으로 갔을 때 실제로 그 회의가 열려야 하기 때문이다.
  */
 
-import { PROJECTS, TEAM, daysAgo } from './people.js'
+import { PROJECTS, daysAgo, teamOf } from './people.js'
 
 const MEETING_IDS = {
   direction: 'b1a11546-5743-46d4-b052-06407fb69c3c',
@@ -22,7 +22,7 @@ const MEETING_IDS = {
 }
 
 function label(project) {
-  return `${TEAM.name} · ${project.name}`
+  return `${teamOf(project).name} · ${project.name}`
 }
 
 function item({ id, meetingId, title, project, needsAnswer = 0, needsConfirm = 0, pendingApprovalTaskIds = [] }) {

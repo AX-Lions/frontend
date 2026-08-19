@@ -25,7 +25,9 @@
  * 여기뿐이다. 다만 목록 자체를 비우지는 않는다.
  */
 
-import { ME, PEOPLE, PROJECTS, TEAM, agentName, daysAgo, minutesAgo, person, todayAt } from './people.js'
+import {
+  ME, PEOPLE, PROJECTS, TEAM, agentName, daysAgo, minutesAgo, person, teamOf, todayAt,
+} from './people.js'
 import { meetingAgendas } from './flow.js'
 
 /** 팀이 회의를 여는 Discord 채널. 실제 응답과 같은 값이다. */
@@ -132,6 +134,15 @@ function meetingOf({
     id,
     project_id: project.id,
     project_name: project.name,
+    /*
+      회의가 **어느 팀 것인지**. 서버는 `meeting.project.team` 을 읽는다.
+
+      팀이 하나뿐일 때는 화면이 `TEAM` 을 갖다 써도 맞았다. 팀이 둘이 되면
+      학술제 회의 머리에 해커톤 팀 이름이 붙는데, 그 화면만 보고는 틀린 줄
+      모른다 — 회의 안에서 팀 이름을 확인할 다른 곳이 없다.
+    */
+    team_id: teamOf(project).id,
+    team_name: teamOf(project).name,
     title,
     status,
     scheduled_at: scheduledAt,

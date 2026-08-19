@@ -37,50 +37,29 @@ function ChatPreview({ chat, selected, onSelect }) {
 /**
  * 팀 한 줄.
  *
- * 예전에는 줄 전체가 버튼 하나였고, 그 안에 `모두 채팅 바로가기` 가 **글씨로만**
- * 들어 있었다. 눌러도 팀이 접히기만 하고 단체방은 열리지 않았다.
- *
- * 그래서 접기와 바로가기를 두 버튼으로 가른다. 버튼 안에 버튼을 넣을 수 없어
- * 줄 자체는 `div` 다.
+ * 줄 하나가 하는 일은 **펼치고 접는 것 하나**다. 예전에는 옆에 `모두 채팅
+ * 바로가기` 가 나란히 있어서, 팀을 펼치려고 눌렀는데 단체방이 열리는 일이
+ * 생겼다. 팀은 방이 아니라 방을 담는 칸이라, 이 줄에서 기대되는 동작은 하나뿐이다.
  *
  * 미읽음 뱃지를 여기 그리는 이유 — 서버가 팀 노드에 하위 프로젝트·방을 **다 더한
  * 합계**를 준다. 접혀 있을 때 그 아래 볼 것이 있는지는 이 숫자로만 알 수 있다.
  */
-function TeamHeader({ team, open, onToggle, onOpenGroupRoom }) {
+function TeamHeader({ team, open, onToggle }) {
   return (
-    <div className="team-chat-header">
-      <button className="team-name" type="button" aria-expanded={open} onClick={onToggle}>
+    <button
+      className="team-chat-header"
+      type="button"
+      aria-expanded={open}
+      aria-label={open ? `${team.name} 접기` : `${team.name} 펼치기`}
+      onClick={onToggle}
+    >
+      <span className="team-name">
         <strong>{team.name}</strong>
         {team.marked ? <RequestIcon small /> : null}
         <UnreadBadge count={team.unread} label={team.name} />
-      </button>
-      <span className="team-actions">
-        {team.groupRoomId ? (
-          <button
-            className="team-shortcut"
-            type="button"
-            onClick={() => onOpenGroupRoom(team.groupRoomId)}
-          >
-            모두 채팅 바로가기
-          </button>
-        ) : (
-          // 팀 단체방은 서버가 첫 조회 때 만들어 준다. 그래도 안 왔으면
-          // 자리를 비우지 않고 왜 없는지 적는다.
-          <span className="team-shortcut disabled" data-tip="이 팀에는 아직 단체방이 없습니다.">
-            단체방 없음
-          </span>
-        )}
-        <button
-          className="chevron-button"
-          type="button"
-          aria-expanded={open}
-          aria-label={open ? `${team.name} 접기` : `${team.name} 펼치기`}
-          onClick={onToggle}
-        >
-          <Icon className={open ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
-        </button>
       </span>
-    </div>
+      <Icon className={open ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
+    </button>
   )
 }
 
@@ -389,11 +368,27 @@ export function ChatListPanel({
             <TeamHeader
               open={isOpen(team.id)}
               team={team}
-              onOpenGroupRoom={onSelectChat}
               onToggle={() => groups.toggle(team.id)}
             />
             {isOpen(team.id) ? (
               <div className="nested-team">
+                {/*
+                  팀 단체방.
+
+                  팀 줄에서 방을 여는 길을 없앴으므로 방 자체는 여기 둔다.
+                  안 두면 **열 수 없는 방의 미읽음이 팀 뱃지에 영영 남는다** —
+                  서버 팀 합계에 그 방 몫이 들어 있기 때문이다.
+
+                  프로젝트보다 위에 두는 이유는 팀 전체에 오는 말이라서다.
+                  프로젝트 사이에 끼면 프로젝트 하나로 읽힌다.
+                */}
+                {team.groupRoom ? (
+                  <ChatPreview
+                    chat={team.groupRoom}
+                    selected={selectedChatId === team.groupRoom.id}
+                    onSelect={() => onSelectChat(team.groupRoom.id)}
+                  />
+                ) : null}
                 {team.projects.length === 0 ? (
                   <p className="chat-list-empty">이 팀에는 아직 프로젝트가 없습니다.</p>
                 ) : null}
