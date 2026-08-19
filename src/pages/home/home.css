@@ -1197,12 +1197,22 @@ h1 {
   font-weight: 600;
 }
 
+/*
+  과녁을 손가락 크기로 둔다.
+
+  24px 상자에 16px 글자였다. 제목(13px)보다 겨우 세 단계 큰 글리프라 **표시로
+  안 읽히고**, 과녁도 손가락보다 작아 몇 번 빗나간다. 접는 것이 이 패널에서
+  가장 자주 하는 일인데 제일 누르기 어려웠다.
+*/
 .dock-panel-head button {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-right: -6px;
+  border-radius: 8px;
   color: #60646c;
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
 }
 

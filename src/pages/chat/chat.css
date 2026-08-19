@@ -1028,8 +1028,32 @@ button.team-shortcut:active {
 }
 
 .settings-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex: 0 0 auto;
   padding: 32px 24px;
+}
+
+/* 나가는 길. 제목 왼쪽에 둔다 (시안 586:7774). */
+.settings-back {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  /* 왼쪽 여백만큼 당겨 제목 줄과 광학적으로 맞춘다. */
+  margin-left: -6px;
+  border-radius: 8px;
+  background: none;
+  border: 0;
+  color: var(--settings-ink, #23262b);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-back:hover {
+  background: #f3f4f6;
 }
 
 .settings-header h1 {

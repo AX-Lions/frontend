@@ -313,7 +313,6 @@ export function DelegatePrepPage() {
 
   const [openId, setOpenId] = useState(null)
   const [menuFor, setMenuFor] = useState(null)
-  const [editing, setEditing] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
   const [stanceText, setStanceText] = useState('')
   /*
@@ -335,6 +334,9 @@ export function DelegatePrepPage() {
     누르면 적어 뒀던 지시를 빈 값으로 덮어쓴다.
   */
   const [extraDraft, setExtraDraft] = useState(null)
+  //  「저장했습니다」 는 잠깐만 띄운다. 계속 남으면 지금 저장한 것인지
+  //  아까 저장한 것인지 구별이 안 된다.
+  const [noteSaved, setNoteSaved] = useState(false)
   const [draft, setDraft] = useState(null)
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
@@ -404,7 +406,23 @@ export function DelegatePrepPage() {
     보이는 글이 서로 다른 것을 가리켰다 — 01 을 읽으면서 03 의 답변을 고치는
     일이 생긴다.
   */
-  const openRow = rows.find((row) => row.id === openId) ?? null
+  /*
+    아무 줄도 안 골랐으면 **아직 답이 없는 첫 줄**을 연다.
+
+    답을 적으러 오는 화면인데 첫 걸음이 줄 하나를 고르는 일이었다. 그동안
+    오른쪽 입력칸은 「왼쪽에서 논쟁점을 펼친 뒤 내 입장을 적어 주세요」 만
+    띄우고 있어서, 들어온 사람은 **쓸 수 있는 화면을 못 본 채로 시작**했다.
+
+    이미 다 답했으면 아무것도 안 연다. 그때는 첫 줄을 펴 봐야 고치라는 뜻으로
+    읽히는데, 확인하러 온 사람에게 고치라고 말할 이유가 없다.
+
+    `openId` 를 건드리지 않고 **파생으로만** 정한다. 상태에 넣으면 목록이 다시
+    올 때마다(저장 뒤 새로고침) 사용자가 접어 둔 줄이 도로 열린다.
+  */
+  const firstUnanswered = rows.find((row) => !latestOf(row)) ?? null
+  const openRow = openId
+    ? (rows.find((row) => row.id === openId) ?? null)
+    : firstUnanswered
   /*
     적어 둔 답변은 **쌓인다** (시안 `692:7442`).
 
@@ -524,7 +542,6 @@ export function DelegatePrepPage() {
       왼쪽 목록이 말하고 있어서, 글만 따라오면 사용자는 알아채지 못한다.
     */
     setStanceText('')
-    setEditing(false)
     setEditingId(null)
     setMenuFor(null)
   }
@@ -546,7 +563,6 @@ export function DelegatePrepPage() {
   const editEntry = (entry) => {
     setOpenId(entry.rowId)
     setStanceText(entry.text)
-    setEditing(true)
     setEditingId(entry.id)
     setMenuFor(null)
     window.requestAnimationFrame(() => stanceInputRef.current?.focus())
@@ -633,6 +649,30 @@ export function DelegatePrepPage() {
     }
   }
 
+  /**
+   * 「추가 설정」만 저장한다.
+   *
+   * `mode` 를 안 보낸다 — 서버는 **보낸 키만** 바꾼다. 자료 범위나 활동 설정을
+   * 건드릴 이유가 없다.
+   */
+  const saveExtraNote = async () => {
+    if (busy || !meetingId) {
+      return
+    }
+    setBusy('note')
+    setError('')
+    try {
+      await saveAgentSetup(meetingId, { extra_note: extraPrompt.trim() })
+      setExtraDraft(null)
+      await prep.reload()
+      setNoteSaved(true)
+    } catch (caught) {
+      setError(caught?.message || '추가 설정을 저장하지 못했습니다.')
+    } finally {
+      setBusy('')
+    }
+  }
+
   const cancel = async () => {
     if (busy || !meetingId) {
       return
@@ -688,7 +728,6 @@ export function DelegatePrepPage() {
       await prep.reload()
       setWritten(null)
       setStanceText('')
-      setEditing(false)
       setEditingId(null)
 
       /*
@@ -745,7 +784,6 @@ export function DelegatePrepPage() {
       await prep.reload()
       setWritten(null)
       setEditingId(null)
-      setEditing(false)
     } catch (caught) {
       setError(caught?.message || '지우지 못했습니다.')
     } finally {
@@ -816,7 +854,7 @@ export function DelegatePrepPage() {
           {prep.loading ? <Loading label="논쟁점을 읽는 중입니다…" /> : null}
 
           {rows.map((row) => {
-            const open = openId === row.id
+            const open = openRow?.id === row.id
             const latest = latestOf(row)
             /*
               상태는 **화면이 정한다.**
@@ -837,19 +875,21 @@ export function DelegatePrepPage() {
               일이 실제로 일어난다. `답변완료` 로 두면 목록만 보고는 그것을
               알 수 없다.
             */
-            const answering = open && (!latest || editing)
+            /*
+              **고치는 중인지는 `editingId` 하나로 본다.**
+
+              전에는 `editing` 불리언과 `editingId` 가 같은 사실을 둘로 들고
+              있었고 뱃지는 불리언만 봤다. 둘이 어긋나면 **고치는 중인데
+              `답변완료` 로 보였다** — 고치다 만 채 회의에 들어가는 것을 잡으려고
+              만든 표시인데 정작 그때 안 떴다.
+            */
+            const answering = open && (!latest || editingId === latest?.id)
             const status = answering
               ? 'ANSWERING'
               : (latest ? 'ANSWERED' : 'NEEDS_ANSWER')
 
             return (
               <article className={open ? 'prep-contention open' : 'prep-contention'} key={row.id}>
-                {/*
-                  줄 하나에 누를 것이 둘이라 **버튼을 겹치지 않게 나눈다.**
-                  전에는 줄 전체가 버튼 하나였는데, 그 안에 상태 버튼을 넣으면
-                  버튼 안의 버튼이 되어 어느 쪽이 눌린 것인지 브라우저마다
-                  달라진다.
-                */}
                 <h3 className="prep-contention-head">
                   <button
                     className="prep-contention-toggle"
@@ -862,21 +902,22 @@ export function DelegatePrepPage() {
                   </button>
 
                   {/*
-                    이미 답이 있으면 **고치기로 들어간다.**
+                    상태는 **표시다. 누르는 자리가 아니다.**
 
-                    빈 칸을 열면 옆에 적어 둔 글이 그대로 보이는 채로 새 칸이
-                    뜬다 — 사용자는 그것을 고치는 칸으로 읽고 처음부터 다시
-                    쓰거나, 덧붙여 쓰고는 앞의 글이 사라졌다고 여긴다.
+                    전에는 이것도 단추라 누르면 입장 칸이 열렸다. 생김새는 상태
+                    표시인데 눌리니 **손을 대 봐야 눌리는지 알 수 있었고**, 바로
+                    옆 제목과 화살표가 이미 같은 일을 하고 있어 한 줄에 같은
+                    동작을 하는 자리가 셋이었다.
+
+                    읽어 주는 쪽에는 `role="status"` 로 준다 — 뱃지가 바뀌는 것이
+                    화면을 못 보는 사람에게도 전해져야 한다.
                   */}
-                  <button
+                  <span
                     className={`prep-status is-${status.toLowerCase()}`}
-                    type="button"
-                    aria-label={`논쟁점 ${pad(row.order)} ${STATUS_LABEL[status]}`
-                      + ` — 내 입장 ${latest ? '고치기' : '쓰기'}`}
-                    onClick={() => (latest ? editEntry(latest) : startStance(row))}
+                    role="status"
                   >
                     {STATUS_LABEL[status]}
-                  </button>
+                  </span>
 
                   {/*
                     화살표는 제목 버튼과 같은 일을 한다. 키보드로는 제목 쪽
@@ -1098,6 +1139,18 @@ export function DelegatePrepPage() {
           </p>
         </div>
 
+        {/*
+          안내를 **누른 자리에도** 띄운다.
+
+          `적용하기` 는 페이지 한참 아래에 있는데 맡겼다는 안내는 화면 맨 위에만
+          떴다. 누르고 나면 눈앞에 변화가 없어 **한 번 더 누르게 된다.**
+
+          위쪽 것을 없애지는 않는다. 논쟁점을 보다가 맡긴 사람은 그쪽을 본다.
+        */}
+        {notice ? (
+          <p className="prep-notice is-inline" role="status">{notice}</p>
+        ) : null}
+
         <div className="prep-apply-row">
           <div className="prep-apply">
             <div>
@@ -1206,12 +1259,30 @@ export function DelegatePrepPage() {
               rows={2}
               maxLength={1000}
               placeholder="원하시는 설정을 입력해주세요."
-              onChange={(event) => setExtraDraft(event.target.value)}
+              onChange={(event) => { setExtraDraft(event.target.value); setNoteSaved(false) }}
             />
           </div>
+          {/*
+            **적은 자리에 저장 단추를 둔다.**
+
+            전에는 저장할 단추가 `이번에만 다르게 사용` 을 눌렀을 때만 나왔다.
+            `현재 설정 사용` 으로 맡긴 사람은 추가 지시를 적어 놓고 나가면
+            **그대로 사라졌다** — 적는 칸은 늘 열려 있는데 담을 곳이 그때만
+            있었던 셈이다.
+          */}
+          <div className="prep-extra-actions">
+            <button
+              type="button"
+              className="prep-extra-save"
+              disabled={!setup || Boolean(busy) || extraPrompt === (setup?.extra_note ?? '')}
+              onClick={saveExtraNote}
+            >
+              {busy === 'note' ? '저장하는 중…' : '추가 설정 저장'}
+            </button>
+            {noteSaved ? <span className="prep-extra-saved" role="status">저장했습니다</span> : null}
+          </div>
           <p className="prep-scope-note">
-            적으신 내용은 <strong>{customOpen ? '설정 완료' : '적용하기'}</strong>를 누를 때
-            이 회의의 사전 지시로 함께 저장됩니다.
+            적으신 내용은 <strong>추가 설정 저장</strong>으로 이 회의에만 남습니다.
             <strong> 현재 설정 사용</strong>을 누르면 평소 설정으로 되돌아가면서 함께 지워집니다.
           </p>
         </div>
