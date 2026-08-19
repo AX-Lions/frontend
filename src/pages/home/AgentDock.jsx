@@ -66,6 +66,19 @@ export function AgentDock({ inline = false }) {
   const [error, setError] = useState('')
   const streamRef = useRef(null)
   const rootRef = useRef(null)
+  const inputRef = useRef(null)
+  /*
+    `+` 로 연 것인지.
+
+    판을 열면 목록을 읽고 **마지막 대화를 자동으로 잇는다**. 그 규칙이
+    `+` 에는 반대로 걸린다 — 새 대화를 비워 두고 판을 열면, 곧이어
+    도착한 목록이 그 빈자리를 마지막 대화로 도로 채운다. 누른 사람
+    입장에서는 `+` 가 그냥 이전 대화를 여는 버튼으로 보인다.
+
+    state 가 아니라 ref 인 이유는 이 값이 화면을 바꾸지 않기 때문이다.
+    state 로 두면 값을 세울 때마다 렌더가 한 번씩 더 돈다.
+  */
+  const wantsNewRef = useRef(false)
 
   // 열려 있을 때만 목록을 읽는다. 홈에 들어오자마자 부르면 첫 화면 요청이
   // 하나 더 늘어나는데, dock 을 열지 않는 사람이 더 많다.
@@ -84,6 +97,12 @@ export function AgentDock({ inline = false }) {
         }
         const rows = body?.results ?? []
         setConversations(rows)
+        if (wantsNewRef.current) {
+          // `+` 가 연 판이다. 여기서 마지막 대화를 이으면 방금 비운
+          // 자리가 도로 채워진다.
+          wantsNewRef.current = false
+          return
+        }
         // 마지막으로 하던 대화를 이어서 연다. 매번 새 대화로 시작하면
         // 어제 물어본 것을 다시 찾을 방법이 없다.
         setConversationId((current) => current ?? rows[0]?.id ?? null)
@@ -225,6 +244,7 @@ export function AgentDock({ inline = false }) {
         // 첫 질문이면 대화부터 만든다. 제목은 서버가 첫 메시지로 잡아 준다.
         const conversation = await createConversation()
         id = conversation.id
+        wantsNewRef.current = false
         setConversationId(id)
         setConversations((current) => [conversation, ...current])
       }
@@ -243,6 +263,18 @@ export function AgentDock({ inline = false }) {
     }
   }
 
+  /**
+   * 새 대화.
+   *
+   * **판을 여는 것까지가 이 버튼의 일이다.** 접혀 있을 때 눌러도 안쪽
+   * 상태만 비우고 판은 그대로여서, 화면에는 아무 일도 일어나지 않았다 —
+   * 누른 사람은 고장 난 버튼과 구별할 수 없다. 홈에서 dock 은 기본이
+   * 접힌 상태이므로 `+` 를 누르는 거의 모든 경우가 그 상태였다.
+   *
+   * 여기서 서버에 대화를 미리 만들지는 않는다. 열어 놓고 물어볼 것을
+   * 정하지 못한 채 닫는 사람이 더 많은데, 그때마다 빈 대화가 목록에
+   * 쌓인다. 대화는 첫 메시지를 보내는 순간 `send()` 가 만든다.
+   */
   const startNew = () => {
     stopWaiting()
     setConversationId(null)
@@ -251,6 +283,11 @@ export function AgentDock({ inline = false }) {
     setNotice('')
     setError('')
     setShowList(false)
+    wantsNewRef.current = true
+    setOpen(true)
+    // 새 대화 다음에 할 일은 언제나 묻는 것이다. 초점을 안 옮기면 빈
+    // 판만 뜨고 커서는 그대로라, 어디에 쳐야 하는지 다시 찾아야 한다.
+    inputRef.current?.focus()
   }
 
   const pick = (id) => {
@@ -258,6 +295,7 @@ export function AgentDock({ inline = false }) {
     // 새 대화의 메시지가 도착하기 전까지 이전 대화가 남아 있으면, 잠깐이지만
     // **다른 대화 내용이 이 대화인 것처럼** 보인다.
     setMessages([])
+    wantsNewRef.current = false
     setConversationId(id)
     setWaiting(false)
     setNotice('')
@@ -355,6 +393,7 @@ export function AgentDock({ inline = false }) {
 
         <input
           className="chat-input"
+          ref={inputRef}
           type="text"
           value={draft}
           aria-label="Bordo에게 물어보기"
