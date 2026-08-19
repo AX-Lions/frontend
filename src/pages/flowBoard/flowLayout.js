@@ -40,11 +40,35 @@ export const NODE_RADIUS = 56
 /** 이웃한 두 노드 사이에 최소한 남겨야 하는 빈 틈. */
 const NODE_MIN_GAP = 44
 
-/** 그린 것 바깥으로 남기는 여백. 선택 링과 그림자가 잘리지 않을 만큼. */
-const STAGE_MARGIN = 32
+/**
+ * 그린 것 바깥으로 남기는 여백.
+ *
+ * 32px 이었다. 링 바깥으로 그만큼씩 비어서, 판을 화면에 맞춰 축소했을 때
+ * **프로필이 판 한가운데 작게 모여 앉고 사방이 허옇게 남았다.** 시안처럼
+ * 프로필이 판 모서리에 바짝 붙어야 같은 축소율에서 얼굴이 더 크게 나온다.
+ * 3px 은 선택 링(`box-shadow`)이 완전히 잘리지 않을 만큼의 최소치다 —
+ * 링은 `overflow` 가 걸리지 않은 부모 위로 넘쳐 그려진다.
+ */
+const STAGE_MARGIN = 3
 
 /** 뱃지 묶음 한 덩이의 대략적인 반지름. 무대 경계를 잴 때만 쓴다. */
 const BADGE_HALF = 46
+
+/**
+ * 뱃지 묶음과 선 사이의 틈.
+ *
+ * 예전에는 뱃지가 선 **위에 올라타** 있었고(선의 중점에 그대로 앉혔다),
+ * 가리는 것을 감추려고 흰 알약 배경을 깔았다 — 선이 뱃지 밑에서 끊겨 보였다.
+ * 시안(`627:3947`)은 선을 안 건드리고 **옆에 나란히** 붙인다. 그래서 선의
+ * 법선 방향으로 밀어 놓는다.
+ */
+const BADGE_LINE_GAP = 2
+
+/** 가로로 누운 뱃지 묶음의 세로 두께 절반 (아이콘 28px + 숫자 여유). */
+const BADGE_ROW_HALF = 16
+
+/** 세로로 선 뱃지 묶음의 가로 폭 절반 (아이콘 + 숫자). */
+const BADGE_COLUMN_HALF = 24
 
 /** 요약표 폭. */
 export const SUMMARY_WIDTH = 592
@@ -203,7 +227,7 @@ function ringAngles(count) {
  * 때문이다. 반지름을 그대로 쓰면 넷일 때 가로 폭이 `2·r·cos45° = 0.71·2r`
  * 로 줄어 그래프가 요약표보다 한참 좁아진다.
  */
-function ringRadii(angles) {
+function ringRadii(angles, halfWidth, halfHeight) {
   const count = angles.length
   const spacing = count > 1
     ? (NODE_RADIUS + NODE_MIN_GAP / 2) / Math.sin(Math.PI / count)
@@ -217,9 +241,27 @@ function ringRadii(angles) {
   const reach = (half, extent) => (extent > 1e-6 ? half / extent : half)
 
   return {
-    rx: Math.max(spacing, reach(RING_HALF_WIDTH, maxCos)),
-    ry: Math.max(spacing, reach(RING_HALF_HEIGHT, maxSin)),
+    rx: Math.max(spacing, reach(halfWidth, maxCos)),
+    ry: Math.max(spacing, reach(halfHeight, maxSin)),
   }
+}
+
+/**
+ * 선의 기울기를 **글자가 뒤집히지 않는 범위**로 접는다.
+ *
+ * 오른쪽에서 왼쪽으로 가는 선은 각도가 180° 근처라, 그대로 돌리면 아이콘과
+ * 숫자가 거꾸로 선다. 180° 를 빼면 같은 기울기의 반대 방향이라 **선과는
+ * 여전히 나란하면서** 글자는 바로 선다.
+ */
+function uprightAngle(dx, dy) {
+  const degrees = Math.atan2(dy, dx) * (180 / Math.PI)
+  if (degrees > 90) {
+    return degrees - 180
+  }
+  if (degrees < -90) {
+    return degrees + 180
+  }
+  return degrees
 }
 
 function unit(dx, dy) {
@@ -260,17 +302,42 @@ function lineBetween(from, to, offset, slideRank) {
   const length = Math.hypot(end.x - start.x, end.y - start.y)
   const slide = slideRank * Math.min(BADGE_SLIDE, length * BADGE_SLIDE_RATIO)
 
+  const axis = Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'row' : 'column'
+
+  /*
+    뱃지를 밀어낼 방향.
+
+    가로로 누운 선은 **위쪽**, 세로로 선 선은 **오른쪽**으로 민다. 부호를
+    선의 진행 방향이 아니라 화면 좌표로 고정해야, 마주 보는 두 화살표의
+    뱃지가 서로 반대쪽으로 튀지 않는다.
+  */
+  const away = axis === 'row'
+    ? (normal.y <= 0 ? normal : { x: -normal.x, y: -normal.y })
+    : (normal.x >= 0 ? normal : { x: -normal.x, y: -normal.y })
+
   return {
     start,
     end,
     // 뱃지가 앉을 자리. 직선이라 두 끝의 한가운데이되, 평행선끼리는 선을
-    // 따라 앞뒤로 어긋나 앉는다.
+    // 따라 앞뒤로 어긋나 앉고, 선 자체는 가리지 않게 옆으로 비켜 앉는다.
     midpoint: {
       x: (start.x + end.x) / 2 + chord.x * slide,
       y: (start.y + end.y) / 2 + chord.y * slide,
     },
-    // 뱃지를 선을 따라 눕힐지 세울지 정한다.
-    axis: Math.abs(end.x - start.x) >= Math.abs(end.y - start.y) ? 'row' : 'column',
+    badgeShift: {
+      x: away.x * (BADGE_LINE_GAP + (axis === 'row' ? BADGE_ROW_HALF : BADGE_COLUMN_HALF)),
+      y: away.y * (BADGE_LINE_GAP + (axis === 'row' ? BADGE_ROW_HALF : BADGE_COLUMN_HALF)),
+    },
+    /*
+      뱃지 묶음을 선과 나란히 눕히는 각도(도).
+
+      비스듬한 선 옆에 수평인 뱃지 줄을 놓으면 어느 선에 붙은 숫자인지
+      헷갈린다 — 시안도 선을 따라 기울여 놓았다(`627:3967` 은 -30.38°).
+      세로로 선 선은 기울이지 않는다. 90° 돌리면 아이콘과 숫자까지 옆으로
+      누워 읽을 수 없고, 그때는 세로로 쌓는 것이 곧 선과 나란한 모양이다.
+    */
+    angle: axis === 'row' ? uprightAngle(end.x - start.x, end.y - start.y) : 0,
+    axis,
   }
 }
 
@@ -302,7 +369,7 @@ function isAiLink(from, to) {
  * @returns `{ kept, ownerOf }` — `ownerOf` 는 모든 노드 id 를 살아남는 id 로
  *          옮기는 표다. 접히지 않은 노드는 자기 자신을 가리킨다.
  */
-function collapseAgents(nodes) {
+function collapseAgents(nodes, arrows) {
   const userByOwner = new Map()
   nodes.forEach((node) => {
     if (node.kind === 'USER' && node.user_id) {
@@ -310,16 +377,44 @@ function collapseAgents(nodes) {
     }
   })
 
+  /*
+    **말을 한 사람**의 id.
+
+    화살표가 나간 노드가 곧 그 회의에서 입을 연 노드다. 받기만 한 사람은
+    여기 없다 — 회의에 있었더라도 판 위에서 한 일이 없으므로, 그 사람의
+    대리인이 대신 말했다면 그 대리인이 판에 서야 한다.
+  */
+  const spoke = new Set((arrows ?? []).map((arrow) => arrow.from_node_id))
+
   const ownerOf = new Map()
   nodes.forEach((node) => {
-    const owner = node.kind === 'AGENT' && node.user_id
+    // 주인이 이 회의에서 직접 말했을 때만 접는다. 주인이 조용했다면 대리인이
+    // 그 자리를 대신한 것이라, 접으면 **사람이 직접 한 말처럼 보인다.**
+    const ownerId = node.kind === 'AGENT' && node.user_id
       ? userByOwner.get(node.user_id)
       : undefined
+    const owner = ownerId && spoke.has(ownerId) ? ownerId : undefined
     ownerOf.set(node.id, owner ?? node.id)
   })
 
+  /*
+    주인도 대리인도 조용한 노드는 판에서 뺀다.
+
+    필터로 화살표가 전부 걸러졌을 때 사람 다섯이 아무 선도 없이 동그라미로만
+    남아 있었다. 접힌 대리인을 남기지 않는 것과 같은 이유다 — 판은 오간 것을
+    그리는 자리다.
+  */
+  const touched = new Set()
+  ;(arrows ?? []).forEach((arrow) => {
+    touched.add(arrow.from_node_id)
+    ;(arrow.to_node_ids ?? []).forEach((id) => touched.add(id))
+  })
+
   return {
-    kept: nodes.filter((node) => ownerOf.get(node.id) === node.id),
+    kept: nodes.filter((node) => ownerOf.get(node.id) === node.id
+      && (touched.size === 0 || touched.has(node.id)
+        // 접혀 들어온 대리인의 몫도 주인이 들고 서 있어야 한다.
+        || nodes.some((other) => ownerOf.get(other.id) === node.id && touched.has(other.id)))),
     ownerOf,
   }
 }
@@ -331,17 +426,46 @@ function collapseAgents(nodes) {
  * @param arrows `GET .../flow` 의 `arrows`
  * @param options `summaryRows` — 요약표 세 열 중 가장 긴 열의 줄 수.
  *                상자 높이가 곧 그래프가 시작하는 자리라 배치에 필요하다.
+ *                `boardWidth` · `boardHeight` — 판이 실제로 차지할 수 있는
+ *                크기(`.board-center-frame`). 0 이면 예전처럼 고정 링을 쓴다.
  * @returns `{ nodes, links, badges, stage, summary }`
  */
-export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {}) {
+export function buildFlowLayout(
+  nodes = [],
+  arrows = [],
+  { summaryRows = 0, boardWidth = 0, boardHeight = 0 } = {},
+) {
   const raw = nodes.filter(Boolean)
   // 접기 전 노드를 들고 있어야 선 색을 정할 수 있다. 접은 뒤에는 전부 사람이다.
   const rawById = new Map(raw.map((node) => [node.id, node]))
-  const { kept, ownerOf } = collapseAgents(raw)
+  const { kept, ownerOf } = collapseAgents(raw, arrows)
   const ordered = orderNodes(kept)
   const angles = ringAngles(ordered.length)
-  const { rx, ry } = ringRadii(angles)
   const summary = { width: SUMMARY_WIDTH, height: summaryHeight(summaryRows) }
+
+  /*
+    링을 **판 크기에 맞춰 벌린다.**
+
+    고정 링(592px 폭)은 판이 아무리 넓어도 그대로라, 1440px 화면에서 프로필
+    넷이 가운데 좁게 모여 앉고 좌우가 통째로 비었다. 판이 얼마나 큰지는
+    화면만 알기 때문에(`boardWidth`·`boardHeight`) 밖에서 받아서 쓴다.
+
+    빼는 값의 뜻:
+    - `NODE_RADIUS`  링 반지름은 원의 **중심**까지다. 원 바깥 테두리가 경계에
+                     닿아야 하므로 반지름 하나만큼 안으로 들인다.
+    - `STAGE_MARGIN` 모서리와의 틈(3px).
+    세로는 위쪽을 요약표가 이미 쓰고 있으므로 그만큼 뺀 나머지를 나눈다.
+
+    값이 안 오면(첫 렌더·측정 실패) 예전 고정값이 그대로 바닥이 된다 —
+    `Math.max` 라 판이 좁아도 링이 오그라들지는 않는다.
+  */
+  const usableWidth = boardWidth - STAGE_MARGIN * 2 - NODE_RADIUS * 2
+  const usableHeight = boardHeight - STAGE_MARGIN * 2 - summary.height - SUMMARY_GAP - NODE_RADIUS * 2
+  const { rx, ry } = ringRadii(
+    angles,
+    Math.max(RING_HALF_WIDTH, usableWidth / 2),
+    Math.max(RING_HALF_HEIGHT, usableHeight / 2),
+  )
 
   /*
     가로 중심은 요약표와 링이 나눠 쓴다 — 둘의 중심축이 어긋나면 그래프가
@@ -491,7 +615,11 @@ export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {
       arrow: link.arrow,
       isAi: link.isAi,
       isSelf: false,
-      point: link.midpoint,
+      point: {
+        x: link.midpoint.x + link.badgeShift.x,
+        y: link.midpoint.y + link.badgeShift.y,
+      },
+      angle: link.angle,
       axis: link.axis,
     }))
 
@@ -524,6 +652,8 @@ export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {
         isAi: entry.isAi,
         isSelf: true,
         point: { x: node.x + dir.x * reach, y: node.y + dir.y * reach },
+        // 자기 뱃지는 붙을 선이 없다. 기울일 기준도 없으므로 눕히지 않는다.
+        angle: 0,
         axis: 'row',
       })
     })

@@ -1255,6 +1255,14 @@ function edgeDetail(spec, { agendas, opacityAt }) {
       document_id: document ? document.id : null,
       agenda_id: agenda ? agenda.id : null,
       occurred_at: spec.at,
+      /*
+        화면에 찍을 시각. 서버가 완성해 준다.
+
+        `occurred_at` 을 화면이 직접 찍으면 브라우저 시간대로 나가 **같은
+        화살표를 사람마다 다른 시각으로 본다.** 참여자 시간대 계산이 서버
+        몫인 것과 같은 이유다.
+      */
+      at_label: clockLabel(spec.at),
       opacity: opacityAt(spec.at),
     },
     delivery_context: deliveryContext,
@@ -1269,6 +1277,171 @@ function edgeDetail(spec, { agendas, opacityAt }) {
     agenda,
     lookup_id: spec.lookup ?? null,
   }
+}
+
+/* ────────────────────────────────────────────────────────────
+   사람 · 대리인 한 명의 상세 (우측 패널, 시안 `601:9055`)
+   ──────────────────────────────────────────────────────────── */
+
+/**
+ * `HH:MM`. 서버가 완성해 주는 표기라 화면은 그대로 읽는다 — 원본
+ * `occurred_at` 을 화면이 찍으면 브라우저 시간대로 나가 같은 발언을 사람마다
+ * 다른 시각으로 본다.
+ */
+function clockLabel(iso) {
+  const at = new Date(iso)
+  return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+}
+
+/**
+ * 카드 제목.
+ *
+ * 원장에 제목을 따로 적지 않는다. 안건이 곧 "무엇에 대한 이야기였나" 이고,
+ * 안건이 없는 엣지는 붙은 문서가 그 자리를 대신한다. 손으로 적으면 같은
+ * 안건을 가리키는 카드들이 저마다 다른 제목을 갖게 된다.
+ */
+function cardTitle(spec, agendas) {
+  if (spec.agenda && agendas[spec.agenda]) {
+    return agendas[spec.agenda].title
+  }
+  if (spec.doc && DOCUMENTS[spec.doc]) {
+    return DOCUMENTS[spec.doc].title
+  }
+  return CONTENT_LABEL[spec.type]
+}
+
+/** 이 엣지에서 그 사람이 실제로 한 말. 없으면 첫 발언을 쓴다. */
+function utteranceOf(spec, name) {
+  const mine = (spec.says ?? []).find(([who]) => who === name)
+  const first = (spec.says ?? [])[0]
+  return (mine ?? first ?? [null, ''])[1]
+}
+
+/**
+ * 대리인이 답을 만들기까지의 진행 표시(시안 `601:9055` 의 `Bordo 생각 중…`).
+ *
+ * **대리인 카드에만 붙는다.** 사람이 한 말에는 이런 과정이 없다. 이 서비스가
+ * 파는 것이 "없는 동안 대리인이 무엇을 근거로 말했나" 라, 근거를 모으는 단계가
+ * 카드 안에서 보여야 한다 — 결과만 보여 주면 지어낸 말과 구별되지 않는다.
+ */
+function agentTrace(spec, agendas) {
+  const agenda = spec.agenda ? agendas[spec.agenda] : null
+  const document = spec.doc ? DOCUMENTS[spec.doc] : null
+  const sources = [
+    agenda ? `안건: ${agenda.title}` : null,
+    document ? `문서: ${document.title}` : null,
+    `창구: ${spec.surface === 'DISCORD' ? 'Discord' : '서비스'}`,
+  ].filter(Boolean)
+
+  return {
+    title: 'Bordo 생각 중…',
+    steps: [
+      { key: 'receive', label: '접수', state: 'DONE', detail: '질문을 확인했어요.' },
+      {
+        key: 'analyze',
+        label: '분석',
+        state: 'DONE',
+        detail: `관련된 프로젝트 기록 ${sources.length}개를 분석했어요.`,
+        bullets: sources,
+      },
+      {
+        key: 'search',
+        label: '검색',
+        state: 'DONE',
+        detail: '관련 기록을 검색했어요.',
+        note: `“${cardTitle(spec, agendas)}” 관련 기록을 찾았어요.`,
+      },
+      { key: 'verify', label: '정확도 확인', state: 'DONE' },
+      { key: 'draft', label: '생성', state: 'DONE' },
+      { key: 'send', label: '발송', state: 'DONE' },
+      { key: 'done', label: '완료', state: 'DONE' },
+    ],
+  }
+}
+
+/**
+ * 한 회의에서 **사람(또는 대리인) 한 명**이 주고받은 것 전부.
+ *
+ * 판 위의 화살표와 같은 원장에서 만든다. 따로 적으면 판에는 화살표가 있는데
+ * 패널은 비어 있는 상태가 조용히 생긴다 — 이 파일이 애초에 원장 하나만 손으로
+ * 적는 이유와 같다.
+ */
+function buildParticipantFlows(edges, agendas) {
+  const out = {}
+
+  Object.values(NODES).forEach((node) => {
+    const sentSpecs = edges.filter((spec) => spec.from === node.name)
+    const receivedSpecs = edges.filter((spec) => spec.to.includes(node.name))
+    if (sentSpecs.length === 0 && receivedSpecs.length === 0) {
+      return
+    }
+
+    const isAgent = node.kind === 'AGENT'
+
+    const group = (specs, mode) => CONTENT_ORDER
+      .map((type) => ({ type, hits: specs.filter((spec) => spec.type === type) }))
+      .filter(({ hits }) => hits.length > 0)
+      .map(({ type, hits }) => ({
+        content_type: type,
+        label: CONTENT_LABEL[type],
+        items: hits.map((spec) => ({
+          id: `${spec.id}::${mode}`,
+          edge_id: spec.id,
+          title: cardTitle(spec, agendas),
+          quote: mode === 'sent'
+            ? utteranceOf(spec, node.name)
+            : utteranceOf(spec, spec.from),
+          counterpart: mode === 'sent'
+            ? spec.to.join(', ')
+            : spec.from,
+          at_label: clockLabel(spec.at),
+          // 대리인이 **보낸** 카드에만 붙는다. 받은 쪽은 상대가 만든 과정이라
+          // 이 사람의 패널에서 보여 줄 것이 아니다.
+          trace: mode === 'sent' && isAgent ? agentTrace(spec, agendas) : null,
+        })),
+      }))
+
+    // 「발언」은 카드 수가 아니라 **실제로 입을 연 횟수**다. 한 엣지 안에서
+    // 두 번 말하면 두 번으로 센다 — 판의 화살표 수와 다른 것이 맞다.
+    const utterances = edges.reduce(
+      (total, spec) => total + (spec.says ?? []).filter(([who]) => who === node.name).length,
+      0,
+    )
+
+    const headline = [...new Set(
+      sentSpecs
+        .map((spec) => utteranceOf(spec, node.name))
+        .filter(Boolean),
+    )]
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 3)
+      .join(' ')
+
+    out[node.id] = {
+      node_id: node.id,
+      name: node.name,
+      kind: node.kind,
+      // 회의에 한 번도 입을 안 뗀 사람(대리인만 말한 사람)은 요약할 말이 없다.
+      // 빈 문자열로 내려서 화면이 "없음" 을 그리게 한다 — 지어내지 않는다.
+      headline,
+      counts: [
+        { key: 'utterance', label: '발언', count: utterances },
+        ...CONTENT_ORDER
+          .map((type) => ({ type, n: sentSpecs.filter((spec) => spec.type === type).length }))
+          .filter(({ n }) => n > 0)
+          .map(({ type, n }) => ({
+            key: type,
+            content_type: type,
+            label: CONTENT_LABEL[type],
+            count: n,
+          })),
+      ],
+      sent: group(sentSpecs, 'sent'),
+      received: group(receivedSpecs, 'received'),
+    }
+  })
+
+  return out
 }
 
 /**
@@ -1300,6 +1473,7 @@ function flowFor({ head, nodeNames, edges }) {
     },
     details,
     agendas,
+    participants: buildParticipantFlows(edges, agendas),
   }
 }
 
@@ -1464,6 +1638,23 @@ export const meetingAgendas = {
  * 판에 올라간 `edge_ids` 를 **전부** 담는다. 원장 하나에서 판과 상세를 같이
  * 만들어 내므로 하나라도 빠질 수가 없다.
  */
+/**
+ * `GET /meetings/{meeting_id}/participants/{node_id}/flow` — 판에서 사람이나
+ * 대리인을 눌렀을 때 열리는 우측 패널(시안 `601:9055`).
+ *
+ * 키는 `{회의 id}::{노드 id}` 다. 같은 사람이라도 회의마다 주고받은 것이
+ * 다르므로 회의를 빼면 어느 회의를 열어도 같은 내용이 뜬다.
+ */
+export const participantFlows = Object.fromEntries([
+  [MEETING_GLOBAL, globalMeeting],
+  [MEETING_DESIGN, designMeeting],
+  [MEETING_REGULAR, regularMeeting],
+  [MEETING_SYNC, syncMeeting],
+  [MEETING_BOOTH, boothMeeting],
+  [MEETING_POSTER, posterMeeting],
+].flatMap(([meetingId, built]) => Object.entries(built.participants)
+  .map(([nodeId, body]) => [`${meetingId}::${nodeId}`, body])))
+
 export const flowEdges = {
   ...globalMeeting.details,
   ...designMeeting.details,

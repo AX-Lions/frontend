@@ -14,6 +14,12 @@ import { TeamSwitchDialog } from '../home/TeamSwitchDialog.jsx'
 import { icons, toneLabels } from './flowBoard.api'
 import { fetchBriefing, toneOf } from './flowBoard.data'
 import { buildFlowLayout } from './flowLayout'
+
+/**
+ * 판 위에 얹힌 회의 제목 줄의 높이.
+ * `.board-center-frame { min-height: calc(100% - 64px) }` 과 짝이다.
+ */
+const MEETING_TITLE_HEIGHT = 64
 import {
   MEETING_MODE,
   WORK_MODE,
@@ -174,9 +180,27 @@ export function FlowBoardPage() {
     [mode, summaryColumns],
   )
 
+  /*
+    판이 실제로 차지할 수 있는 크기.
+
+    링 반지름을 여기 맞춰 벌려야 프로필이 판 모서리에 붙는다(`flowLayout` 의
+    `usableWidth` 주석 참고). 재는 대상은 **`.flow-board`(스크롤 상자)** 다 —
+    안쪽 `.board-center-frame` 은 `width: max-content` 라 내용이 커지면 같이
+    커진다. 그것을 재면 판이 커질 때마다 링이 또 커지는 **되먹임**이 된다.
+
+    `MEETING_TITLE_HEIGHT` 는 판 위에 얹힌 회의 제목 줄 몫이다
+    (`.board-center-frame { min-height: calc(100% - 64px) }` 과 짝).
+  */
+  const [boardSize, setBoardSize] = useState({ width: 0, height: 0 })
+
+
   const layout = useMemo(
-    () => buildFlowLayout(flow.data?.nodes ?? [], flow.data?.arrows ?? [], { summaryRows }),
-    [flow.data, summaryRows],
+    () => buildFlowLayout(flow.data?.nodes ?? [], flow.data?.arrows ?? [], {
+      summaryRows,
+      boardWidth: boardSize.width,
+      boardHeight: boardSize.height - MEETING_TITLE_HEIGHT,
+    }),
+    [flow.data, summaryRows, boardSize.width, boardSize.height],
   )
 
   // 무대 크기를 배치에서 가져온다. 776×931 이 `BOARD_CONTENT_BOUNDS` · SVG
@@ -201,6 +225,38 @@ export function FlowBoardPage() {
     zoomOut,
     zoomPercent,
   } = useFlowBoard(contentBounds)
+
+  /*
+    판을 **콜백 ref 로** 잡는다.
+
+    `boardRef.current` 를 보는 effect 로는 안 된다. 이 화면은 회의를 읽는
+    동안 다른 것을 그리다가(위쪽 `if (meeting.loading …) return`) 나중에야
+    판을 붙이는데, ref 객체는 그때도 같은 객체라 **effect 가 다시 돌지
+    않는다.** 처음 한 번 `null` 을 보고 끝나서 판 크기가 영영 0 이었다.
+    콜백 ref 는 붙는 순간 불리므로 그 시점을 놓치지 않는다.
+  */
+  const [boardEl, setBoardEl] = useState(null)
+  const attachBoard = (node) => {
+    boardRef.current = node
+    setBoardEl(node)
+  }
+
+  useEffect(() => {
+    if (!boardEl) {
+      return undefined
+    }
+    const observer = new ResizeObserver(([entry]) => {
+      const box = entry.contentRect
+      setBoardSize((current) => (
+        // 소수점만 흔들려도 배치를 다시 계산하면 렌더가 끝없이 돈다.
+        Math.abs(current.width - box.width) < 1 && Math.abs(current.height - box.height) < 1
+          ? current
+          : { width: box.width, height: box.height }
+      ))
+    })
+    observer.observe(boardEl)
+    return () => observer.disconnect()
+  }, [boardEl])
 
   const edgeIds = panel?.kind === 'edge' ? panel.edgeIds : []
   const edgeDetails = useEdgeDetails(edgeIds)
@@ -288,13 +344,22 @@ export function FlowBoardPage() {
       : { kind: 'node', nodeId: node.id, node })
   }
 
+  /*
+    화살표 뱃지 하나를 눌렀다.
+
+    누른 뱃지에 걸린 엣지만 읽지 않는다. 패널 머리에 `의견 3 · 요청사항 5 ·
+    변동사항 2` 가 나란히 서는 자리라(시안 `601:10010`), **그 화살표에 걸린
+    것 전부**를 읽어야 그 줄을 그릴 수 있다. 누른 뱃지는 어느 묶음을 가리켜
+    열었는지로만 쓴다.
+  */
   const selectBadge = (badgeId, count, arrow) => {
     setPanel({
       kind: 'edge',
       badgeId,
       count,
+      arrow,
       direction: arrow.direction_label,
-      edgeIds: count.edge_ids ?? [],
+      edgeIds: (arrow.counts ?? []).flatMap((entry) => entry.edge_ids ?? []),
     })
   }
 
@@ -381,7 +446,7 @@ export function FlowBoardPage() {
         <section
           className={isPanning ? 'flow-board is-panning' : 'flow-board'}
           aria-label="회의 플로우보드"
-          ref={boardRef}
+          ref={attachBoard}
           onWheel={handleBoardWheel}
           onPointerDown={handleBoardPointerDown}
           onPointerMove={handleBoardPointerMove}
@@ -389,10 +454,32 @@ export function FlowBoardPage() {
           onPointerCancel={stopBoardPan}
         >
           <header className="meeting-title">
+            {/*
+              사이드바를 접으면 여는 단추가 여기로 온다.
+
+              예전에는 접힌 사이드바의 머리(`team-header`)가 화면 왼쪽 위에
+              **떠 있는 흰 카드**로 남아 그 안의 `«` 로만 다시 펼 수 있었다.
+              접었는데 왼쪽에 카드가 하나 떠 있으면 접은 것으로 보이지 않고,
+              카드가 판 위를 덮기도 했다. 접힌 뒤 왼쪽 끝에 남는 것은 회의
+              제목 줄 하나이므로, 여는 단추도 그 줄 맨 앞에 둔다.
+            */}
+            {ui.isFlowSidebarCollapsed ? (
+              <button
+                className="meeting-title-menu"
+                type="button"
+                aria-label="사이드바 펼치기"
+                data-tip="사이드바 펼치기"
+                aria-expanded="false"
+                onClick={ui.toggleFlowSidebar}
+              >
+                <img src={icons.menu} alt="" />
+              </button>
+            ) : null}
             <h1>{headerLabel}</h1>
             <button
               type="button"
               aria-label="회의 선택"
+              data-tip="다른 회의 보기"
               aria-expanded={ui.isMeetingMenuOpen}
               onClick={ui.toggleMeetingMenu}
             >
@@ -479,7 +566,7 @@ export function FlowBoardPage() {
                               className={activeSummaryItem === itemKey ? 'is-active' : ''}
                               type="button"
                               key={itemKey}
-                              title={item}
+                              data-tip={item}
                               onClick={() => {
                                 setActiveSummaryItem((current) => (current === itemKey ? null : itemKey))
                                 setPanel({ kind: 'briefing' })
@@ -521,11 +608,11 @@ export function FlowBoardPage() {
             **화면에 아예 없었다.** 확대하려면 먼저 확대해야 하는 셈이었다.
           */}
           <div className="zoom-controls" aria-label="플로우보드 확대 축소">
-            <button type="button" aria-label="축소" onClick={zoomOut} disabled={zoom <= minZoom}>
+            <button type="button" aria-label="축소" data-tip="축소" onClick={zoomOut} disabled={zoom <= minZoom}>
               -
             </button>
             <output aria-live="polite">{zoomPercent}%</output>
-            <button type="button" aria-label="확대" onClick={zoomIn} disabled={zoom >= maxZoom}>
+            <button type="button" aria-label="확대" data-tip="확대" onClick={zoomIn} disabled={zoom >= maxZoom}>
               +
             </button>
           </div>
@@ -546,7 +633,7 @@ export function FlowBoardPage() {
             <aside className="briefing-panel inspector-panel" aria-label="Bordo 브리핑">
               <header className="briefing-header">
                 <h2>Bordo 브리핑</h2>
-                <button className="panel-close" type="button" aria-label="패널 닫기" onClick={() => setPanel(null)}>
+                <button className="panel-close" type="button" aria-label="패널 닫기" data-tip="닫기" onClick={() => setPanel(null)}>
                   ×
                 </button>
               </header>
@@ -559,6 +646,7 @@ export function FlowBoardPage() {
 
         {panel?.kind === 'node' && selectedNode ? (
           <FlowNodePanel
+            meetingId={meetingId}
             node={selectedNode}
             participant={participantOf(selectedNode)}
             onClose={() => setPanel(null)}
@@ -567,6 +655,7 @@ export function FlowBoardPage() {
 
         {panel?.kind === 'edge' ? (
           <FlowEdgePanel
+            arrow={panel.arrow}
             count={panel.count}
             direction={panel.direction}
             edges={edgeDetails}

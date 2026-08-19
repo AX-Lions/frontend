@@ -33,7 +33,7 @@ import {
 import {
   meetingIndexes, meetings, projectMeetings, summaryTables, workIndexes,
 } from './data/meetings.js'
-import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
+import { flowEdges, meetingFlows, participantFlows, projectFlows } from './data/flow.js'
 import { teamMembers } from './data/home.js'
 import { inbox } from './data/inbox.js'
 import { TEAM } from './data/people.js'
@@ -302,6 +302,14 @@ function resolve(path, method, body) {
     // 지금은 헤더만 채운다 — 예상 논쟁점 · Bordo 활동 설정은 이 팝업이 안 쓴다.
     if (a === 'meetings' && c === 'prep') return { header: viewerMeetingPrepHeader(b) }
     if (a === 'meetings' && c === 'flow') return meetingFlows[b] ?? null
+    /*
+      판에서 사람·대리인을 눌렀을 때 열리는 우측 패널(시안 `601:9055`).
+      노드 id 는 대리인일 때 `{user_id}:agent` 라 `:` 가 들어간다 — 경로
+      조각 하나로 그대로 온다.
+    */
+    if (a === 'meetings' && c === 'participants' && s[4] === 'flow') {
+      return participantFlows[`${b}::${decodeURIComponent(s[3])}`] ?? null
+    }
     if (a === 'meetings' && c === 'summary-table') return summaryTables[b] ?? null
     if (a === 'meetings' && c === 'ai-briefing') return viewerBriefing(b)
     if (a === 'meetings' && c === 'indexes') {
