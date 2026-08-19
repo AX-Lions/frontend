@@ -403,7 +403,23 @@ export function DelegatePrepPage() {
     보이는 글이 서로 다른 것을 가리켰다 — 01 을 읽으면서 03 의 답변을 고치는
     일이 생긴다.
   */
-  const openRow = rows.find((row) => row.id === openId) ?? null
+  /*
+    아무 줄도 안 골랐으면 **아직 답이 없는 첫 줄**을 연다.
+
+    답을 적으러 오는 화면인데 첫 걸음이 줄 하나를 고르는 일이었다. 그동안
+    오른쪽 입력칸은 「왼쪽에서 논쟁점을 펼친 뒤 내 입장을 적어 주세요」 만
+    띄우고 있어서, 들어온 사람은 **쓸 수 있는 화면을 못 본 채로 시작**했다.
+
+    이미 다 답했으면 아무것도 안 연다. 그때는 첫 줄을 펴 봐야 고치라는 뜻으로
+    읽히는데, 확인하러 온 사람에게 고치라고 말할 이유가 없다.
+
+    `openId` 를 건드리지 않고 **파생으로만** 정한다. 상태에 넣으면 목록이 다시
+    올 때마다(저장 뒤 새로고침) 사용자가 접어 둔 줄이 도로 열린다.
+  */
+  const firstUnanswered = rows.find((row) => !latestOf(row)) ?? null
+  const openRow = openId
+    ? (rows.find((row) => row.id === openId) ?? null)
+    : firstUnanswered
   /*
     적어 둔 답변은 **쌓인다** (시안 `692:7442`).
 
@@ -811,7 +827,7 @@ export function DelegatePrepPage() {
           {prep.loading ? <Loading label="논쟁점을 읽는 중입니다…" /> : null}
 
           {rows.map((row) => {
-            const open = openId === row.id
+            const open = openRow?.id === row.id
             const latest = latestOf(row)
             /*
               상태는 **화면이 정한다.**
