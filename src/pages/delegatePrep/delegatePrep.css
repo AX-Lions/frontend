@@ -298,7 +298,6 @@
   font-weight: 400;
   line-height: 14px;
   white-space: nowrap;
-  cursor: pointer;
 }
 
 .prep-status.is-answered {
@@ -313,14 +312,6 @@
   color: var(--prep-ink);
 }
 
-/* 눌리는 것임을 손이 닿을 때 알려 준다. 시안에는 없는 상태지만, 없으면
-   글자색만 다른 라벨로 보여 아무도 누르지 않는다. */
-.prep-status:hover {
-  background: var(--prep-orange-bg);
-  color: var(--prep-orange);
-}
-
-.prep-status:focus-visible,
 .prep-contention-toggle:focus-visible {
   outline: 2px solid var(--prep-orange);
   outline-offset: 2px;

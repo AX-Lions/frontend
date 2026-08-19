@@ -847,12 +847,6 @@ export function DelegatePrepPage() {
 
             return (
               <article className={open ? 'prep-contention open' : 'prep-contention'} key={row.id}>
-                {/*
-                  줄 하나에 누를 것이 둘이라 **버튼을 겹치지 않게 나눈다.**
-                  전에는 줄 전체가 버튼 하나였는데, 그 안에 상태 버튼을 넣으면
-                  버튼 안의 버튼이 되어 어느 쪽이 눌린 것인지 브라우저마다
-                  달라진다.
-                */}
                 <h3 className="prep-contention-head">
                   <button
                     className="prep-contention-toggle"
@@ -865,21 +859,22 @@ export function DelegatePrepPage() {
                   </button>
 
                   {/*
-                    이미 답이 있으면 **고치기로 들어간다.**
+                    상태는 **표시다. 누르는 자리가 아니다.**
 
-                    빈 칸을 열면 옆에 적어 둔 글이 그대로 보이는 채로 새 칸이
-                    뜬다 — 사용자는 그것을 고치는 칸으로 읽고 처음부터 다시
-                    쓰거나, 덧붙여 쓰고는 앞의 글이 사라졌다고 여긴다.
+                    전에는 이것도 단추라 누르면 입장 칸이 열렸다. 생김새는 상태
+                    표시인데 눌리니 **손을 대 봐야 눌리는지 알 수 있었고**, 바로
+                    옆 제목과 화살표가 이미 같은 일을 하고 있어 한 줄에 같은
+                    동작을 하는 자리가 셋이었다.
+
+                    읽어 주는 쪽에는 `role="status"` 로 준다 — 뱃지가 바뀌는 것이
+                    화면을 못 보는 사람에게도 전해져야 한다.
                   */}
-                  <button
+                  <span
                     className={`prep-status is-${status.toLowerCase()}`}
-                    type="button"
-                    aria-label={`논쟁점 ${pad(row.order)} ${STATUS_LABEL[status]}`
-                      + ` — 내 입장 ${latest ? '고치기' : '쓰기'}`}
-                    onClick={() => (latest ? editEntry(latest) : startStance(row))}
+                    role="status"
                   >
                     {STATUS_LABEL[status]}
-                  </button>
+                  </span>
 
                   {/*
                     화살표는 제목 버튼과 같은 일을 한다. 키보드로는 제목 쪽
