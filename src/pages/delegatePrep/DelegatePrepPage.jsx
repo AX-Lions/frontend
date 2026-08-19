@@ -1139,6 +1139,18 @@ export function DelegatePrepPage() {
           </p>
         </div>
 
+        {/*
+          안내를 **누른 자리에도** 띄운다.
+
+          `적용하기` 는 페이지 한참 아래에 있는데 맡겼다는 안내는 화면 맨 위에만
+          떴다. 누르고 나면 눈앞에 변화가 없어 **한 번 더 누르게 된다.**
+
+          위쪽 것을 없애지는 않는다. 논쟁점을 보다가 맡긴 사람은 그쪽을 본다.
+        */}
+        {notice ? (
+          <p className="prep-notice is-inline" role="status">{notice}</p>
+        ) : null}
+
         <div className="prep-apply-row">
           <div className="prep-apply">
             <div>
