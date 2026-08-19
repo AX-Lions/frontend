@@ -99,22 +99,47 @@ export function ChatPage() {
   const [pendingPresence, setPendingPresence] = useState(null)
   const presenceStatus = pendingPresence ?? presence.data?.status ?? 'ACTIVE'
 
+  const awayHandled = useResource((signal) => fetchAwayHandled(signal), [], { cacheKey: 'chat-away' })
+
+  /**
+   * 자리 비움을 바꾼다.
+   *
+   * ## 스위치가 두 번 튀던 이유
+   *
+   * 예전에는 `pending` 을 내리는 것과 `presence` 를 **다시 읽는 것**이 따로
+   * 놀았다. `pending` 이 사라지는 순간 화면이 보는 값은 아직 안 바뀐 옛
+   * 응답이라, 한 번 누르면
+   *
+   *     자리 비움(pending) → 활동 중(옛 응답) → 자리 비움(새 응답)
+   *
+   * 이렇게 세 번 그려졌다. 가운데 한 칸이 왕복 시간만큼 떠 있어서, 스위치가
+   * 좌우로 튀는 것으로 보인다. 그 사이 버튼이 다시 눌리기까지 해서 두 번
+   * 누르면 요청이 엇갈려 상태가 뒤집힌 채로 남았다.
+   *
+   * 그래서 **서버가 돌려준 값을 그대로 가진 값에 얹는다.** 같은 렌더에서
+   * `pending` 이 내려가고 새 상태가 올라오므로 중간 칸이 아예 없다. 확인용
+   * 재조회도 없앤다 — `PATCH` 응답이 이미 서버가 정한 값이라, 한 번 더 읽는
+   * 것은 튈 자리를 한 칸 더 만드는 일일 뿐이다.
+   *
+   * 실패하면 `pending` 만 내려가고 가진 값이 그대로 남아 스위치가 원래
+   * 자리로 돌아간다 — 서버가 못 받은 것을 받은 것처럼 두지 않는다.
+   */
   const changePresence = async (status) => {
-    if (status === presenceStatus) {
+    if (status === presenceStatus || pendingPresence) {
       return
     }
     setPendingPresence(status)
     try {
-      await setPresence(status)
+      const updated = await setPresence(status)
+      presence.setData((current) => ({ ...(current ?? {}), status: updated?.status ?? status }))
       // 자리 비움을 풀면 그 사이 쌓인 것이 곧바로 목록에 와야 한다.
       awayHandled.reload()
+    } catch {
+      // 가진 값이 그대로 남는다. 되돌리는 코드가 따로 필요 없다.
     } finally {
       setPendingPresence(null)
-      presence.reload()
     }
   }
-
-  const awayHandled = useResource((signal) => fetchAwayHandled(signal), [], { cacheKey: 'chat-away' })
 
   /*
     자리를 비운 사이 Bordo 가 대신 나눈 대화.
