@@ -36,7 +36,7 @@ function BordoSettingsPage({ onBack }) {
   return (
     <div className="settings-page">
       <GlobalSidebar active="chat" onNavigate={handleNavigate} />
-      <AgentSettingsPanel />
+      <AgentSettingsPanel onBack={onBack} />
       <main className="settings-brand" aria-label="설정 미리보기">
         <p>Bordo</p>
       </main>

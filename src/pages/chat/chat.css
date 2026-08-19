@@ -1330,9 +1330,43 @@ button.team-shortcut:active {
   color: #ff6450;
 }
 
+/*
+  제목 줄 (시안 `586:7774`).
+
+  뒤로 가기와 제목이 16px 사이로 나란히 선다. 예전에는 제목만 있었고, 이
+  화면이 채팅을 통째로 덮는데 **나갈 길이 왼쪽 레일 아이콘 하나뿐**이었다.
+*/
 .settings-header {
+  display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 16px;
   padding: 32px 24px;
+}
+
+.settings-back {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--chat-muted);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.settings-back:hover {
+  background: var(--chat-white-hover);
+}
+
+.settings-back img {
+  display: block;
+  width: 24px;
+  height: 24px;
 }
 
 .settings-header h1 {

@@ -8,6 +8,7 @@ import {
   patchAgentSettings,
   updatePrompt,
 } from './chat.data.js'
+import { icons } from './chat.icons.js'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
@@ -151,7 +152,7 @@ function PromptCard({ prompt, selected, onSelect, onSave, onRemove }) {
   )
 }
 
-export function AgentSettingsPanel() {
+export function AgentSettingsPanel({ onBack }) {
   const settingsResource = useResource((signal) => fetchAgentSettings(signal), [], { cacheKey: 'agent-settings' })
   const promptsResource = useResource((signal) => fetchPrompts(signal), [], { cacheKey: 'agent-prompts' })
   const { data: serverSettings, setData: setServerSettings } = settingsResource
@@ -273,6 +274,17 @@ export function AgentSettingsPanel() {
   return (
     <aside className="settings-panel" aria-label="Bordo 설정">
       <header className="settings-header">
+        {/*
+          제목 왼쪽의 뒤로 가기(시안 `586:7774`).
+
+          이 화면은 채팅을 **통째로 덮는다.** 그런데 나갈 길이 왼쪽 레일의
+          `채팅` 아이콘 하나뿐이었다 — 설정에 들어온 사람은 그 아이콘이
+          "돌아가기" 라는 것을 알 수 없고, 아이콘 줄은 화면이 좁아지면
+          접히기까지 한다. 제목 옆이 나가는 자리다.
+        */}
+        <button className="settings-back" type="button" aria-label="뒤로 가기" data-tip="채팅으로" onClick={onBack}>
+          <img src={icons.expandLeft} alt="" />
+        </button>
         <h1>Bordo 설정</h1>
       </header>
 
