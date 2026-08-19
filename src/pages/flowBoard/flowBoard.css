@@ -26,12 +26,19 @@
 .flow-board-page {
   --ink: #1f1f1f;
   --muted: #60646c;
-  --soft: #fafafb;
   --surface: #ffffff;
   --panel: #f7f7f8;
   --line: #e5e7eb;
   --border: #e5e7eb;
   --brand: #002662;
+  /*
+    오른쪽 패널 바닥. 시안(`배경/우측사이드바`)은 `--brand` 를 5% 로 깐 값이다.
+
+    반투명(`rgb(0 38 98 / 5%)`)이 아니라 흰 바닥에 얹은 결과값을 그대로 적는다.
+    `.briefing-header` 가 스크롤되는 내용을 가리는 고정 머리말이라, 반투명이면
+    그 아래 글자가 비쳐 보인다.
+  */
+  --panel-ground: #f2f4f7;
   /* AI 가 나른 것과 사람끼리 오간 것을 색으로 가른다. FlowCanvas 의 상수와 짝. */
   --link-ai: #f59e0b;
   --link-human: #374151;
@@ -1057,7 +1064,7 @@
   flex-direction: column;
   overflow: hidden;
   border-left: 1px solid var(--border);
-  background: var(--soft);
+  background: var(--panel-ground);
   scrollbar-width: none;
 }
 
@@ -1066,7 +1073,7 @@
   z-index: 3;
   flex: 0 0 auto;
   padding: 36px 24px 24px;
-  background: var(--soft);
+  background: var(--panel-ground);
 }
 
 .briefing-header h2 {
