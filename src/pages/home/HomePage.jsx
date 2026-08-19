@@ -406,7 +406,7 @@ export function HomePage() {
                           goInApp(event, href)
                         }}
                       >
-                        <strong>{meeting.title}</strong>
+                        <strong><span>{meeting.title}</span></strong>
 
                         {/*
                           이 서비스가 답하려는 질문이 "내가 없는 동안 무슨 일이

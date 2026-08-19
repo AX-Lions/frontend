@@ -678,7 +678,18 @@ h1 {
   grid-template-rows: auto 1fr;
   position: relative;
   width: 100%;
-  height: var(--card-height, 169px);
+  /*
+    **고정이 아니라 최소값**이다.
+
+    좁은 화면에서 이 값이 132px 까지 줄어드는데, 제목이 두 줄이고 `불참한 회의`
+    뱃지까지 붙으면 내용이 그보다 커진다. 고정해 두면 바닥줄이 카드 밖으로
+    삐져나온다 — 다섯 장이 나란히 서는 줄이라 옆 카드 위에 겹쳐 보인다.
+
+    다섯 장의 키는 그리드가 맞춘다(`align-items: stretch` 가 기본이라
+    가장 큰 카드에 나머지가 따라간다). 최소값은 내용이 적은 카드가 납작해지는
+    것만 막는다.
+  */
+  min-height: var(--card-height, 169px);
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #ffffff;
@@ -723,10 +734,8 @@ h1 {
   바꾸게 둔다.
 */
 .card-foot {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  /* 흐름 안에 둔다. 띄워 두면 제목이 이 자리를 지나간다 — 위 주석 참고. */
+  margin-top: auto;
   display: flex;
   /* 시각이 위, `불참한 회의` 뱃지가 아래다. 한 줄에 나란히 두면 카드가
      정사각형까지 좁아졌을 때 둘이 서로를 밀어냈다. */
@@ -742,14 +751,6 @@ h1 {
   중 어느 것이 그 회의인지가 카드에서 가장 먼저 읽혀야 한다. 요약 카드의
   같은 뱃지와 색을 맞춘다.
 */
-/* 뱃지가 앉는 줄. 비어 있어도 높이를 지킨다. */
-.missed-slot {
-  display: flex;
-  align-items: center;
-  min-height: 22px;
-  margin-top: 8px;
-}
-
 .missed-badge {
   /* **제목 바로 밑**이다. 아래(날짜 옆)에 두면 다섯 장을 훑을 때 눈이 카드
      바닥까지 내려가야 이 회의가 그 회의인지 알 수 있다. 제목을 읽는 자리에서
@@ -789,10 +790,23 @@ h1 {
   줄을 정해 두면 뱃지가 있든 없든 같은 자리다. 뱃지 자리를 비어도 남기는 이유도
   같다 — 그 줄이 사라지면 위가 다시 밀린다.
 */
+/*
+  제목과 바닥줄이 **서로 자리를 나눈다.**
+
+  전에는 블록 흐름에 `.card-foot` 만 `position: absolute` 로 바닥에 붙였다.
+  띄운 상자는 흐름에서 빠지므로 **제목이 그 자리를 그냥 지나간다** — 제목이
+  두 줄이 되는 순간 날짜와 `불참한 회의` 뱃지를 덮어썼다. 카드 높이가
+  고정(`--card-height`)이라 늘어나 피할 수도 없었다.
+
+  세로 flex 로 두고 바닥줄을 `margin-top: auto` 로 민다. 제목이 한 줄이든
+  두 줄이든 바닥줄은 늘 카드 바닥이고, 둘이 겹칠 자리가 아예 없어진다.
+*/
 .project-card-link {
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
 /*
@@ -857,14 +871,42 @@ h1 {
   폭도 124px 로 묶여 있었다. 즐겨찾기 별은 카드 맨 위 줄에만 걸치므로 제목은
   카드 폭을 다 써도 된다. 24px 이 늘면 그만큼 덜 접힌다.
 */
+/*
+  제목은 **두 줄에서 자른다.**
+
+  `-webkit-box` 는 flex 부모의 자식이 되면 브라우저가 `display` 를 `flow-root`
+  로 바꿔 버려 `-webkit-line-clamp` 이 죽는다. 자르기가 안 먹으면 긴 제목이
+  세 줄로 자라 날짜·`불참한 회의` 뱃지 위에 겹쳐 찍힌다.
+
+  한 겹 감싸 그 안에서 자른다 — 바깥 `span` 이 flex 자식으로서 높이를 지키고,
+  안쪽이 `-webkit-box` 로 남아 말줄임을 맡는다.
+*/
 .project-card strong {
-  display: -webkit-box;
+  display: block;
+  overflow: hidden;
   width: 100%;
+  height: 40px;
   min-height: 40px;
+  /*
+    `flex` 속성을 주지 않는다.
+
+    `flex: 0 0 auto` 를 붙였더니 브라우저가 `display` 를 `flow-root` 로
+    바꿔 **`-webkit-line-clamp` 이 죽었다.** 제목이 세 줄 네 줄로 자라 바닥줄
+    위에 겹쳐 찍혔다 — 자르기가 안 먹으면 이 카드는 답이 없다.
+
+    `-webkit-box` 는 그 자체로 크기가 정해지므로(두 줄 + `min-height`)
+    flex 부모 안에서도 안 부푼다.
+  */
   overflow: hidden;
   font-size: 16px;
   font-weight: 600;
   line-height: 1.2;
+}
+
+/* 실제로 자르는 자리. 부모가 높이를 쥐고 있어 여기는 흐름에서 자유롭다. */
+.project-card strong > span {
+  display: -webkit-box;
+  overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
