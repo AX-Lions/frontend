@@ -66,7 +66,7 @@ function TeamHeader({ team, open, onToggle, onOpenGroupRoom }) {
         ) : (
           // 팀 단체방은 서버가 첫 조회 때 만들어 준다. 그래도 안 왔으면
           // 자리를 비우지 않고 왜 없는지 적는다.
-          <span className="team-shortcut disabled" title="이 팀에는 아직 단체방이 없습니다.">
+          <span className="team-shortcut disabled" data-tip="이 팀에는 아직 단체방이 없습니다.">
             단체방 없음
           </span>
         )}

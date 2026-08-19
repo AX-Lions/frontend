@@ -350,6 +350,7 @@ export function HomePage() {
                 className="section-arrow"
                 href="/flow-board"
                 aria-label="회의 화면으로"
+                data-tip="회의 화면으로"
                 onClick={(event) => goInApp(event, '/flow-board')}
               >
                 <img src="/icons/Expandright.svg" alt="" aria-hidden="true" />
@@ -400,6 +401,7 @@ export function HomePage() {
                         className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
                         type="button"
                         aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
+                        data-tip={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
                         disabled={pendingFavorites.includes(meeting.meeting_id)}
                         onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
                       >
@@ -425,7 +427,7 @@ export function HomePage() {
                   className="icon-button"
                   type="button"
                   aria-label="회의 일정 추가"
-                  title="회의 일정 추가"
+                  data-tip="회의 일정 추가"
                   onClick={() => setAddingMeeting(true)}
                 >
                   <img src="/icons/AddIcon.svg" alt="" />
@@ -522,6 +524,7 @@ export function HomePage() {
                     className="section-arrow"
                     href={`/flow-board?meeting=${summary.meeting_id}`}
                     aria-label={`${summary.title} 자세히 보기`}
+                    data-tip="회의 자세히 보기"
                     onClick={(event) => goInApp(event, `/flow-board?meeting=${summary.meeting_id}`)}
                   >
                     <img src="/icons/Expandright.svg" alt="" aria-hidden="true" />

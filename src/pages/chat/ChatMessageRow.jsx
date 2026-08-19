@@ -188,7 +188,7 @@ export function ChatMessageRow({ message, focused, onChanged, onImportantChanged
       {message.is_important ? (
         <span
           className={message.important_confirmed_at ? 'message-mark confirmed' : 'message-mark'}
-          title={message.important_confirmed_at ? '확인한 중요 메시지' : '중요 메시지'}
+          data-tip={message.important_confirmed_at ? '확인한 중요 메시지' : '중요 메시지'}
         >
           <RequestIcon muted={Boolean(message.important_confirmed_at)} small />
         </span>

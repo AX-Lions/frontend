@@ -283,13 +283,13 @@ export function AgentDock() {
 
       <div className="dock-bar">
         <div className="chat-tools">
-          <button type="button" aria-label="새 대화" title="새 대화" onClick={startNew}>
+          <button type="button" aria-label="새 대화" data-tip="새 대화" onClick={startNew}>
             <img src={icons.add} alt="" />
           </button>
           <button
             type="button"
             aria-label="대화 목록"
-            title="대화 목록"
+            data-tip="대화 목록"
             aria-expanded={open && showList}
             onClick={() => {
               setOpen(true)

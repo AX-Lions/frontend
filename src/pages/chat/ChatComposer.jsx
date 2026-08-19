@@ -136,7 +136,7 @@ export function ChatComposer({ roomId, onSent }) {
         <button
           type="button"
           aria-label="파일 첨부"
-          title="파일 첨부"
+          data-tip="파일 첨부"
           disabled={!roomId || busy}
           onClick={() => fileRef.current?.click()}
         >
@@ -147,7 +147,7 @@ export function ChatComposer({ roomId, onSent }) {
           type="button"
           aria-label="중요로 보내기"
           aria-pressed={important}
-          title="중요로 보내면 받는 사람의 중요 채팅에 남습니다."
+          data-tip="중요로 보내면 받는 사람의 중요 채팅에 남습니다."
           disabled={!roomId}
           onClick={() => setImportant((on) => !on)}
         >

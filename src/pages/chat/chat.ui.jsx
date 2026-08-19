@@ -20,7 +20,7 @@ export function IconButton({ children, label, active = false, disabled = false, 
       aria-label={label}
       aria-pressed={active}
       disabled={disabled}
-      title={label}
+      data-tip={label}
       onClick={onClick}
     >
       {children}

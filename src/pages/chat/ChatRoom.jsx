@@ -17,7 +17,7 @@ function DayDivider({ row, onOpenCalendar }) {
     <button
       className="date-divider"
       type="button"
-      title={`${row.label} · 다른 날짜로 이동`}
+      data-tip={`${row.label} · 다른 날짜로 이동`}
       onClick={() => onOpenCalendar(row.date)}
     >
       {row.label}

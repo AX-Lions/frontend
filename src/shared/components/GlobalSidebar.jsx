@@ -93,7 +93,7 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
                   type="button"
                   className="global-sidebar-link global-sidebar-live"
                   aria-label="지금 진행 중인 회의"
-                  title="지금 진행 중인 회의"
+                  data-tip="지금 진행 중인 회의"
                   onClick={openPrompt}
                 >
                   <img src="/icons/LiveMeetingIcon.svg" alt="" />
@@ -108,7 +108,7 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
                 key={item.id}
                 aria-label={item.label}
                 aria-current={current(item.id)}
-                title={item.label}
+                data-tip={item.label}
                 onClick={(event) => onNavigate?.(event, item)}
               >
                 <img src={RAIL_ICON_OVERRIDE[item.id] ?? item.icon} alt="" />
@@ -125,7 +125,7 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
           href={accountItem.href}
           aria-label={accountLabel}
           aria-current={current(accountItem.id)}
-          title={accountLabel}
+          data-tip={accountLabel}
           onClick={(event) => onNavigate?.(event, accountItem)}
         >
           <img src={user?.avatarUrl || '/figma-icons/global-profile.png'} alt="" />
