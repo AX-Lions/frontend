@@ -49,6 +49,9 @@ const DELAY = 120
 
 const EMPTY = { count: 0, results: [] }
 
+/** 화면 안내와 짝이 맞는 데모 Discord 연결 코드. */
+const DEMO_DISCORD_CODE = '4F2A91'
+
 /**
  * 표에 없는 주소.
  *
@@ -574,6 +577,60 @@ function resolve(path, method, body) {
     if (path === '/me/briefing-dismiss') return { dismissed: true }
 
     /*
+      Discord 계정 잇기 · 끊기.
+
+      **아무 코드나 통과시키지 않는다.** 서버는 6자리 코드를 확인하고 틀리면
+      `DISCORD_CODE_INVALID` 를 준다. 여기서 다 통과시키면 화면의 오류 처리가
+      한 번도 안 밟혀, 실서버에서 처음 틀렸을 때 무슨 일이 생기는지 모른다.
+
+      데모 코드는 `4F2A91` 하나다. 화면 안내(`/bordo-connect` 를 치면 코드가
+      온다)와 짝이 맞게, 여기서도 「어디선가 받은 코드」 를 넣는 흉내를 낸다.
+    */
+    if (a === 'me' && b === 'discord' && c === 'link') {
+      if (method === 'DELETE') {
+        patch(`connections:${viewerMe().id}`, { discord_linked: false })
+        return { ...viewerMe(), discord_linked: false }
+      }
+      if (String(body?.connect_code ?? '').toUpperCase() !== DEMO_DISCORD_CODE) {
+        throw mockError({
+          code: 'DISCORD_CODE_INVALID',
+          message: '연결 코드가 올바르지 않습니다.',
+          details: { connect_code: [`올바르지 않은 코드입니다. (데모: ${DEMO_DISCORD_CODE})`] },
+        })
+      }
+      patch(`connections:${viewerMe().id}`, { discord_linked: true })
+      return { ...viewerMe(), discord_linked: true }
+    }
+
+    /*
+      개인 AI 토큰 발급 · 폐기.
+
+      **원문과 붙여 넣을 명령어를 반드시 함께 준다.** 화면이 그 둘을 그대로
+      보여 주고 복사 버튼을 단다 — 안 주면 빈 칸에 「이 토큰은 지금만 보입니다」
+      라고 적힌 화면이 나온다.
+
+      재발급하면 이전 것이 죽는다는 규칙도 흉내 낸다. 여기서 여러 개를 살려
+      두면 화면이 「다시 발급하면 지금 쓰던 것은 즉시 못 쓰게 됩니다」 라고
+      경고해 놓고 실제로는 안 죽는 것을 확인하게 된다.
+    */
+    if (path === '/me/mcp-token') {
+      const me = viewerMe()
+      if (method === 'DELETE') {
+        patch(`connections:${me.id}`, { mcp_token_issued_at: null })
+        return null
+      }
+      const token = `brd_${nextId()}${'x'.repeat(28)}`
+      const at = new Date().toISOString()
+      patch(`connections:${me.id}`, { mcp_token_issued_at: at })
+      return {
+        token,
+        issued_at: at,
+        setup_command: 'claude mcp add --transport http bordo '
+          + `${window.location.origin}/mcp --header "Authorization: Bearer ${token}"`,
+      }
+    }
+
+    /*
       채팅 메시지.
 
       **`sent_at` 이 반드시 있어야 한다.** 없으면 화면이 `new Date(undefined)`
@@ -807,7 +864,18 @@ function resolve(path, method, body) {
       }
     }
 
-    return { ...(body ?? {}), id: `mock-${nextId()}`, ok: true }
+    /*
+      표에 없는 쓰기는 **오류다.**
+
+      전에는 보낸 것을 그대로 돌려주고 `ok: true` 를 붙였다. 그러면 붙인 적 없는
+      기능이 **성공한 것처럼 보인다** — 개인 설정의 연결 카드를 붙였을 때
+      실제로 그랬다. 토큰 발급을 누르면 빈 칸이 나오고, 아무 Discord 코드나
+      넣어도 「이었습니다」 가 떴다.
+
+      조회는 처음부터 이렇게 막고 있었는데(`notMocked`) 쓰기만 관대했다.
+      **가상 데이터가 실서버보다 관대하면 이 모드로 확인하는 의미가 없다.**
+    */
+    throw notMocked(`${method} ${path}`)
   }
 
   return undefined
