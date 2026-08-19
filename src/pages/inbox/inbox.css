@@ -134,9 +134,22 @@
   margin-top: 16px;
 }
 
+/*
+ * 높이는 **바닥이지 천장이 아니다.**
+ *
+ * `height: 194px` 로 못박아 두면 카드 안 내용이 194px 를 넘는 순간 flex 가
+ * 자식들을 눌러서 맞춘다. 눌리는 것은 `overflow: hidden` 이 걸린 제목이라,
+ * 글자가 위아래로 반쯤 잘린 채 남는다 — 줄이 사라지는 게 아니라 글자가
+ * 가로로 썰려서, 언뜻 보면 폰트가 깨진 것처럼 보인다. 화면 배율을 바꾸면
+ * 줄 높이가 소수점으로 반올림되면서 넘치는 양이 달라져 잘리는 정도도 같이
+ * 바뀐다 — "배율에 따라 글자가 깨진다" 로 보이던 것의 정체다.
+ *
+ * 그래서 `min-height` 로 바꾸고 자식들에게 `flex: none` 을 걸어, **눌리는
+ * 대신 카드가 자라게** 한다. 넘치지 않으면 시안대로 194px 그대로다.
+ */
 .inbox-card {
   display: flex;
-  height: 194px;
+  min-height: 194px;
   flex-direction: column;
   padding: 16px;
   border: 1px solid #e5e7eb;
@@ -145,6 +158,7 @@
 
 .inbox-card-head {
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -168,8 +182,13 @@
   background: #ff6450;
 }
 
+/*
+ * 두 줄까지 보여 주고 넘치면 `...` 로 끊는다. 제목 길이는 회의마다 제각각인데
+ * 다 보여 주겠다고 늘리면 카드 높이가 제목 길이대로 들쭉날쭉해진다.
+ */
 .inbox-card-title {
   overflow: hidden;
+  flex: none;
   margin: 0 0 16px;
   color: #1f1f1f;
   font-size: 14px;
@@ -180,15 +199,23 @@
   -webkit-line-clamp: 2;
 }
 
+/*
+ * `margin-top: auto` — 같은 줄의 카드는 격자가 높이를 맞춰 늘리므로(grid 기본
+ * `stretch`), 제목이 한 줄인 카드와 두 줄인 카드가 나란히 서면 아래에 공백이
+ * 남는다. 그 공백을 여기서 먹어 「답변/확인/승인 필요」 줄을 카드 바닥에
+ * 붙인다 — 카드마다 숫자 줄의 높이가 어긋나면 세로로 훑어 읽을 수가 없다.
+ */
 .inbox-card-divider {
   height: 1px;
-  margin: 0 0 12px;
+  flex: none;
+  margin: auto 0 12px;
   border: 0;
   background: #e5e7eb;
 }
 
 .inbox-card-rows {
   display: flex;
+  flex: none;
   flex-direction: column;
   gap: 10px;
 }
