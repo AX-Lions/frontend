@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { navigate } from '../../app/navigation.js'
 import { dismissBriefing } from './home.api.js'
+import './briefingPrompt.css'
 
 /**
  * 읽지 않은 브리핑이 있을 때 홈에서 뜨는 팝업.
@@ -97,28 +98,28 @@ export function BriefingPrompt({ briefing, onClose }) {
 
   return (
     <div
-      className="delegate-backdrop"
+      className="briefing-backdrop"
       role="presentation"
       onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
     >
       <div
-        className="delegate-dialog briefing-dialog"
+        className="briefing-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="briefing-title"
       >
-        <header className="delegate-header">
-          <div>
-            <h2 id="briefing-title">확인하지 않은 브리핑이 있습니다</h2>
-            <p>자리를 비운 사이 회의에서 무슨 일이 있었는지 정리해 두었습니다.</p>
-          </div>
-          {/* `onClick={onClose}` 로 넘기면 클릭 이벤트가 첫 인자로 들어가,
-              홈이 그것을 **저장 결과로 읽는다.** 인자 없이 부른다. */}
-          <button ref={closeRef} type="button" aria-label="닫기" onClick={() => onClose()}>×</button>
-        </header>
+        <div className="briefing-modal-body">
+          {/* 시안(`666:5231`)의 팝업은 제목 두 줄과 설명 한 줄이 가운데로
+              모인 모양이다. 닫기(×)는 없다 — 답은 아래 두 버튼으로만 한다.
+              그래도 Esc·바깥 클릭은 살려 둔다(위 `useEffect` · `onClick`). */}
+          <h2 id="briefing-title">
+            확인하지 않은 브리핑이 있습니다.
+            <br />
+            지금 보시겠습니까?
+          </h2>
+          <p>자리를 비운 사이 회의에서 무슨 일이 있었는지 정리해 두었습니다.</p>
 
-        <div className="delegate-body">
-          <label className="briefing-always">
+          <label className="briefing-modal-always">
             <input
               type="checkbox"
               checked={always}
@@ -128,17 +129,23 @@ export function BriefingPrompt({ briefing, onClose }) {
             <span>홈에 들어오면 브리핑을 바로 엽니다</span>
           </label>
 
-          {error ? <p className="delegate-error" role="alert">{error}</p> : null}
+          {error ? <p className="briefing-modal-error" role="alert">{error}</p> : null}
         </div>
 
-        <footer className="delegate-footer">
-          <button className="delegate-cancel" type="button" disabled={busy} onClick={() => finish(false)}>
+        <div className="briefing-modal-actions">
+          <button
+            ref={closeRef}
+            className="briefing-modal-later"
+            type="button"
+            disabled={busy}
+            onClick={() => finish(false)}
+          >
             나중에 보기
           </button>
-          <button className="delegate-save" type="button" disabled={busy} onClick={() => finish(true)}>
+          <button className="briefing-modal-go" type="button" disabled={busy} onClick={() => finish(true)}>
             브리핑 보러가기
           </button>
-        </footer>
+        </div>
       </div>
     </div>
   )

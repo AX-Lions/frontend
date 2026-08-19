@@ -35,20 +35,32 @@ body,
   box-sizing: border-box;
 }
 
-.home-layout button,
-.home-layout input,
-.home-layout a {
+/*
+  홈 레이아웃 안의 기본값 지우기.
+  ── 반드시 `:where()` 안에 둔다 ──
+
+  예전에는 `.home-layout button { background: transparent }` 이었다. 선택자
+  점수가 `클래스+요소`(0,1,1)라 **홑클래스로 쓴 단추 규칙보다 세다.** 그래서
+  이 레이아웃을 빌려 쓰는 화면·팝업이 배경을 적어 놓고도 전부 투명해졌다 —
+  회의 일정의 `일정 추가하기` 와 달력 일정 카드, 브리핑 팝업의 버튼 두 개가
+  그렇게 색을 잃고 있었다. 고칠 때마다 앞에 `.home-layout` 을 덧붙이는 것은
+  같은 사고를 계속 낳는다.
+
+  `:where()` 안의 것은 점수가 0 이다. 셋 다 감싸면 이 블록 전체가 0,0,0 이
+  되어 **어떤 클래스 규칙이든 이긴다** — 초기화가 원래 해야 하는 일이다.
+*/
+:where(.home-layout) :where(button, input, a) {
   font: inherit;
 }
 
-.home-layout button {
+:where(.home-layout) :where(button) {
   border: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
 }
 
-.home-layout a {
+:where(.home-layout) :where(a) {
   color: inherit;
   text-decoration: none;
 }
@@ -607,24 +619,64 @@ h1 {
   height: 24px;
 }
 
-/* 카드 다섯 장이 가로로 늘어선다. 좁아지거나 확대하면 뒤쪽이 잘리는데
-   `overflow: hidden` 이라 **닿을 방법이 없었다.** 넘치면 밀어서 볼 수 있게 한다 —
-   잘린 것과 스크롤되는 것은 사용자에게 전혀 다르다. */
+/*
+  카드 다섯 장이 가로로 늘어선다.
+
+  ## 정사각형이 바닥이다
+
+  예전에는 폭이 `calc((100% - 64px) / 5)` 였다 — 창을 줄이면 다섯 장이 끝까지
+  같이 홀쭉해져서, 시안(`576:4425`)의 180×169 카드가 세로로 긴 조각이 되고
+  제목 두 줄이 들어갈 자리가 사라졌다. 이제 **높이(= 정사각형)까지만 줄고**
+  그 아래로는 안 줄어든다. 더 좁아지면 뒤쪽 카드는 잘리는 대신 가로로 밀린다 —
+  잘린 것과 스크롤되는 것은 사용자에게 전혀 다르다.
+
+  높이는 세로가 짧은 화면에서 함께 줄기 때문에(아래 `@media (max-height: …)`)
+  변수로 들고 다닌다. 그래야 "정사각형" 의 기준이 늘 지금 카드 높이다.
+*/
 .project-strip {
+  --card-height: 169px;
+
   display: grid;
-  grid-auto-columns: 180px;
+  grid-auto-columns: clamp(var(--card-height), calc((100% - 64px) / 5), 180px);
   grid-auto-flow: column;
   gap: 16px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 2px;
+  /* 스크롤바와 카드 사이의 틈. `2px` 이라 막대가 카드에 붙어 있었다. */
+  padding-bottom: 14px;
   scrollbar-width: thin;
+  scrollbar-color: #e5e7eb transparent;
+}
+
+/* WebKit 은 `scrollbar-color` 를 안 읽는다. 같은 연회색을 따로 적어 준다. */
+.project-strip::-webkit-scrollbar {
+  height: 8px;
+}
+
+/* 양 끝의 화살표 단추. 안 지우면 막대 대신 이것들이 먼저 눈에 띈다. */
+.project-strip::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.project-strip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.project-strip::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.project-strip::-webkit-scrollbar-thumb:hover {
+  background: #d1d5db;
 }
 
 .project-card {
   position: relative;
-  width: 180px;
-  height: 169px;
+  width: 100%;
+  height: var(--card-height, 169px);
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #ffffff;
@@ -658,13 +710,26 @@ h1 {
   outline-offset: 2px;
 }
 
-/* 시각과 뱃지가 카드 바닥에 함께 앉는다. */
+/*
+  시각과 뱃지가 카드 바닥에 함께 앉는다.
+
+  `margin-top: auto` 로 밀어 두었는데, 부모(`.project-card-link`)가 flex 가
+  아니라 블록 흐름이라 **아무 일도 안 하고 있었다**(제목 두 줄 말줄임을
+  살리려고 일부러 블록으로 둔 것이다 — 그쪽 주석 참고). 제목이 한 줄이면
+  이 줄이 카드 중간에 떠 있었고, 카드가 정사각형까지 좁아지자 뱃지와 시각이
+  한 줄에 안 들어가 서로 밀어냈다. 바닥에 붙여 놓고, 안 들어가면 줄을
+  바꾸게 둔다.
+*/
 .card-foot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: auto;
+  gap: 4px 8px;
 }
 
 /*
@@ -695,6 +760,7 @@ h1 {
  * 만들어 줘야 줄이 갈린다.
  */
 .project-card-link {
+  position: relative;
   display: block;
   height: 100%;
 }
@@ -705,7 +771,9 @@ h1 {
 }
 
 .project-card .meeting-company {
-  max-width: 108px;
+  /* 별(24px)과 그 왼쪽 여백만큼 비워 둔다. 108px 고정이면 카드가 정사각형
+     까지 좁아졌을 때 이름이 별 밑으로 들어간다. */
+  max-width: calc(100% - 32px);
   margin-bottom: 18px;
   overflow: hidden;
   color: #1f1f1f;
@@ -719,7 +787,7 @@ h1 {
    (`.project-card-link` 주석 참고). */
 .project-card strong {
   display: -webkit-box;
-  width: min(100%, 124px);
+  width: 100%;
   min-height: 40px;
   overflow: hidden;
   font-size: 16px;
@@ -1190,14 +1258,6 @@ h1 {
     width: 100%;
   }
 
-  .project-strip {
-    grid-auto-columns: calc((100% - 64px) / 5);
-  }
-
-  .project-card {
-    width: 100%;
-  }
-
   .dashboard-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1222,21 +1282,30 @@ h1 {
     margin-top: 64px;
   }
 
-  .project-strip {
-    grid-auto-columns: 180px;
-    overflow-x: auto;
-  }
-
-  .dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .chat-dock {
     width: min(375px, calc(100vw - 32px));
   }
 
   .chat-dock.is-open {
     width: min(420px, calc(100vw - 32px));
+  }
+}
+
+/*
+  「오늘 일정」·「최근 회의」를 한 열로 내리는 지점.
+
+  1360px 아래로는 두 패널이 절반씩 나눠 가지는데, 창이 1180px 밑으로 가면
+  한 패널이 320px 도 안 된다. 그 안에서 시각(74px) · 제목 · 참여 단추(126px)
+  가 한 줄에 앉으려다 **제목 칸이 0 이 되어 글자가 한 자씩 세로로 떨어졌다.**
+  나란히 두는 것보다 한 열로 내리는 편이 읽힌다.
+*/
+@media (max-width: 1180px) {
+  .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .schedule-info {
+    max-width: none;
   }
 }
 
@@ -1318,8 +1387,11 @@ h1 {
     font-size: 18px;
   }
 
+  .project-strip {
+    --card-height: 132px;
+  }
+
   .project-card {
-    height: 132px;
     padding: 14px;
   }
 
@@ -1447,8 +1519,11 @@ h1 {
     margin-top: 34px;
   }
 
+  .project-strip {
+    --card-height: 112px;
+  }
+
   .project-card {
-    height: 112px;
     padding: 10px 12px;
   }
 

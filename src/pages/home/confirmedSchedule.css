@@ -34,7 +34,9 @@
   box-sizing: border-box;
 }
 
-.cs-dialog button {
+/* 초기화는 점수 0 으로. `.cs-dialog button`(0,1,1) 은 `.cs-cancel`(0,1,0)
+   보다 세서, 아래에서 칠한 배경을 도로 지우고 있었다. */
+:where(.cs-dialog) :where(button) {
   border: 0;
   background: transparent;
   color: inherit;

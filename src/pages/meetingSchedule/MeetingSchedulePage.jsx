@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { navigate } from '../../app/navigation.js'
 import { getCurrentTeamId, onCurrentTeamChange } from '../../lib/currentTeam.js'
 import { useResource } from '../../lib/useResource.js'
 import { Loading, LoadError } from '../../shared/components/LoadState.jsx'
+import { ConfirmedScheduleDialog } from '../home/ConfirmedScheduleDialog.jsx'
 import { NewProjectDialog } from '../home/NewProjectDialog.jsx'
 import { Sidebar } from '../home/Sidebar.jsx'
-import { fetchHome } from '../home/home.api.js'
+import { fetchHome, fetchTeamMembers } from '../home/home.api.js'
 // `Sidebar` 는 자기 스타일을 안 갖고 다닌다(`.sidebar` · `.home-layout` 이
 // 전부 `home.css` 에 있다) — 홈 화면이 부르는 대로 여기서도 함께 가져온다.
 import '../home/home.css'
@@ -56,6 +56,27 @@ export function MeetingSchedulePage() {
   const [eventsByProject, setEventsByProject] = useState({})
   const [addingProject, setAddingProject] = useState(false)
   const [addingEvent, setAddingEvent] = useState(false)
+  /*
+    달력의 일정 한 칸을 눌렀을 때 뜨는 「확정된 일정 확인」 팝업(시안
+    `697:9393`)이 보여 줄 일정.
+
+    예전에는 누르면 곧장 플로우 화면으로 넘어갔다 — 그것도 `related_meeting`
+    이 있을 때만이고, 서버가 주는 값은 거의 전부 `null` 이라 **실제로는 눌러도
+    아무 일도 일어나지 않았다.** 홈 「오늘 일정」은 같은 클릭에 이 팝업을
+    띄우는데 달력만 달랐다. 확인은 팝업이 하고, 이동은 팝업 안의 `회의 보기`
+    가 한다.
+  */
+  const [confirming, setConfirming] = useState(null)
+
+  /*
+    참여자 id → 이름.
+
+    달력 한 칸(`CalendarEvent`)은 `participant_ids` 만 준다. 팝업은 이름을
+    보여 줘야 하는데, 회의가 안 걸린 일정은 이름을 물어볼 회의도 없다. 팀
+    구성원 목록이 그 답을 갖고 있으므로 보이는 프로젝트들의 팀만 한 번씩
+    읽어 표를 만든다.
+  */
+  const [nameById, setNameById] = useState({})
 
   const homeData = home.data
 
@@ -97,6 +118,39 @@ export function MeetingSchedulePage() {
     return () => { alive = false }
   }, [projects, from, to])
 
+  const teamIds = useMemo(
+    () => [...new Set(projects.map((project) => project.team_id).filter(Boolean))],
+    [projects],
+  )
+
+  useEffect(() => {
+    let alive = true
+    teamIds.forEach((teamId) => {
+      fetchTeamMembers(teamId)
+        .then((body) => {
+          if (!alive) {
+            return
+          }
+          // `GET /teams/{id}/members` 는 `{ count, results }` 로 감싸 준다.
+          const members = Array.isArray(body) ? body : (body?.results ?? [])
+          setNameById((current) => {
+            const next = { ...current }
+            members.forEach((member) => {
+              // 팀마다 응답 모양이 조금씩 다르다(`user_id` 또는 `id`).
+              const id = member.user_id ?? member.id
+              if (id && member.name) {
+                next[id] = member.name
+              }
+            })
+            return next
+          })
+        })
+        // 이름을 못 읽어도 팝업은 떠야 한다. 참여자 줄만 비운다.
+        .catch(() => {})
+    })
+    return () => { alive = false }
+  }, [teamIds])
+
   const monthEvents = useMemo(() => {
     const list = []
     projects.forEach((project) => {
@@ -128,10 +182,26 @@ export function MeetingSchedulePage() {
   const totalDays = daysInMonth(visibleMonth)
   const cells = Array.from({ length: 42 }, (_, index) => index - firstWeekday + 1)
 
+  /** `8월 18일 14:00 ~ 15:00` — 시안 `697:9393` 의 둘째 줄. */
+  const whenLabel = (row) => {
+    const at = new Date(row.start_at)
+    const day = `${at.getMonth() + 1}월 ${at.getDate()}일`
+    return `${day} ${hhmm(row.start_at)} ~ ${hhmm(row.end_at ?? row.start_at)}`
+  }
+
   const openEvent = (row) => {
-    if (row.related_meeting) {
-      navigate(`/flow-board?meeting=${row.related_meeting}`)
-    }
+    setConfirming({
+      meetingId: row.related_meeting ?? null,
+      schedule: {
+        title: row.title,
+        teamName: row.team_name,
+        projectName: row.project_name,
+        when: whenLabel(row),
+        participantNames: (row.participant_ids ?? [])
+          .map((id) => nameById[id])
+          .filter(Boolean),
+      },
+    })
   }
 
   if (home.loading && !homeData) {
@@ -155,6 +225,7 @@ export function MeetingSchedulePage() {
   return (
     <div className="home-layout">
       <Sidebar
+        active="meeting"
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((c) => !c)}
         favoriteProjects={(homeData.favorite_projects ?? []).filter(inCurrentTeam)}
@@ -179,6 +250,7 @@ export function MeetingSchedulePage() {
               type="button"
               className="msched-chevron is-prev"
               aria-label="이전 달"
+              data-tip="이전 달"
               onClick={() => setVisibleMonth((m) => addMonths(m, -1))}
             >
               <img src="/icons/Expandright.svg" alt="" />
@@ -188,6 +260,7 @@ export function MeetingSchedulePage() {
               type="button"
               className="msched-chevron"
               aria-label="다음 달"
+              data-tip="다음 달"
               onClick={() => setVisibleMonth((m) => addMonths(m, 1))}
             >
               <img src="/icons/Expandright.svg" alt="" />
@@ -226,9 +299,8 @@ export function MeetingSchedulePage() {
                       {rows.map((row) => (
                         <button
                           type="button"
-                          className="msched-event"
+                          className={row.status === 'CONFIRMED' ? 'msched-event is-confirmed' : 'msched-event'}
                           key={row.id}
-                          disabled={!row.related_meeting}
                           onClick={() => openEvent(row)}
                         >
                           <strong>{row.team_name ?? row.project_name}</strong>
@@ -255,6 +327,14 @@ export function MeetingSchedulePage() {
             recent_projects: [project, ...(current.recent_projects ?? [])],
             project_progress: [project, ...(current.project_progress ?? [])],
           } : current))}
+        />
+      ) : null}
+
+      {confirming ? (
+        <ConfirmedScheduleDialog
+          meetingId={confirming.meetingId}
+          schedule={confirming.schedule}
+          onClose={() => setConfirming(null)}
         />
       ) : null}
 
