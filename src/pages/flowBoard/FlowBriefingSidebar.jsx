@@ -130,7 +130,7 @@ export function FlowBriefingSidebar({
         </section>
 
         <BriefSection
-          title="확인이 필요해요"
+          data-tip="확인이 필요해요"
           cards={confirmations}
           emptyText="확인할 변경이 없습니다."
           renderCard={(card) => (
@@ -145,7 +145,7 @@ export function FlowBriefingSidebar({
         />
 
         <BriefSection
-          title="나에게 요청한 내용"
+          data-tip="나에게 요청한 내용"
           cards={requests}
           emptyText="나에게 온 요청이 없습니다."
           renderCard={(card) => (
@@ -158,7 +158,7 @@ export function FlowBriefingSidebar({
         />
 
         <BriefSection
-          title="답변이 필요해요"
+          data-tip="답변이 필요해요"
           cards={answers}
           emptyText="대리인이 유보한 질문이 없습니다."
           renderCard={(card) => (
