@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { AppLink } from '../../app/AppLink.jsx'
-import { useSearchParam } from '../../app/navigation.js'
+import { navigate, useSearchParam } from '../../app/navigation.js'
 import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
 import { LoadError, Loading } from '../../shared/components/LoadState.jsx'
@@ -206,6 +206,65 @@ function PrepShell({ children }) {
   )
 }
 
+/**
+ * "설정을 완료했습니다" 모달.
+ *
+ * 논쟁점에 전부 답하고 Bordo 활동 설정까지 적용했을 때만 뜬다 — 준비가
+ * 실제로 끝났다는 확인이지, 저장 버튼을 눌렀다는 확인이 아니다. 하나만
+ * 됐는데 여기서 끝났다고 하면 사용자는 나머지를 잊고 회의로 넘어간다.
+ */
+function CompleteModal({ onClose }) {
+  const homeButtonRef = useRef(null)
+
+  useEffect(() => {
+    homeButtonRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="prep-complete-backdrop"
+      role="presentation"
+      onClick={(event) => { if (event.target === event.currentTarget) onClose() }}
+    >
+      <div
+        className="prep-complete-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="prep-complete-title"
+      >
+        <button className="prep-complete-close" type="button" aria-label="닫기" onClick={onClose}>
+          ×
+        </button>
+        <h2 id="prep-complete-title">설정을 완료했습니다</h2>
+        <p>
+          모든 논쟁점에 입장을 남기고 Bordo 활동 설정까지 마쳤습니다.
+          회의 시간이 되면 Bordo가 대신 참석해 처리합니다.
+        </p>
+        {/* 닫기(×)는 이 화면에 남아 더 손보게 하고, 이 버튼은 준비가 끝났다는
+            사람의 판단을 그대로 따라 홈으로 데려간다. */}
+        <button
+          ref={homeButtonRef}
+          className="prep-complete-home"
+          type="button"
+          onClick={() => navigate('/')}
+        >
+          홈으로 가기
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function DelegatePrepPage() {
   const meetingId = useSearchParam('meeting')
 
@@ -264,6 +323,7 @@ export function DelegatePrepPage() {
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [showComplete, setShowComplete] = useState(false)
   const stanceInputRef = useRef(null)
   const menuRef = useRef(null)
   const panelRef = useRef(null)
@@ -341,6 +401,15 @@ export function DelegatePrepPage() {
   const orderOf = (rowId) => rows.find((row) => row.id === rowId)?.order ?? 0
   const stacked = [...entries]
     .sort((a, b) => (b.seq - a.seq) || (orderOf(a.rowId) - orderOf(b.rowId)))
+
+  /*
+    "완료" 모달을 띄울지 판단하는 기준.
+
+    논쟁점 하나하나가 아니라 **전부** 답했는지를 본다. 하나라도 `답변필요` 로
+    남아 있으면 회의에서 대리인이 그 쟁점에 대해 할 말이 없다 — 준비가 끝난
+    것이 아니다. 논쟁점이 하나도 없는 회의는 답할 것이 없으므로 통과시킨다.
+  */
+  const allAnswered = rows.length === 0 || rows.every((row) => Boolean(latestOf(row)))
 
   /*
     같은 논쟁점의 답은 **라벨 하나 아래로 묶는다.**
@@ -531,6 +600,10 @@ export function DelegatePrepPage() {
       setNotice(mode === 'current'
         ? '평소 설정으로 Bordo에게 맡겼습니다.'
         : '이번 회의에만 적용해 Bordo에게 맡겼습니다.')
+      // 이 적용으로 "논쟁점 전부 답변 + 설정 적용" 이 둘 다 갖춰졌을 때만 뜬다.
+      if (allAnswered) {
+        setShowComplete(true)
+      }
       return true
     } catch (caught) {
       setError(caught?.message || '적용하지 못했습니다.')
@@ -571,6 +644,13 @@ export function DelegatePrepPage() {
     if (!openRow || !text || busy) {
       return
     }
+    /*
+      **고치는 중이었는지를 먼저 붙잡아 둔다.**
+
+      저장이 끝나면 `editingId` 를 비우는데, 다음 줄로 넘어갈지 말지는 그 값으로
+      정한다. 비운 뒤에 읽으면 고치던 사람도 다음 줄로 끌려간다.
+    */
+    const wasEditing = Boolean(editingId)
     setBusy('stance')
     setError('')
     try {
@@ -590,6 +670,41 @@ export function DelegatePrepPage() {
       setStanceText('')
       setEditing(false)
       setEditingId(null)
+
+      /*
+        저장이 끝나면 **다음 논쟁점으로 넘어간다.**
+
+        세 줄을 차례로 답하는 것이 이 화면에서 하는 일인데, 저장할 때마다 목록으로
+        돌아가 다음 줄을 찾아 누르게 하면 같은 동작을 논쟁점 수만큼 반복한다.
+        다음 줄이 펼쳐지면서 그 줄의 예측 근거가 바로 보이고 칸도 그 줄을 가리킨다.
+
+        **서버가 받은 뒤에 넘어간다.** 보내는 것과 동시에 넘기면, 저장이 실패해도
+        화면은 이미 다음 줄에 가 있어 방금 쓴 글이 어디로 갔는지 알 수 없다.
+
+        **고칠 때는 넘어가지 않는다.** 그 한 장을 바로잡으러 온 것이지 다음을
+        쓰러 온 것이 아니라, 넘어가 버리면 방금 고친 결과를 확인할 자리를 잃는다.
+
+        마지막 줄이면 아무 데도 가지 않고 닫는다. 첫 줄로 되돌리면 이미 답한 것을
+        다시 답하라는 뜻으로 읽힌다.
+      */
+      const next = wasEditing
+        ? openRow
+        : (rows
+          .filter((row) => row.order > openRow.order)
+          .sort((a, b) => a.order - b.order)[0] ?? null)
+
+      setOpenId(next?.id ?? null)
+
+      /*
+        쓰던 칸에 초점을 남긴다.
+
+        보낸 단추는 칸이 비는 순간 꺼진다. 초점을 옮겨 두지 않으면 그 단추와 함께
+        사라져 문서 맨 앞으로 풀리고, 키보드로 쓰던 사람은 목록을 처음부터 다시
+        훑어야 다음 칸에 닿는다.
+      */
+      if (next) {
+        window.requestAnimationFrame(() => stanceInputRef.current?.focus())
+      }
     } catch (caught) {
       // 길이 제한처럼 서버가 이유를 말해 주는 것이 있다. 그대로 보여 준다.
       setError(caught?.message || '입장을 저장하지 못했습니다.')
@@ -1110,6 +1225,8 @@ export function DelegatePrepPage() {
           </button>
         ) : null}
       </section>
+
+      {showComplete ? <CompleteModal onClose={() => setShowComplete(false)} /> : null}
     </PrepShell>
   )
 }
