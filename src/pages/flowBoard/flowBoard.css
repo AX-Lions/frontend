@@ -483,7 +483,14 @@
   line-height: 1;
 }
 
-.meeting-title button {
+/*
+  자식 선택자로 좁힌다. 자손(`.meeting-title button`)으로 두면 아래 회의 선택
+  드롭다운 항목까지 걸려 **항목이 16px 정사각형으로 찌그러졌다** — 제목이 한
+  글자씩 세로로 꺾이고 항목끼리 겹쳤다. `.meeting-menu button` 이 뒤에 오지만
+  명시도가 같고 `width` · `height` · `display` 를 선언하지 않아 이 값이 그대로
+  살아남는다. 여기서 노리는 것은 회의명 옆 펼침 아이콘 하나뿐이다.
+*/
+.meeting-title > button {
   display: inline-flex;
   width: 16px;
   height: 16px;
