@@ -390,6 +390,7 @@ export function HomePage() {
                           className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
                           type="button"
                           aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
+                          data-tip={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
                           disabled={pendingFavorites.includes(meeting.meeting_id)}
                           onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
                         >
@@ -405,7 +406,7 @@ export function HomePage() {
                           goInApp(event, href)
                         }}
                       >
-                        <strong>{meeting.title}</strong>
+                        <strong><span>{meeting.title}</span></strong>
 
                         {/*
                           이 서비스가 답하려는 질문이 "내가 없는 동안 무슨 일이
@@ -424,18 +425,7 @@ export function HomePage() {
                             <span className="missed-badge">불참한 회의</span>
                           ) : null}
                         </span>
-                        <time>{meeting.displayed_at}</time>
                       </a>
-                      <button
-                        className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
-                        type="button"
-                        aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
-                        data-tip={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
-                        disabled={pendingFavorites.includes(meeting.meeting_id)}
-                        onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
-                      >
-                        <img src={meeting.is_favorite ? starIcons.active : starIcons.inactive} alt="" />
-                      </button>
                     </article>
                   )
                 })}
