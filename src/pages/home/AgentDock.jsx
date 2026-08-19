@@ -275,7 +275,15 @@ export function AgentDock({ inline = false }) {
         <div className="dock-panel">
           <div className="dock-panel-head">
             <strong>{showList ? '대화 목록' : 'Bordo 에게 물어보기'}</strong>
-            <button type="button" aria-label="접기" onClick={() => setOpen(false)}>×</button>
+            <button
+              className="dock-close"
+              type="button"
+              aria-label="접기"
+              data-tip="접기"
+              onClick={() => setOpen(false)}
+            >
+              ×
+            </button>
           </div>
 
           {showList ? (

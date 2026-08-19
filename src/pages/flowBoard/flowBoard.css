@@ -27,6 +27,9 @@
   --ink: #1f1f1f;
   --muted: #60646c;
   --soft: #fafafb;
+  /* 우측 패널 바탕. Bordo 입력칸과 같은 값이라 한 곳에 둔다 — 두 군데 적으면
+     한쪽만 고쳤을 때 패널 안에 경계선이 생긴다. */
+  --panel-tint: rgb(0 38 98 / 5%);
   --surface: #ffffff;
   --panel: #f7f7f8;
   --line: #e5e7eb;
@@ -1284,16 +1287,30 @@
   flex-direction: column;
   overflow: hidden;
   border-left: 1px solid var(--border);
-  background: var(--soft);
+  /*
+    패널 **전체**가 한 바탕이다.
+
+    `--soft`(#FAFAFB) 였는데, 맨 아래 Bordo 입력칸만 남색 5% 라 같은 패널 안에
+    바탕이 둘이었다. 경계가 가로줄로 보여서 입력칸이 패널에 딸린 것이 아니라
+    그 밑에 따로 붙은 상자처럼 읽혔다. 입력칸 쪽 색으로 통일한다 — 이쪽이
+    카드(흰색)와 대비가 더 서서 무엇이 읽을 것이고 무엇이 바탕인지 갈린다.
+  */
+  background: var(--panel-tint);
   scrollbar-width: none;
 }
 
+/*
+  바탕을 **다시 깔지 않는다.**
+
+  `--panel-tint` 는 반투명이라, 패널이 이미 깔아 둔 위에 머리가 한 번 더 깔면
+  그 칸만 두 겹이 되어 진해진다 — 검색칸 아래에 없던 가로 경계가 생겼다.
+  머리는 흐름 안의 형제라 스크롤 내용이 밑으로 파고들 일도 없다.
+*/
 .briefing-header {
   position: relative;
   z-index: 3;
   flex: 0 0 auto;
   padding: 36px 24px 24px;
-  background: var(--soft);
 }
 
 .briefing-header h2 {
@@ -2046,7 +2063,8 @@
   border-top: 1px solid var(--border);
   border-radius: 0;
   padding: 24px;
-  background: rgb(0 38 98 / 5%);
+  /* 패널이 이미 이 색이다. 여기서 한 번 더 깔면 반투명이 겹쳐 이 칸만 진해진다. */
+  background: transparent;
   box-shadow: none;
 }
 

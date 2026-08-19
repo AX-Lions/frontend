@@ -1141,16 +1141,36 @@ h1 {
   font-weight: 600;
 }
 
-.dock-panel-head button {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+/*
+  접기(×).
+
+  24px 상자에 16px 글자였다. 제목(13px)보다 겨우 세 단계 큰 글리프라 **표시가
+  아니라 먼지처럼** 보였고, 과녁도 손가락보다 작았다. 28px 로 넓히고 글자를
+  키운다.
+
+  `line-height: 1` 만으로는 `×` 가 상자 가운데 안 온다 — 글꼴이 이 글리프를
+  기준선 위로 올려 그린다. flex 로 가운데를 잡는다.
+
+  **클래스로 잡는다.** `.dock-panel-head button`(0,1,1) 은 플로우 화면의
+  `.flow-board-page button { font: inherit }`(같은 0,1,1) 와 점수가 같아서,
+  나중에 실리는 그쪽이 이겨 글자 크기가 제목 크기(13px)로 되돌아갔다. 상자만
+  커지고 글리프는 그대로라 더 초라해 보였다.
+*/
+.dock-panel-head .dock-close {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
   color: #60646c;
-  font-size: 16px;
+  font-size: 22px;
   line-height: 1;
+  transition: background 120ms ease;
 }
 
-.dock-panel-head button:hover {
+.dock-panel-head .dock-close:hover {
   background: #f3f4f6;
 }
 
