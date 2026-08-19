@@ -29,6 +29,12 @@
   pointer-events: none;
 }
 
+/*
+  시안(`576:4858` `글로벌사이드바_회의아이콘`)의 단추는 52×40, 왼쪽만 둥근
+  모서리(`8px 0 0 8px`)로 레일 오른쪽 벽에 붙고, 아이콘은 그 안에서
+  왼쪽으로 붙는다 — 가운데 원이 아니다. `align-items: flex-end` 로
+  단추를 오른쪽 벽에 붙인다.
+*/
 .global-sidebar-nav {
   display: flex;
   width: 100%;
@@ -37,24 +43,59 @@
   gap: 32px;
 }
 
-.global-sidebar-link,
+.global-sidebar-link {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 .global-sidebar-user {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
   border: 0;
   background: transparent;
   cursor: pointer;
 }
 
 .global-sidebar-link {
+  position: relative;
   width: 52px;
   height: 40px;
+  padding-left: 8px;
   border-radius: 8px 0 0 8px;
   transition:
     background 120ms ease,
     transform 120ms ease;
+}
+
+/*
+  아이콘 오른쪽 위 모서리에 걸친다. 아이콘이 칸 왼쪽에 붙어 있으므로
+  `right` 가 아니라 `left` 로 그 자리를 잡는다 — `right` 를 쓰면 52px 짜리
+  칸의 오른쪽 빈 자리(아이콘이 없는 곳)에 뱃지가 떨어져 아이콘과 따로 논다.
+  `overflow: hidden` 이 없어야 위로 튀어나온 부분이 안 잘린다 — 전에는
+  링크에도 걸려 있어서(아바타를 원으로 자르던 규칙과 같이 쓰고 있었다)
+  뱃지 절반이 통째로 잘려 나갔다.
+*/
+.global-sidebar-badge {
+  position: absolute;
+  top: -4px;
+  left: 24px;
+  display: flex;
+  min-width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #ff6450;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
 }
 
 .global-sidebar-link:hover,
@@ -85,6 +126,7 @@
   width: 48px;
   height: 48px;
   padding: 6px;
+  overflow: hidden;
   border-radius: 999px;
   background: transparent;
   transition:
@@ -102,4 +144,14 @@
 
 .global-sidebar-user.active {
   box-shadow: inset 0 0 0 2px #002662;
+}
+
+/* 지금 진행 중인 회의가 있을 때 `회의` 자리에 대신 뜨는 아이콘. 옅은 색으로
+   눈에 띄게 해 둔다 — 다른 아이콘과 똑같아 보이면 놓치기 쉽다. */
+.global-sidebar-live {
+  background: rgba(255, 100, 80, 0.12);
+}
+
+.global-sidebar-live:hover {
+  background: rgba(255, 100, 80, 0.2);
 }

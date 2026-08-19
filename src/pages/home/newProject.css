@@ -56,6 +56,25 @@
   font-weight: 600;
 }
 
+.np-lead {
+  margin: -24px 0 0;
+  color: #60646c;
+  font-size: 13px;
+}
+
+/* 팀·프로젝트를 나란히(회의 일정 추가, 시안 `692:8292`). 좁아지면 세로로
+   쌓는다 — 640px 짜리 팝업에 384px 최소폭 둘을 나란히 두면 넘친다. */
+.np-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.np-row .np-team {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
 .np-body {
   display: flex;
   flex-direction: column;

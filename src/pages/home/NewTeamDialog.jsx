@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 
 import { createInviteCode, createTeam } from './home.api.js'
 import { TextBox } from './newProjectBits.jsx'
-import { useEscapeToClose } from './useEscapeToClose.js'
+import { useEscapeToClose } from '../../shared/hooks/useEscapeToClose.js'
 import { TIME_ZONES, currentTimeZone, matchesZone, offsetLabel, zoneOf } from './timezones.js'
 
 /**

@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './Sidebar.jsx'
 import { AgentDock } from './AgentDock.jsx'
 import { BriefingPrompt } from './BriefingPrompt.jsx'
+import { ConfirmedScheduleDialog } from './ConfirmedScheduleDialog.jsx'
+import { NewMeetingDialog } from './NewMeetingDialog.jsx'
 import { NewProjectDialog } from './NewProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { navigate } from '../../app/navigation.js'
+import { getCurrentTeamId, onCurrentTeamChange } from '../../lib/currentTeam.js'
 import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
-import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 import { TeamOnboarding } from './TeamOnboarding.jsx'
 
@@ -50,6 +52,9 @@ export function HomePage() {
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
   const [pendingFavorites, setPendingFavorites] = useState([])
   const [addingProject, setAddingProject] = useState(false)
+  const [addingMeeting, setAddingMeeting] = useState(false)
+  // 「오늘 일정」 한 줄을 눌렀을 때 뜨는 확정된 일정 확인 팝업의 대상 회의.
+  const [confirmingMeetingId, setConfirmingMeetingId] = useState(null)
   /*
     사이드바 접힘은 **레일과 프로젝트 목록이 함께 본다.** 접었을 때 레일만
     남으면 왼쪽이 여전히 두 칸이라 접힌 것으로 보이지 않는다. 값을 둘의 공통
@@ -57,6 +62,10 @@ export function HomePage() {
   */
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const toggleSidebar = () => setIsSidebarCollapsed((collapsed) => !collapsed)
+  // `팀 전환하기`(`TeamSwitchDialog`)가 고른 팀. `null` 이면 전체 보기다.
+  // `localStorage` 값이라 리액트 상태로 옮겨 받아야 바뀌었을 때 다시 그린다.
+  const [currentTeamId, setCurrentTeamIdState] = useState(getCurrentTeamId)
+  useEffect(() => onCurrentTeamChange(setCurrentTeamIdState), [])
   // 브리핑 팝업은 한 번만 뜬다. `homeData` 를 다시 읽을 때마다 뜨면, 별 하나
   // 눌렀다고 팝업이 다시 올라온다.
   const [briefingSeen, setBriefingSeen] = useState(false)
@@ -196,12 +205,13 @@ export function HomePage() {
     }
   }
 
-  // 전역 레일은 **읽는 중에도 실패해도 자리에 있어야 한다.** 홈이 안 불러와졌다고
-  // 채팅·설정으로 갈 길까지 사라지면, 사용자는 새로고침 말고 할 수 있는 것이 없다.
+  // 사이드바 상단(로고+아이콘 줄)은 **읽는 중에도 실패해도 자리에 있어야 한다.**
+  // 홈이 안 불러와졌다고 채팅·설정으로 갈 길까지 사라지면, 사용자는 새로고침
+  // 말고 할 수 있는 것이 없다. 아이콘 줄은 `homeData` 가 아니라 자기 훅으로
+  // 따로 읽으므로 여기서도 그대로 뜬다.
   if (loading && !homeData) {
     return (
       <div className="home-layout">
-        <GlobalSidebar active="home" collapsed={isSidebarCollapsed} />
         <Sidebar
           favoriteProjects={[]}
           recentProjects={[]}
@@ -216,7 +226,6 @@ export function HomePage() {
   if (error && !homeData) {
     return (
       <div className="home-layout">
-        <GlobalSidebar active="home" collapsed={isSidebarCollapsed} />
         <Sidebar
           favoriteProjects={[]}
           recentProjects={[]}
@@ -231,6 +240,17 @@ export function HomePage() {
   const recentMeetings = homeData.recent_meetings ?? []
   const todaySchedule = homeData.today_schedule ?? []
   const summary = homeData.recent_meeting_summary
+
+  /*
+    팀 전환하기가 고른 팀만 남긴다.
+
+    회의·오늘 일정은 안 거른다 — 저 둘은 이미 지나갔거나 오늘 잡힌
+    **참석 대상**이지 "지금 보는 팀" 과 무관하다. 팀을 바꿔도 오늘 회의가
+    없어지면 정작 봐야 할 것을 놓친다. 거르는 것은 프로젝트 목록뿐이다.
+  */
+  const inCurrentTeam = (project) => !currentTeamId || project.team_id === currentTeamId
+  const favoriteProjects = (homeData.favorite_projects ?? []).filter(inCurrentTeam)
+  const recentProjects = (homeData.recent_projects ?? []).filter(inCurrentTeam)
 
   /*
     아무 데도 안 붙어 있는 사람.
@@ -254,6 +274,8 @@ export function HomePage() {
     동료들이 쓰는 판 옆에 빈 판을 하나 더 만들게 된다 — 이 화면이 막으려던
     바로 그 사고다.
   */
+  // 팀 전환하기로 고른 팀에 프로젝트가 없다고 해서 온보딩(첫 팀·프로젝트 만들기)을
+  // 다시 띄우면 안 된다 — 다른 팀엔 있을 수 있다. 판정은 거르기 전 값으로 한다.
   const nothingYet = recentMeetings.length === 0
     && (homeData.project_progress ?? []).length === 0
     && todaySchedule.length === 0
@@ -263,12 +285,11 @@ export function HomePage() {
 
   return (
     <div className="home-layout">
-      <GlobalSidebar active="home" collapsed={isSidebarCollapsed} user={{ name: homeData.user_name }} />
       <Sidebar
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={toggleSidebar}
-        favoriteProjects={homeData.favorite_projects ?? []}
-        recentProjects={homeData.recent_projects ?? []}
+        favoriteProjects={favoriteProjects}
+        recentProjects={recentProjects}
         shortcuts={homeData.shortcuts}
         userName={homeData.user_name}
         avatarUrl={homeData.user_avatar_url}
@@ -413,10 +434,19 @@ export function HomePage() {
               <div className="section-heading">
                 <h2>오늘 일정</h2>
                 {/*
-                  전체 일정 화면이 아직 없다. `href="/"` 짜리 화살표를 두면
-                  눌렀을 때 홈이 다시 뜨는데, 그건 "없다" 가 아니라 "고장" 으로
-                  읽힌다. 갈 곳이 생기면 그때 붙인다.
+                  전체 일정 화면은 아직 없다 — 화살표는 안 둔다. `+` 는
+                  화면 하나로 안 가고 팝업을 여는 것이라 이 사정과 무관하다
+                  (시안 `692:8292`).
                 */}
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label="회의 일정 추가"
+                  title="회의 일정 추가"
+                  onClick={() => setAddingMeeting(true)}
+                >
+                  <img src="/icons/AddIcon.svg" alt="" />
+                </button>
               </div>
               <div className="schedule-content">
                 {todaySchedule.length === 0 ? (
@@ -440,7 +470,14 @@ export function HomePage() {
                       <button
                         className={selectedScheduleKey === scheduleKey ? 'schedule-info selected' : 'schedule-info'}
                         type="button"
-                        onClick={() => setSelectedScheduleKey(scheduleKey)}
+                        onClick={() => {
+                          setSelectedScheduleKey(scheduleKey)
+                          // 상세가 있는 회의만 확인 팝업을 연다 — 회의 없이 시각만
+                          // 잡힌 일정(`meeting_id: null`)은 보여 줄 회의가 없다.
+                          if (schedule.meeting_id) {
+                            setConfirmingMeetingId(schedule.meeting_id)
+                          }
+                        }}
                       >
                         <div>
                           <strong>{schedule.title}</strong>
@@ -588,6 +625,22 @@ export function HomePage() {
             recent_projects: [project, ...(current.recent_projects ?? [])],
             project_progress: [project, ...(current.project_progress ?? [])],
           } : current))}
+        />
+      ) : null}
+
+      {addingMeeting ? (
+        <NewMeetingDialog
+          onClose={() => setAddingMeeting(false)}
+          // 새로 만든 회의가 오늘 일정·최근 회의 어디에 걸리는지는 서버
+          // 집계 규칙이다(시간대별 "오늘" 판정 등). 흉내 내지 않고 다시 읽는다.
+          onCreated={() => reload()}
+        />
+      ) : null}
+
+      {confirmingMeetingId ? (
+        <ConfirmedScheduleDialog
+          meetingId={confirmingMeetingId}
+          onClose={() => setConfirmingMeetingId(null)}
         />
       ) : null}
 

@@ -27,7 +27,7 @@ import { appendTo, patch, patchedOf, withAppended } from './store.js'
 
 import {
   viewerAgentPrompts, viewerAgentSettings, viewerBriefing, viewerConversationMessages,
-  viewerConversations, viewerHome, viewerMe, viewerSidebar, viewerTeams,
+  viewerConversations, viewerHome, viewerMe, viewerMeetingPrepHeader, viewerSidebar, viewerTeams,
 } from './perspective.js'
 import {
   meetingIndexes, meetings, projectMeetings, summaryTables, workIndexes,
@@ -35,8 +35,12 @@ import {
 import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
 import { PREP_STATUS_LABEL, preps } from './data/prep.js'
 import { teamMembers } from './data/home.js'
+import { inbox } from './data/inbox.js'
+import { TEAM } from './data/people.js'
+import { tasks } from './data/tasks.js'
+import { calendarEvents } from './data/calendar.js'
 import {
-  activeDates, chatCandidates, chatImportant, chatRooms,
+  activeDates, chatCandidates, chatRooms,
   dailySummaries, roomDetails, roomMessages,
 } from './data/chat.js'
 
@@ -58,6 +62,22 @@ function notMocked(path) {
   error.details = { path }
   error.retryable = false
   error.status = 501
+  return error
+}
+
+/**
+ * 가상 데이터 안에서 실제로 실패하는 요청.
+ *
+ * `notMocked` 와 달리 **주소는 있는데 값이 틀린 경우**다. `details` 를
+ * 필드별 배열로 주면 화면이 그 칸 밑에 그대로 찍는다(`authErrors.js`).
+ */
+function mockError({ code, message, details, status = 422 }) {
+  const error = new Error(message)
+  error.name = 'ApiError'
+  error.code = code
+  error.details = details ?? {}
+  error.retryable = false
+  error.status = status
   return error
 }
 
@@ -114,7 +134,29 @@ function applyDelegations(home) {
 function livePrep(meetingId) {
   const base = preps[meetingId]
   if (!base) {
-    return null
+    /*
+      준비 데이터를 안 만들어 둔 회의.
+
+      **`null` 을 주면 화면이 통째로 오류가 된다.** 준비 화면은 회의 여덟 개
+      어디서나 열 수 있는데 자세한 것은 셋만 채워 뒀다. 나머지는 헤더만 채우고
+      「아직 예상된 논쟁점이 없어요」 로 그린다 — 실제로 그 회의는 예측이 아직
+      안 돈 상태이므로 거짓말이 아니다.
+
+      설정은 안 준다. 화면이 로딩으로 두고 기다린다 — **빈 객체를 주면 토글이
+      전부 꺼진 것처럼 그려지는데** 그건 「아무것도 공개 안 함」 이라는 뜻이라
+      실제와 정반대다.
+    */
+    const header = viewerMeetingPrepHeader(meetingId)
+    return header ? {
+      header,
+      debate: {
+        notice: '아직 예상된 논쟁점이 없어요. 회의 자료가 쌓이면 Bordo가 예상해 드려요.',
+        count: 0,
+        answered_count: 0,
+        points: [],
+      },
+      agent_setup: null,
+    } : null
   }
 
   const absence = patchedOf(`absence:${meetingId}`)
@@ -157,6 +199,155 @@ function segments(path) {
   return path.split('?')[0].split('/').filter(Boolean)
 }
 
+/** 이번에 승인·반려한 태스크면 그 상태를 덮어 얹는다. */
+function effectiveTask(id) {
+  const base = tasks[id]
+  return base ? { ...base, ...patchedOf(`task:${id}`) } : null
+}
+
+/**
+ * 이번에 승인·반려한 것을 요청함 응답에 비춘다.
+ *
+ * `승인 필요` 줄의 숫자와 그 뒤에 붙은 태스크 id 목록은 정적 목이라, 승인
+ * 팝업에서 하나를 처리해도 다시 읽으면 그대로다 — 처리한 태스크를
+ * 걸러내야 뱃지 숫자가 줄고, 다음에 열었을 때 이미 끝난 태스크가 또 뜨지
+ * 않는다.
+ */
+function applyTaskPatches(base) {
+  const groups = base.groups.map((group) => ({
+    ...group,
+    items: group.items.map((item) => {
+      const pending = (item.pending_approval_task_ids ?? [])
+        .filter((id) => effectiveTask(id)?.status === 'PENDING_APPROVAL')
+      return {
+        ...item,
+        pending_approval_task_ids: pending,
+        needs_approval: pending.length,
+        urgent: item.needs_answer + item.needs_confirm + pending.length > 0,
+      }
+    }),
+  }))
+  return { ...base, groups }
+}
+
+/**
+ * 이번에 읽은 방의 미읽음을 0 으로 접는다.
+ *
+ * `POST /chat/rooms/{id}/read` 는 성공만 돌려주고 사이드바 숫자는 그대로다
+ * (`chat.js` 의 `unread_count` 가 모듈이 켜질 때 한 번 구운 값이라서). 화면이
+ * `markRead` 뒤 사이드바를 다시 읽으면 **방금 읽은 방이 다시 미읽음으로
+ * 보인다** — 방을 열었다 닫아도 안 읽힌 것처럼 남는다.
+ *
+ * 방 하나를 접으면 그 방이 속한 프로젝트·팀 합계도 다시 더해야 한다 — 안
+ * 그러면 방 뱃지는 꺼졌는데 프로젝트·팀 뱃지는 그대로다.
+ */
+function applyReadPatches(sidebar) {
+  const wasRead = (id) => Boolean(id) && Boolean(patchedOf(`room-read:${id}`))
+  const zero = (room) => (wasRead(room.id) ? { ...room, unread_count: 0 } : room)
+
+  const teams = (sidebar.teams ?? []).map((team) => {
+    const originalProjectSum = (team.projects ?? [])
+      .flatMap((p) => p.rooms ?? [])
+      .reduce((sum, r) => sum + r.unread_count, 0)
+    const projects = (team.projects ?? []).map((project) => {
+      const rooms = (project.rooms ?? []).map(zero)
+      return { ...project, rooms, unread_count: rooms.reduce((sum, r) => sum + r.unread_count, 0) }
+    })
+    const teamGroupUnread = wasRead(team.group_chat_room_id)
+      ? 0
+      : Math.max(0, team.unread_count - originalProjectSum)
+    return {
+      ...team,
+      projects,
+      unread_count: projects.reduce((sum, p) => sum + p.unread_count, 0) + teamGroupUnread,
+    }
+  })
+
+  const directRooms = (sidebar.direct_rooms ?? []).map(zero)
+  const myAgentRoom = sidebar.my_agent_room ? zero(sidebar.my_agent_room) : sidebar.my_agent_room
+
+  return {
+    ...sidebar,
+    teams,
+    direct_rooms: directRooms,
+    my_agent_room: myAgentRoom,
+    total_unread:
+      teams.reduce((sum, t) => sum + t.unread_count, 0)
+      + directRooms.reduce((sum, r) => sum + r.unread_count, 0)
+      + (myAgentRoom?.unread_count ?? 0),
+  }
+}
+
+/** 이번에 중요 표시·확인을 바꾼 메시지면 그 값을 덮어 얹는다. */
+function applyMessagePatch(message) {
+  const saved = patchedOf(`message:${message.id}`)
+  return saved ? { ...message, ...saved } : message
+}
+
+/**
+ * `GET /chat/important` 를 매번 다시 센다.
+ *
+ * 미리 구운 `chatImportant` 는 처음 상태 그대로다. `확인` 을 부르면 그
+ * 메시지가 여기서 빠져야 하는데, 고정된 목록으로는 그럴 수가 없다 —
+ * 확인을 눌러도(또는 방을 열어 자동으로 확인돼도) 목록이 그대로면
+ * 사용자는 확인이 안 된 줄 알고 계속 누른다.
+ */
+function liveImportant() {
+  const results = Object.values(roomMessages)
+    .flatMap((response) => response.results)
+    .map(applyMessagePatch)
+    .filter((m) => m.is_important && !m.important_confirmed_at)
+    .sort((a, b) => b.sent_at.localeCompare(a.sent_at))
+    .map((message) => ({ message, room: roomDetails[message.room_id] }))
+  return { count: results.length, results }
+}
+
+/**
+ * 팀 Discord 연결 상태(시안 `768:5926`).
+ *
+ * 실제 `GET .../discord/status` 에는 `guild_name` · `channels` 가 없다
+ * (그 둘은 `POST .../discord/link` 응답에만 있다 — 봇이 스스로 채널을
+ * 만들어서다). 여기서는 방금 연결한 것을 다시 읽었을 때도 화면이 서버
+ * 이름을 잃지 않도록 함께 들고 있는다. 실서버로 가면 이 둘은 다시
+ * `null` 로 보일 자리라, `TeamDiscordDialog` 는 없어도 되게 짜여 있다.
+ */
+function discordStatus(teamId) {
+  const saved = patchedOf(`discord:${teamId}`)
+  if (!saved?.connected) {
+    return {
+      connected: false, guild_id: null, guild_name: null, channels: null,
+      bot_status: 'DISCONNECTED', warnings: [],
+    }
+  }
+  return {
+    connected: true,
+    guild_id: saved.guild_id,
+    guild_name: saved.guild_name,
+    channels: saved.channels,
+    bot_status: 'READY',
+    warnings: [],
+  }
+}
+
+/**
+ * 회의 일정 달력(시안 `692:7910`)의 한 프로젝트 분.
+ *
+ * `from` · `to` (YYYY-MM-DD, 둘 다 있을 때만) 로 걸러 낸다 — 안 걸러 주면
+ * 달력이 보이는 달과 무관하게 항상 같은 여섯 건만 보인다. 이번 방문에 만든
+ * 일정은 `appendTo` 로 이어 붙인다.
+ */
+function projectCalendarEvents(projectId, from, to) {
+  const all = withAppended(`calendar:${projectId}`, calendarEvents)
+    .filter((e) => e.project_id === projectId)
+  const ranged = from && to
+    ? all.filter((e) => {
+      const day = e.start_at.slice(0, 10)
+      return day >= from && day <= to
+    })
+    : all
+  return { count: ranged.length, results: ranged, range: { from: from ?? null, to: to ?? null } }
+}
+
 function resolve(path, method, body) {
   const s = segments(path)
   const [a, b, c] = s
@@ -170,6 +361,13 @@ function resolve(path, method, body) {
     if (path === '/teams') return viewerTeams()
     // 새 프로젝트 팝업의 `참여자 선택` 후보.
     if (a === 'teams' && c === 'members') return teamMembers
+    // 팀 사이드바를 펼쳤을 때 · 팀 변경 팝오버의 미리보기가 같이 쓴다.
+    if (a === 'teams' && c === 'projects') {
+      const results = (viewerHome().project_progress ?? []).filter((p) => p.team_id === b)
+      return { count: results.length, results }
+    }
+
+    if (a === 'teams' && c === 'discord' && s[3] === 'status') return discordStatus(b)
 
     if (a === 'meetings' && b && !c) return meetings[b] ?? null
     if (a === 'meetings' && c === 'prep') return livePrep(b)
@@ -185,21 +383,27 @@ function resolve(path, method, body) {
         : (meetingIndexes[b] ?? EMPTY)
     }
 
+    if (a === 'projects' && c === 'calendar' && s[3] === 'events') {
+      const query = new URLSearchParams(path.split('?')[1] || '')
+      return projectCalendarEvents(b, query.get('from'), query.get('to'))
+    }
     if (a === 'projects' && c === 'flow') return projectFlows[b] ?? null
     if (a === 'projects' && c === 'meetings') return projectMeetings[b] ?? EMPTY
 
     if (a === 'flow-edges' && b) return flowEdges[b] ?? null
 
-    if (path === '/chat/sidebar') return viewerSidebar()
-    if (path.startsWith('/chat/important')) return chatImportant
+    if (path === '/chat/sidebar') return applyReadPatches(viewerSidebar())
+    if (path.startsWith('/chat/important')) return liveImportant()
     if (path.startsWith('/chat/candidates')) return chatCandidates
     if (a === 'chat' && b === 'rooms' && !c) return chatRooms
     if (a === 'chat' && b === 'rooms' && c && !s[3]) return roomDetails[c] ?? null
     if (a === 'chat' && b === 'rooms' && s[3] === 'messages') {
       const base = roomMessages[c] ?? { results: [], next_before: null, has_older: false, has_newer: false }
       // 이번 방문에 보낸 말을 뒤에 잇는다. 안 이으면 화면이 다시 읽는 순간
-      // 방금 보낸 말이 사라진다.
-      return { ...base, results: withAppended(`room:${c}`, base.results ?? []) }
+      // 방금 보낸 말이 사라진다. 중요 표시·확인을 바꾼 것도 같이 얹는다 —
+      // 안 그러면 말풍선의 `확인` 버튼이 눌러도 그대로 남는다.
+      const results = withAppended(`room:${c}`, base.results ?? []).map(applyMessagePatch)
+      return { ...base, results }
     }
     if (a === 'chat' && b === 'rooms' && s[3] === 'active-dates') return activeDates[c] ?? null
     if (a === 'chat' && b === 'rooms' && s[3] === 'daily-summary') {
@@ -213,6 +417,8 @@ function resolve(path, method, body) {
       // 읽는 순간 원래대로 돌아간다.
       return { ...viewerAgentSettings(), ...(patchedOf('agent-settings') ?? {}) }
     }
+    if (path === '/me/inbox') return applyTaskPatches(inbox)
+    if (a === 'tasks' && b && !c) return effectiveTask(b)
     if (path === '/me/agent/prompts') return viewerAgentPrompts()
     if (path === '/me/agent/conversations') return viewerConversations()
     if (a === 'me' && s[2] === 'conversations' && s[4] === 'messages') {
@@ -313,7 +519,58 @@ function resolve(path, method, body) {
       })
       return method === 'DELETE' ? null : { id: `stance-${b}`, ...body }
     }
-    if (a === 'chat' && s[3] === 'read') return null
+
+    /*
+      회원가입의 이메일 인증 · 초대 코드 확인(시안 `707:6492`).
+
+      **백엔드에 아직 없는 주소다** — 이 화면 안에서만 흉내 낸다. 인증번호는
+      실제로 보내지 않으므로 고정값 `123456` 을 받는다. 초대 코드는
+      `BRD-XXXX-XXXX` 모양만 맞으면 통과시킨다(`home.api.js` 의
+      `createInviteCode` 가 만드는 모양과 같다).
+    */
+    if (path === '/auth/signup/email-code') return { sent: true }
+    if (path === '/auth/signup/email-code/confirm') {
+      if (body?.code !== '123456') {
+        throw mockError({
+          code: 'INVALID_EMAIL_CODE',
+          message: '인증번호가 올바르지 않습니다.',
+          details: { code: ['인증번호가 올바르지 않습니다. (데모: 123456)'] },
+        })
+      }
+      return { verified: true }
+    }
+    if (path === '/auth/signup/invite-code/verify') {
+      if (!/^BRD-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(body?.code ?? '')) {
+        throw mockError({
+          code: 'INVALID_INVITE_CODE',
+          message: '유효하지 않은 초대 코드입니다.',
+          details: { code: ['유효하지 않은 초대 코드입니다. (데모: BRD- 뒤에 4자리-4자리)'] },
+        })
+      }
+      return { valid: true, team_name: TEAM.name }
+    }
+    if (a === 'chat' && s[3] === 'read') {
+      patch(`room-read:${c}`, { read: true })
+      return null
+    }
+
+    /*
+      중요 표시 · 확인.
+
+      **표시를 내리면 확인 기록도 같이 지운다.** 서버 규칙이 그렇다 — 다시
+      중요로 찍히면 또 확인해야 한다. 여기서 안 지우면 껐다 켠 메시지가
+      확인도 안 했는데 `중요 채팅` 에서 빠진 채로 남는다.
+    */
+    if (a === 'chat' && b === 'messages' && s[3] === 'important' && !s[4]) {
+      return patch(`message:${c}`, {
+        is_important: body?.is_important,
+        ...(body?.is_important ? {} : { important_confirmed_at: null }),
+      })
+    }
+    if (a === 'chat' && b === 'messages' && s[3] === 'important' && s[4] === 'confirm') {
+      return patch(`message:${c}`, { important_confirmed_at: new Date().toISOString() })
+    }
+
     if (path === '/me/briefing-dismiss') return { dismissed: true }
 
     /*
@@ -372,6 +629,92 @@ function resolve(path, method, body) {
       return { ...viewerAgentSettings(), ...patch('agent-settings', body ?? {}) }
     }
 
+    /*
+      태스크 승인 · 반려(승인 필요 상세 내용 팝업, 시안 `701:5558`).
+
+      `POST /tasks/{id}/approve|reject` 는 실제로 붙어 있는 주소다(백엔드
+      `apps/tasks/views.py`). 요청함의 `승인 필요` 줄이 여기로 이어진다.
+    */
+    if (a === 'tasks' && c === 'approve') {
+      const before = effectiveTask(b)
+      if (!before) {
+        throw notMocked(path)
+      }
+      const saved = patch(`task:${b}`, { status: 'TODO' })
+      return {
+        ...before,
+        ...saved,
+        previous_status: 'PENDING_APPROVAL',
+        approved_by: viewerMe().id,
+        approved_at: new Date().toISOString(),
+      }
+    }
+    if (a === 'tasks' && c === 'reject') {
+      const before = effectiveTask(b)
+      if (!before) {
+        throw notMocked(path)
+      }
+      if (!body?.reason?.trim()) {
+        throw mockError({
+          code: 'VALIDATION_ERROR',
+          message: '반려 사유를 입력해 주십시오.',
+          details: { reason: ['반려 사유를 입력해 주십시오.'] },
+        })
+      }
+      patch(`task:${b}`, { status: 'REJECTED' })
+      return {
+        id: b,
+        status: 'REJECTED',
+        previous_status: 'PENDING_APPROVAL',
+        rejected_by: viewerMe().id,
+        reason: body.reason.trim(),
+        rejected_at: new Date().toISOString(),
+      }
+    }
+
+    /*
+      팀 Discord 연결 · 해제(시안 `768:5926`).
+
+      `connect_code` 는 실제로는 Discord 봇의 `/deputy-connect` 로만 받을 수
+      있는 1회용 코드라 여기서는 값만 있으면 통과시킨다 — 화면이 어떤
+      코드를 받고 서버를 연결하는지 보여 주는 자리이지, 진짜 봇과 잇는
+      자리가 아니다.
+    */
+    if (a === 'teams' && c === 'discord' && s[3] === 'link') {
+      if (method === 'DELETE') {
+        patch(`discord:${b}`, {
+          connected: false, guild_id: null, guild_name: null, channels: null,
+        })
+        return { team_id: b, unlinked_at: new Date().toISOString(), dropped_outbox_count: 0 }
+      }
+      if (!body?.connect_code?.trim()) {
+        throw mockError({
+          code: 'VALIDATION_ERROR',
+          message: '연결 코드를 입력해 주십시오.',
+          details: { connect_code: ['연결 코드를 입력해 주십시오.'] },
+        })
+      }
+      const saved = patch(`discord:${b}`, {
+        connected: true,
+        guild_id: body.guild_id?.trim() || null,
+        guild_name: body.guild_id?.trim() ? '가상 데이터 서버' : null,
+        channels: body.guild_id?.trim()
+          ? { meeting: { id: 'mock-channel-meeting', name: 'general' } }
+          : null,
+      })
+      return {
+        linked: true,
+        team_id: b,
+        user_id: viewerMe().id,
+        discord_user_id: `mock-discord-${viewerMe().id}`,
+        guild_id: saved.guild_id,
+        guild_name: saved.guild_name,
+        channels: saved.channels,
+        permissions_ok: true,
+        linked_at: new Date().toISOString(),
+      }
+    }
+
     // 불참 등록. 홈이 이것을 읽어 버튼을 `대리 참석 중` 으로 바꾼다.
     if (a === 'meetings' && c === 'delegate') {
       const saved = patch(`delegate:${b}`, {
@@ -415,6 +758,34 @@ function resolve(path, method, body) {
         group_chat_room_id: null,
         created_at: new Date().toISOString(),
         last_opened_at: null,
+      }
+    }
+
+    if (a === 'projects' && c === 'calendar' && s[3] === 'events') {
+      return appendTo(`calendar:${b}`, {
+        id: `mock-event-${nextId()}`,
+        project_id: b,
+        title: body?.title ?? '새 일정',
+        kind: 'MEETING',
+        start_at: body?.start_at,
+        end_at: body?.end_at ?? body?.start_at,
+        status: 'SCHEDULED',
+        participant_ids: body?.participant_ids ?? [],
+        related_meeting: null,
+        discord_notified: false,
+      })
+    }
+
+    if (a === 'projects' && c === 'meetings') {
+      return {
+        id: `mock-meeting-${nextId()}`,
+        project_id: b,
+        title: body?.title ?? '새 회의',
+        scheduled_at: body?.scheduled_at,
+        duration_min: body?.duration_min,
+        participant_ids: body?.participant_ids ?? [],
+        status: 'SCHEDULED',
+        created_at: new Date().toISOString(),
       }
     }
 

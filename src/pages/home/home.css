@@ -154,6 +154,143 @@ body,
   height: 100%;
 }
 
+/*
+  로고 밑 아이콘 줄(시안 `666:5059`). `GlobalSidebar` 의 세로 레일과 같은
+  화면 목록·같은 훅을 쓰지만, 여기서는 로고와 한 칸에 있어야 해서 가로 줄로
+  따로 그린다.
+*/
+.sidebar-icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 8px 20px;
+}
+
+.sidebar-icon-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.sidebar-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: inherit;
+  transition: background 120ms ease;
+}
+
+.sidebar-icon-btn:hover {
+  background: #e9eaed;
+}
+
+.sidebar-icon-btn.active {
+  background: #dfe1e5;
+}
+
+.sidebar-icon-btn img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+/* 지금 진행 중인 회의가 있을 때 `회의` 자리에 대신 뜨는 아이콘. */
+.sidebar-icon-live {
+  background: rgba(255, 100, 80, 0.12);
+}
+
+.sidebar-icon-live:hover {
+  background: rgba(255, 100, 80, 0.2);
+}
+
+/*
+  팀장의 `회의 시작하기 · 회의 일정 보기` 드롭다운(시안 `692:7910`).
+
+  자리 잡는 기준은 이 단추가 아니라 `.sidebar-icon-row` 다 — `.sidebar` 에
+  `overflow: hidden` 이 걸려 있어(작은 화면에서 프로젝트 목록이 넘치지
+  않게 하는 규칙), 회의 아이콘 기준으로 오른쪽에 펼치면 사이드바 폭(240px)
+  을 넘는 부분이 그대로 잘렸다. 아이콘 줄 오른쪽 끝에 붙이면 어느 아이콘을
+  눌렀든 사이드바 안에 들어온다.
+*/
+.sidebar-icon-row {
+  position: relative;
+}
+
+.sidebar-meeting-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 8px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: 152px;
+  padding: 6px;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.sidebar-meeting-panel hr {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+}
+
+.sidebar-meeting-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 6px;
+  color: #1f1f1f;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.sidebar-meeting-row:hover {
+  background: #f3f4f6;
+}
+
+.sidebar-meeting-row[aria-disabled='true'] {
+  color: #b8bbc0;
+  cursor: default;
+}
+
+.sidebar-meeting-row[aria-disabled='true']:hover {
+  background: transparent;
+}
+
+.sidebar-meeting-row img {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebar-icon-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: flex;
+  min-width: 15px;
+  height: 15px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: #ff6450;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .search-box {
   display: flex;
   align-items: center;

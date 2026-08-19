@@ -1,12 +1,21 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { navigate } from '../../app/navigation.js'
+import { LiveMeetingPrompt } from '../../shared/components/LiveMeetingPrompt.jsx'
+import { globalNavItems } from '../../shared/constants/globalNav.js'
+import { useChatBadge } from '../../shared/hooks/useChatBadge.js'
+import { useInboxBadge } from '../../shared/hooks/useInboxBadge.js'
+import { useIsTeamLead } from '../../shared/hooks/useIsTeamLead.js'
+import { useLiveMeeting } from '../../shared/hooks/useLiveMeeting.js'
 
 /**
- * 홈의 프로젝트 사이드바.
+ * 홈의 사이드바.
  *
- * 전역 레일(`GlobalSidebar`)과 **다른 것**이다. 레일은 화면을 고르고, 이쪽은
- * 지금 화면 안에서 프로젝트를 고른다. 그래서 둘을 합치지 않고 나란히 둔다.
+ * 프로젝트 목록은 지금 화면 안에서 프로젝트를 고르는 자리라, 화면을 고르는
+ * 전역 레일(`GlobalSidebar`)과는 원래도 다른 일이었다. 그런데 시안(`666:5059`)은
+ * 로고 밑에 화면 이동 아이콘 줄을 붙여 둔 모양이라, 홈에서는 이 컴포넌트가
+ * 그 줄까지 그린다 — 로고와 아이콘이 같은 칸에 있어야 붙어 보인다. 나머지
+ * 화면은 지금처럼 `GlobalSidebar` 하나로 다닌다.
  *
  * ## 링크가 전부 `/` 였다
  *
@@ -59,6 +68,79 @@ export function Sidebar({
     recent: true,
     favorite: true,
   })
+  const [meetingMenuOpen, setMeetingMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchInputRef = useRef(null)
+  const meetingMenuRef = useRef(null)
+  const searchButtonRef = useRef(null)
+  const searchBoxRef = useRef(null)
+
+  const inboxBadge = useInboxBadge()
+  const chatBadge = useChatBadge()
+  const isTeamLead = useIsTeamLead()
+  const {
+    liveMeeting, promptOpen, secondsLeft, responding,
+    openPrompt, respondDecline, respondJoin,
+  } = useLiveMeeting()
+
+  /*
+    `회의 시작하기 · 회의 일정 보기` 드롭다운(시안 `692:7910`)은 바깥을
+    눌러도 닫혀야 한다 — 안 닫히면 다음에 누른 것을 가리고, 사용자는 왜
+    안 눌리는지 모른 채 같은 자리를 다시 누른다. `Escape` 도 같은 이유로 받는다.
+  */
+  useEffect(() => {
+    if (!meetingMenuOpen) {
+      return undefined
+    }
+    const close = (event) => {
+      if (!meetingMenuRef.current?.contains(event.target)) {
+        setMeetingMenuOpen(false)
+      }
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        setMeetingMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [meetingMenuOpen])
+
+  /*
+    프로젝트 검색 칸도 같은 이유로 바깥을 누르면 닫는다.
+
+    닫을 때 검색어도 지운다 — 칸만 감추고 검색어를 남기면, 다시 열었을 때
+    아래 프로젝트 목록이 왜 걸러져 있는지 칸이 닫힌 동안은 알 길이 없다.
+  */
+  useEffect(() => {
+    if (!searchOpen) {
+      return undefined
+    }
+    const close = (event) => {
+      if (!searchBoxRef.current?.contains(event.target)
+        && !searchButtonRef.current?.contains(event.target)) {
+        setSearchOpen(false)
+        setQuery('')
+      }
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        setSearchOpen(false)
+        setQuery('')
+        searchButtonRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [searchOpen])
 
   const toggleSection = (section) => {
     setOpenSections((current) => ({
@@ -135,7 +217,8 @@ export function Sidebar({
   const agentHref = agentRoomId ? `/chat?room=${agentRoomId}` : '/chat'
 
   return (
-    <aside className={isCollapsed ? 'sidebar is-collapsed' : 'sidebar'} aria-label="사이드 메뉴">
+    <>
+      <aside className={isCollapsed ? 'sidebar is-collapsed' : 'sidebar'} aria-label="사이드 메뉴">
       <div className="sidebar-top">
         <button
           className="icon-button"
@@ -153,16 +236,154 @@ export function Sidebar({
 
       {!isCollapsed ? (
         <>
-          <label className="search-box">
-            <img src={icons.search} alt="" aria-hidden="true" />
-            <input
-              aria-label="프로젝트 검색"
-              type="search"
-              placeholder="프로젝트 검색"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+          {/*
+            시안 `666:5059` 의 아이콘 줄. `홈` 은 언제나 이 화면 자체라 항상
+            켜진 것으로 그린다. 지금 진행 중인 회의가 있으면 `회의` 자리가
+            실시간 아이콘으로 바뀐다 — `GlobalSidebar` 와 같은 훅을 쓰므로
+            판정도 팝업도 똑같다.
+
+            검색 칸은 눌러야 뜬다 — 늘 펼쳐 두면 최근 항목·즐겨찾기보다
+            위에 항상 자리를 차지해, 프로젝트를 찾을 일이 없는 대부분의
+            방문에서 화면만 차지한다.
+          */}
+          <div className="sidebar-icon-row" aria-label="주요 화면">
+            <div className="sidebar-icon-group">
+              {globalNavItems.map((item) => {
+                if (item.id === 'meeting' && liveMeeting) {
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="sidebar-icon-btn sidebar-icon-live"
+                      aria-label="지금 진행 중인 회의"
+                      title="지금 진행 중인 회의"
+                      onClick={openPrompt}
+                    >
+                      <img src="/icons/LiveMeetingIcon.svg" alt="" />
+                    </button>
+                  )
+                }
+
+                /*
+                  팀장에게는 `회의` 를 눌렀을 때 곧장 이동하지 않고 먼저
+                  묻는다(시안 `692:7910`) — 회의를 시작할지, 잡힌 일정을
+                  볼지. 팀장이 아니면 원래대로 `/flow-board` 로 바로 간다.
+                */
+                if (item.id === 'meeting' && isTeamLead) {
+                  return (
+                    <div className="sidebar-meeting-menu" key={item.id} ref={meetingMenuRef}>
+                      <button
+                        type="button"
+                        className={meetingMenuOpen ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
+                        aria-label={item.label}
+                        aria-haspopup="menu"
+                        aria-expanded={meetingMenuOpen}
+                        title={item.label}
+                        onClick={() => setMeetingMenuOpen((open) => !open)}
+                      >
+                        <img src={item.icon} alt="" />
+                      </button>
+
+                      {meetingMenuOpen ? (
+                        <div className="sidebar-meeting-panel" role="menu">
+                          {/*
+                            디스코드가 실제 회의 자리다 — "시작" 은 그리로
+                            보내는 것이지, 서버가 따로 만드는 행위가 아니다.
+                          */}
+                          <a
+                            className="sidebar-meeting-row"
+                            role="menuitem"
+                            href={discord?.connected && discord.url ? discord.url : undefined}
+                            aria-disabled={!(discord?.connected && discord.url)}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            onClick={(event) => {
+                              if (!(discord?.connected && discord.url)) {
+                                event.preventDefault()
+                                return
+                              }
+                              setMeetingMenuOpen(false)
+                            }}
+                          >
+                            <img src="/icons/SignalStart.svg" alt="" />
+                            회의 시작하기
+                          </a>
+                          <hr />
+                          <a
+                            className="sidebar-meeting-row"
+                            role="menuitem"
+                            href="/meeting-schedule"
+                            onClick={(event) => {
+                              setMeetingMenuOpen(false)
+                              goInApp(event, '/meeting-schedule')
+                            }}
+                          >
+                            <img src="/icons/CalendarCheck.svg" alt="" />
+                            회의 일정 보기
+                          </a>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                }
+
+                const isActive = item.id === 'home'
+                return (
+                  <a
+                    key={item.id}
+                    className={isActive ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
+                    href={item.href}
+                    aria-label={item.label}
+                    aria-current={isActive ? 'page' : undefined}
+                    title={item.label}
+                    onClick={(event) => goInApp(event, item.href)}
+                  >
+                    <img src={item.icon} alt="" />
+                    {item.id === 'inbox' && inboxBadge > 0 ? (
+                      <span className="sidebar-icon-badge">{inboxBadge > 99 ? '99+' : inboxBadge}</span>
+                    ) : null}
+                    {item.id === 'chat' && chatBadge > 0 ? (
+                      <span className="sidebar-icon-badge">{chatBadge > 99 ? '99+' : chatBadge}</span>
+                    ) : null}
+                  </a>
+                )
+              })}
+            </div>
+
+            <button
+              ref={searchButtonRef}
+              type="button"
+              className={searchOpen ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
+              aria-label="검색"
+              aria-expanded={searchOpen}
+              title="검색"
+              onClick={() => setSearchOpen((open) => {
+                const next = !open
+                if (next) {
+                  window.requestAnimationFrame(() => searchInputRef.current?.focus())
+                } else {
+                  setQuery('')
+                }
+                return next
+              })}
+            >
+              <img src={icons.search} alt="" />
+            </button>
+          </div>
+
+          {searchOpen ? (
+            <label className="search-box" ref={searchBoxRef}>
+              <img src={icons.search} alt="" aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                aria-label="프로젝트 검색"
+                type="search"
+                placeholder="프로젝트 검색"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+          ) : null}
 
           <nav className="project-nav" aria-label="프로젝트">
             <div className="section-title">
@@ -244,6 +465,16 @@ export function Sidebar({
           </a>
         </>
       ) : null}
-    </aside>
+      </aside>
+
+      <LiveMeetingPrompt
+        open={promptOpen}
+        meeting={liveMeeting}
+        secondsLeft={secondsLeft}
+        responding={responding}
+        onDecline={respondDecline}
+        onJoin={respondJoin}
+      />
+    </>
   )
 }

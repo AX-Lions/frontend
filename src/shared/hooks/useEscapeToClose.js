@@ -3,8 +3,9 @@ import { useEffect } from 'react'
 /**
  * 팝업이 열려 있는 동안 Escape 로 닫는다.
  *
- * 컴포넌트 파일(`newProjectBits.jsx`)에 같이 두면 그 파일이 컴포넌트 말고
- * 다른 것도 내보내게 되어 개발 중 빠른 새로고침이 통째로 꺼진다.
+ * `pages/home` 의 팝업(새 프로젝트 · 팀 전환 · 회의 일정)과 `pages/inbox` 의
+ * 승인 팝업이 함께 쓴다 — 화면 하나에 묶어 두면 다른 화면이 페이지 경계를
+ * 넘어 가져다 써야 한다.
  */
 export function useEscapeToClose(onClose) {
   useEffect(() => {

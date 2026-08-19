@@ -42,6 +42,7 @@ export function FlowNavigationSidebar({
   onParticipantToggle,
   onScroll,
   onSidebarToggle,
+  onTeamSwitch,
   onTimeOrderToggle,
   participantKeyword,
   participants,
@@ -65,8 +66,14 @@ export function FlowNavigationSidebar({
         <AppLink className="team-name" href="/">
           {teamName ?? '　'}
         </AppLink>
-        <button className="team-refresh" type="button" aria-label="새로고침">
-          <img src={icons.refresh} alt="" />
+        {/*
+          팀 전환하기(시안 `692:8230`, 여는 자리는 `576:4862`). 프로젝트 이름
+          옆의 이 작은 순환 아이콘이 원래 그 자리다 — 컴포넌트 레이어 이름이
+          `팀변경아이콘`이다. 아무 동작이 없던 자리를 새로고침으로 오해해서는
+          안 된다.
+        */}
+        <button className="team-switch" type="button" aria-label="팀 전환하기" onClick={onTeamSwitch}>
+          <img src={icons.teamSwitch} alt="" />
         </button>
         <button
           className="sidebar-toggle"
