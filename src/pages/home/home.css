@@ -1637,8 +1637,15 @@ h1 {
 }
 
 @media (max-width: 860px) {
+  /*
+    두 열 선언이 여기 남아 있었다.
+
+    위쪽 `@media (max-width: 1180px)` 이 한 열로 내려 놓은 것을, **더 좁은**
+    이 블록이 뒤에 와서 다시 두 열로 되돌리고 있었다. 그래서 창을 줄이면
+    한 열로 잘 내려가다가 860px 을 지나는 순간 다시 반으로 갈라져, 한 패널이
+    200px 짜리로 쪼그라들었다. 폭 규칙은 1180px 블록 하나가 맡는다.
+  */
   .dashboard-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     margin-top: 18px;
   }
 
