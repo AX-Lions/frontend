@@ -1640,14 +1640,6 @@ button.team-shortcut:active {
   display: none;
 }
 
-.composer-important.on {
-  background: var(--chat-orange);
-}
-
-.composer-important.on img {
-  filter: brightness(0) invert(1);
-}
-
 /* ─────────────────────────────── 그 날 요약 */
 
 .daily-summary {

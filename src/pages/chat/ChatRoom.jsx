@@ -79,6 +79,7 @@ export function ChatRoom({
   fullscreen,
   onClose,
   onImportantChanged,
+  onOpenAgentSettings,
   onOpenSettings,
   onToggleFullscreen,
 }) {
@@ -365,7 +366,7 @@ export function ChatRoom({
       </div>
       )}
 
-      <ChatComposer roomId={roomId} onSent={appendSent} />
+      <ChatComposer roomId={roomId} onSent={appendSent} onOpenAgentSettings={onOpenAgentSettings} />
 
       {calendarMonth && roomId ? (
         <ChatDateCalendar
