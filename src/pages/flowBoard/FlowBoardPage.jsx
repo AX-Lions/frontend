@@ -7,6 +7,10 @@ import { FlowCanvas } from './FlowCanvas'
 import { FlowEdgePanel, FlowNodePanel } from './FlowInspectorPanel'
 import { FlowNavigationSidebar } from './FlowNavigationSidebar'
 import { FlowRail } from './FlowRail'
+// 팀 전환하기는 홈에서 먼저 생겼다. 회의 화면에도 같은 팝업이 필요해져
+// 여기서 그대로 가져다 쓴다 — 팝업 하나 때문에 `pages/home` 전체를
+// `shared` 로 옮기면 그쪽에 남는 `NewProjectDialog` 등도 다 옮겨야 한다.
+import { TeamSwitchDialog } from '../home/TeamSwitchDialog.jsx'
 import { icons, toneLabels } from './flowBoard.api'
 import { fetchBriefing, toneOf } from './flowBoard.data'
 import { buildFlowLayout } from './flowLayout'
@@ -53,6 +57,7 @@ function rememberMeetingInUrl(meetingId) {
 export function FlowBoardPage() {
   const entryParams = new URLSearchParams(window.location.search)
   const [mode, setMode] = useState(MEETING_MODE)
+  const [switchingTeam, setSwitchingTeam] = useState(false)
 
   /*
     주소의 회의·프로젝트를 **계속 지켜본다.**
@@ -200,12 +205,18 @@ export function FlowBoardPage() {
   const edgeIds = panel?.kind === 'edge' ? panel.edgeIds : []
   const edgeDetails = useEdgeDetails(edgeIds)
 
-  const myAgentNodeId = useMemo(() => {
-    // 대리인 노드가 `임수연의 Bordo` 로 박혀 있었다. 내 것인지는 노드의
-    // `user_id` 와 로그인한 사람의 id 를 맞춰 봐야 안다.
+  /*
+    판에서 나를 가리키는 노드.
+
+    전에는 **내 대리인 노드**(`kind: 'AGENT'`)를 찾았다. 대리인을 주인에게
+    접으면서 그 노드가 없어졌다 — 그대로 두면 `null` 이 되어 내 자리 표시가
+    사라지고, **브리핑으로 들어가는 입구도 같이 없어진다.** 대리인이 내 노드
+    안으로 들어왔으므로 이제 내 노드가 그 입구다.
+  */
+  const myNodeId = useMemo(() => {
     const myId = me.data?.id
     return myId
-      ? (flow.data?.nodes ?? []).find((n) => n.kind === 'AGENT' && n.user_id === myId)?.id ?? null
+      ? (flow.data?.nodes ?? []).find((n) => n.kind === 'USER' && n.user_id === myId)?.id ?? null
       : null
   }, [flow.data, me.data])
 
@@ -271,8 +282,8 @@ export function FlowBoardPage() {
   }
 
   const selectNode = (node) => {
-    // 내 대리인을 누르면 브리핑, 남을 누르면 그 사람 패널.
-    setPanel(node.id === myAgentNodeId
+    // 내 노드를 누르면 브리핑(내 대리인이 한 일), 남을 누르면 그 사람 패널.
+    setPanel(node.id === myNodeId
       ? { kind: 'briefing', nodeId: node.id }
       : { kind: 'node', nodeId: node.id, node })
   }
@@ -337,7 +348,7 @@ export function FlowBoardPage() {
 
   return (
     <div className="flow-board-page">
-      <FlowRail />
+      <FlowRail collapsed={ui.isFlowSidebarCollapsed} />
 
       <FlowNavigationSidebar
         activeCategory={mode}
@@ -359,6 +370,7 @@ export function FlowBoardPage() {
         onParticipantToggle={toggleExcluded(setExcludedParticipants)}
         onScroll={(event) => ui.setIsSidebarScrolled(event.currentTarget.scrollTop > 0)}
         onSidebarToggle={ui.toggleFlowSidebar}
+        onTeamSwitch={() => setSwitchingTeam(true)}
         onTimeOrderToggle={ui.toggleTimeOrder}
         participantKeyword={ui.participantKeyword}
         participants={participantRows}
@@ -428,7 +440,7 @@ export function FlowBoardPage() {
                 activeBadgeId={panel?.badgeId ?? null}
                 highlightedEdgeIds={highlightedEdgeIds}
                 layout={layout}
-                myAgentNodeId={myAgentNodeId}
+                myNodeId={myNodeId}
                 onBadgeSelect={selectBadge}
                 onNodeSelect={selectNode}
                 selectedNodeId={selectedNodeId}
@@ -562,6 +574,8 @@ export function FlowBoardPage() {
           />
         ) : null}
       </main>
+
+      {switchingTeam ? <TeamSwitchDialog onClose={() => setSwitchingTeam(false)} /> : null}
     </div>
   )
 }

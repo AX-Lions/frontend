@@ -92,8 +92,84 @@ export function fetchTeams(signal) {
   return api.get('/teams', undefined, { signal })
 }
 
-export function createProject(teamId, name) {
-  return api.post(`/teams/${teamId}/projects`, { name })
+export function fetchTeamMembers(teamId, signal) {
+  return api.get(`/teams/${teamId}/members`, undefined, { signal })
+}
+
+/**
+ * 팀 하나의 프로젝트 목록.
+ *
+ * 명세가 이 주소를 짚어 둔 두 자리 중 하나가 **팀 변경 팝오버의
+ * `팀 A → 프로젝트 1, 프로젝트 2` 미리보기**다(다른 하나는 사이드바를
+ * 펼쳤을 때). `TeamSwitchDialog` 가 이것으로 미리보기를 채운다.
+ */
+export function fetchTeamProjects(teamId, signal) {
+  return api.get(`/teams/${teamId}/projects`, undefined, { signal })
+}
+
+/**
+ * 새 프로젝트.
+ *
+ * ## 서버가 아직 모르는 칸이 있다
+ *
+ * 시안(`707:5617` · `707:5739`)은 **진행기간과 프로젝트 목표**를 받는데,
+ * `POST /teams/{team_id}/projects` 가 받는 것은 `name` · `description` ·
+ * `member_ids` 뿐이다.
+ *
+ * `CLAUDE.md` 의 순서(화면이 계약을 주도한다)대로 **보낼 것은 그대로 보낸다** —
+ * 지금 서버는 모르는 필드를 무시하므로 저장은 아직 안 되고, 백엔드가
+ * `goal` · `period_start` · `period_end` 를 받으면 그 순간부터 저장된다.
+ * 여기서 값을 빼 버리면 나중에 화면·API 양쪽을 다시 손봐야 한다.
+ *
+ * `member_ids` 를 안 실으면 **팀 전원**이 들어간다(서버 기본값). 참여자를
+ * 고른 경우에만 싣는다 — 빈 배열을 보내면 아무도 없는 프로젝트가 된다.
+ */
+export function createProject(teamId, { name, description, goal, memberIds, periodStart, periodEnd }) {
+  return api.post(`/teams/${teamId}/projects`, {
+    name,
+    ...(description ? { description } : {}),
+    ...(goal ? { goal } : {}),
+    ...(periodStart ? { period_start: periodStart } : {}),
+    ...(periodEnd ? { period_end: periodEnd } : {}),
+    ...(memberIds?.length ? { member_ids: memberIds } : {}),
+  })
+}
+
+// ─────────────────────────────────────────── 회의 일정 추가
+
+/**
+ * 회의 일정 추가(시안 `692:8292`).
+ *
+ * `POST /projects/{project_id}/meetings` 는 **고정 시각 하나**만 받는다 —
+ * 후보를 여럿 던지고 참여자가 고르는 식이 아니다. 시안의 "가능한 시간을
+ * 모두 입력해주세요" 는 그래서 여러 후보가 아니라 **그 날짜의 시작~끝**으로
+ * 읽는다 — `duration_min` 이 그 차이다.
+ *
+ * `participant_ids` 를 안 실으면 서버가 알아서 채우는 값이 없다(프로젝트와
+ * 달리 기본값이 "전원" 이 아니다) — 최소 회의를 만든 사람은 넣어야 한다.
+ */
+export function createMeeting(projectId, { title, scheduledAt, durationMin, participantIds }) {
+  return api.post(`/projects/${projectId}/meetings`, {
+    title,
+    scheduled_at: scheduledAt,
+    duration_min: durationMin,
+    participant_ids: participantIds,
+  })
+}
+
+/**
+ * 초대 코드.
+ *
+ * **팀을 만든 뒤에만 부를 수 있다** — 코드는 팀에 매달려 나온다. 시안은 팀을
+ * 만들기 전 화면에 코드를 그려 뒀는데, 그 자리에 그럴듯한 문자열을 띄우면
+ * 복사해서 공유한 코드가 아무 데도 안 닿는다.
+ */
+export function createInviteCode(teamId) {
+  return api.post(`/teams/${teamId}/invite-codes`, {
+    expires_in_hours: 72,
+    max_uses: 10,
+    default_role: 'MEMBER',
+  })
 }
 
 /**
@@ -103,11 +179,65 @@ export function createProject(teamId, name) {
  * 없다.** 홈이 전부 0 으로 뜨는데 팀을 만들 버튼도, 초대 코드를 넣을 칸도
  * 화면에 없었다. 서버에는 처음부터 있던 기능이다.
  */
-export function createTeam(name) {
-  return api.post('/teams', { name })
+export function createTeam(name, { description, timezone } = {}) {
+  /*
+    `timezone` 도 서버 계약에 없다. 팀의 **기준 시간대**는 이 서비스의 전제
+    (사람마다 하루를 자르는 기준이 다르다)와 직결되는 값이라, 화면에서 받은
+    것을 그대로 실어 보내고 백엔드가 받게 한다.
+  */
+  return api.post('/teams', {
+    name,
+    ...(description ? { description } : {}),
+    ...(timezone ? { timezone } : {}),
+  })
 }
 
 /** 받은 초대 코드로 팀에 들어간다. 코드 모양은 `BRD-A1B2-C3D4`. */
 export function joinTeam(code) {
   return api.post('/teams/join', { code })
+}
+
+// ─────────────────────────────────────────── 팀 Discord 관리자 설정
+//
+// 팝업(시안 `768:5926`)이 쓴다. `팀 전환하기` 목록에서 내 역할이
+// OWNER·ADMIN 인 팀에만 여는 톱니바퀴가 붙는다 — 시안 부제("팀 관리자일
+// 경우에만 보이는 설정이에요")가 그대로 조건이다.
+
+export function fetchDiscordStatus(teamId, signal) {
+  return api.get(`/teams/${teamId}/discord/status`, undefined, { signal })
+}
+
+/**
+ * `connect_code` 는 Discord 봇에서 `/deputy-connect` 를 실행해야 받는
+ * 1회용 코드다 — 화면에서 만들어 줄 수 없다. `guild_id` 를 함께 보내야
+ * 서버까지 연결된다(코드만 보내면 계정 연결만 되고 `403` 이 난다,
+ * OWNER·ADMIN 이 아니면 애초에 이 화면을 못 연다).
+ */
+export function linkTeamDiscord(teamId, { connectCode, guildId }) {
+  return api.post(`/teams/${teamId}/discord/link`, {
+    connect_code: connectCode,
+    ...(guildId ? { guild_id: guildId } : {}),
+  })
+}
+
+export function unlinkTeamDiscord(teamId) {
+  return api.delete(`/teams/${teamId}/discord/link`)
+}
+
+// ─────────────────────────────────────────── 확정된 일정 확인 팝업
+//
+// 팝업(시안 `697:9393`)은 두 곳에서 값을 모은다.
+//
+//     header   GET /meetings/{id}/prep   team_name · project_name · when · badge
+//     참여자    GET /meetings/{id}       participants[].name
+//
+// `when` · `badge` 는 홈의 대리 참석 버튼 · 준비 화면과 같은 문구를 서버가
+// 조립해 준다 — 여기서 다시 만들면 화면마다 "대리 참석 예정" 이 갈린다.
+
+export function fetchMeetingPrepHeader(meetingId, signal) {
+  return api.get(`/meetings/${meetingId}/prep`, undefined, { signal }).then((body) => body?.header ?? null)
+}
+
+export function fetchMeetingParticipants(meetingId, signal) {
+  return api.get(`/meetings/${meetingId}`, undefined, { signal }).then((body) => body?.participants ?? [])
 }

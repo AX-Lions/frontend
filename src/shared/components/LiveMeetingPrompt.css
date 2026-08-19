@@ -1,0 +1,94 @@
+.live-meeting-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.live-meeting-dialog {
+  width: 404px;
+  max-width: calc(100vw - 32px);
+  padding: 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.08);
+}
+
+.live-meeting-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.live-meeting-body h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1f1f1f;
+}
+
+.live-meeting-body p {
+  margin: 0;
+  font-size: 14px;
+  color: #60646c;
+}
+
+.live-meeting-countdown {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e5e7eb;
+  font-size: 16px;
+  color: #60646c;
+}
+
+.live-meeting-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 32px;
+}
+
+.live-meeting-actions button {
+  flex: 1;
+  padding: 14px 12px;
+  border: 0;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.live-meeting-actions button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.live-meeting-decline {
+  background: #f0f1f3;
+  color: #60646c;
+}
+
+.live-meeting-decline:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.live-meeting-join {
+  background: #002662;
+  color: #ffffff;
+}
+
+.live-meeting-join:hover {
+  background: #013080;
+}

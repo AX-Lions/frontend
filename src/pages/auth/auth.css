@@ -1,8 +1,5 @@
 /*
- * 임시 인증 화면.
- *
- * 디자인 시안이 아직 없다. 시안이 나오면 이 파일은 통째로 갈린다 — 그래서
- * 다른 화면이 여기 스타일에 기대지 않도록 `auth-` 로만 짓는다.
+ * 로그인 · 회원가입(시안 `707:6391` · `707:6492`).
  */
 
 .auth-page {
@@ -12,137 +9,314 @@
   min-height: 100vh;
   min-height: 100dvh;
   padding: 24px;
-  background: var(--sidebar);
+  background: #ffffff;
+}
+
+.auth-page,
+.auth-page * {
+  box-sizing: border-box;
+}
+
+.auth-page button,
+.auth-page input,
+.auth-page select {
+  font: inherit;
+}
+
+.auth-logo {
+  position: fixed;
+  top: 21px;
+  left: 28px;
+  display: block;
+  width: 86px;
 }
 
 .auth-card {
+  display: flex;
   width: 100%;
-  max-width: 380px;
-  padding: 32px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--bg);
+  max-width: 436px;
+  flex-direction: column;
+  gap: 32px;
 }
 
 .auth-card h1 {
   margin: 0;
-  font-size: 22px;
-  letter-spacing: -0.01em;
+  color: #1f1f1f;
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: pre-line;
 }
 
 .auth-lead {
-  margin: 8px 0 24px;
-  color: var(--muted);
+  margin: 4px 0 0;
+  color: #1f1f1f;
+  font-size: 24px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.auth-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  padding: 42px 34px;
+  border: 1px solid #e5e7eb;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 0 6px 0 rgba(0, 38, 98, 0.25);
+}
+
+.auth-panel h2 {
+  margin: 0;
+  color: #1f1f1f;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.auth-banner {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #ff6450;
+  border-radius: 8px;
+  color: #ff6450;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
 }
 
 .auth-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
-.auth-field label {
-  font-size: 13px;
+.auth-field-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-field-head label {
+  color: #1f1f1f;
+  font-size: 14px;
   font-weight: 600;
 }
 
-.auth-field input,
-.auth-field select {
-  height: 42px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 14px;
-}
-
-.auth-field input:disabled,
-.auth-field select:disabled {
-  background: var(--sidebar);
-  color: var(--muted);
-}
-
-.auth-field[data-invalid='true'] input,
-.auth-field[data-invalid='true'] select {
-  border-color: var(--accent);
-}
-
-.auth-hint {
-  color: var(--muted);
+.auth-field-head .auth-error {
+  margin: 0;
+  color: #ff6450;
   font-size: 12px;
 }
 
-.auth-error {
-  color: var(--accent);
-  font-size: 12px;
-  line-height: 1.4;
+.auth-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-/* 오류는 색만으로 알리지 않는다. 색을 구별하기 어려운 사람에게는 아무 표시도
-   없는 것과 같다. 문구 앞에 기호를 붙인다. */
-.auth-error::before {
-  content: '! ';
-  font-weight: 700;
-}
-
-.auth-banner {
-  margin-bottom: 16px;
-  padding: 10px 12px;
-  border: 1px solid var(--accent);
+.auth-input-box {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
-  color: var(--accent);
-  font-size: 13px;
-  line-height: 1.4;
+  background: #ffffff;
+  transition: border-color 120ms ease;
+}
+
+.auth-input-box:focus-within {
+  border-color: #002662;
+}
+
+.auth-field[data-invalid='true'] .auth-input-box {
+  border-color: #ff6450;
+}
+
+.auth-field[data-valid='true'] .auth-input-box {
+  border-color: #002662;
+}
+
+.auth-input-box input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #1f1f1f;
+  font-size: 12px;
+}
+
+.auth-input-box input::placeholder {
+  color: #b8bbc0;
+}
+
+.auth-input-box input:disabled {
+  color: #b8bbc0;
+}
+
+.auth-eye {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.auth-eye img {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.auth-verify {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #fafafa;
+  color: #b8bbc0;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.auth-verify:not(:disabled) {
+  color: #1f1f1f;
+  cursor: pointer;
+}
+
+.auth-verify:not(:disabled):hover {
+  background: #f0f1f3;
 }
 
 .auth-submit {
-  height: 44px;
-  border-radius: 8px;
-  background: var(--text);
-  color: var(--bg);
+  width: 100%;
+  padding: 20px 57px;
+  border: 0;
+  border-radius: 16px;
+  background: #d1d5db;
+  color: #ffffff;
   font-size: 14px;
   font-weight: 600;
+  transition: background 120ms ease;
 }
 
-.auth-submit:disabled {
-  background: var(--button);
-  color: var(--muted);
-  cursor: default;
+.auth-submit[data-ready='true'] {
+  background: #002662;
+  cursor: pointer;
+}
+
+.auth-submit[data-ready='true']:hover {
+  background: #013080;
 }
 
 .auth-switch {
-  margin-top: 20px;
-  color: var(--muted);
-  font-size: 13px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 0;
+  color: #1f1f1f;
+  font-size: 14px;
 }
 
 .auth-switch button {
-  color: var(--text);
+  border: 0;
+  background: transparent;
+  color: #1f1f1f;
+  font-size: 14px;
   font-weight: 600;
   text-decoration: underline;
+  cursor: pointer;
 }
 
-.auth-demo {
+.auth-hint {
+  margin: 0;
+  color: #60646c;
+  font-size: 12px;
+}
+
+/*
+  가상 데이터 스위치·데모 계정.
+
+  시안에는 없는, 시연·개발용 블록이다. 카드 아래 눈에 띄게 붙여 두되
+  카드 자체의 모양(로그인 창)과는 구별되게 옅은 배경을 쓴다.
+*/
+.auth-dev {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
+  padding: 16px;
+  border: 1px dashed #e5e7eb;
+  border-radius: 16px;
+  background: #fafafa;
+}
+
+.auth-mock {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.auth-mock input {
+  margin-top: 2px;
+  width: 15px;
+  height: 15px;
+  accent-color: #002662;
+  cursor: pointer;
+}
+
+.auth-mock span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.auth-mock strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+
+.auth-mock em {
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.5;
+  color: #60646c;
 }
 
 .auth-demo h2 {
   margin: 0 0 8px;
-  color: var(--muted);
+  color: #60646c;
   font-size: 12px;
   font-weight: 600;
+}
+
+.auth-demo-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #60646c;
 }
 
 .auth-demo-list {
@@ -153,18 +327,21 @@
 
 .auth-demo-list button {
   padding: 6px 8px;
+  border: 0;
   border-radius: 6px;
-  color: var(--muted);
+  background: transparent;
+  color: #60646c;
   font-size: 12px;
   text-align: left;
+  cursor: pointer;
 }
 
 .auth-demo-list button:hover:not(:disabled) {
-  background: var(--sidebar);
-  color: var(--text);
+  background: #ffffff;
+  color: #1f1f1f;
 }
 
 .auth-demo-list strong {
-  color: var(--text);
+  color: #1f1f1f;
   font-weight: 600;
 }

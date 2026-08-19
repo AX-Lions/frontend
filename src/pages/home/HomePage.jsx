@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './Sidebar.jsx'
-import { DelegateDialog } from './DelegateDialog.jsx'
 import { AgentDock } from './AgentDock.jsx'
 import { BriefingPrompt } from './BriefingPrompt.jsx'
-import { CreateProjectDialog } from './CreateProjectDialog.jsx'
+import { ConfirmedScheduleDialog } from './ConfirmedScheduleDialog.jsx'
+import { NewMeetingDialog } from './NewMeetingDialog.jsx'
+import { NewProjectDialog } from './NewProjectDialog.jsx'
 import { fetchHome, setMeetingFavorite } from './home.api.js'
 import { navigate } from '../../app/navigation.js'
+import { getCurrentTeamId, onCurrentTeamChange } from '../../lib/currentTeam.js'
 import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
-import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 import { TeamOnboarding } from './TeamOnboarding.jsx'
 
@@ -50,24 +51,27 @@ export function HomePage() {
   const [selectedMeetingId, setSelectedMeetingId] = useState(null)
   const [selectedScheduleKey, setSelectedScheduleKey] = useState(null)
   const [pendingFavorites, setPendingFavorites] = useState([])
-  const [delegateFor, setDelegateFor] = useState(null)
   const [addingProject, setAddingProject] = useState(false)
+  const [addingMeeting, setAddingMeeting] = useState(false)
+  // 「오늘 일정」 한 줄을 눌렀을 때 뜨는 확정된 일정 확인 팝업의 대상 회의.
+  const [confirmingMeetingId, setConfirmingMeetingId] = useState(null)
+  /*
+    사이드바 접힘은 **레일과 프로젝트 목록이 함께 본다.** 접었을 때 레일만
+    남으면 왼쪽이 여전히 두 칸이라 접힌 것으로 보이지 않는다. 값을 둘의 공통
+    부모인 여기에 두고 양쪽에 내려 준다.
+  */
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const toggleSidebar = () => setIsSidebarCollapsed((collapsed) => !collapsed)
+  // `팀 전환하기`(`TeamSwitchDialog`)가 고른 팀. `null` 이면 전체 보기다.
+  // `localStorage` 값이라 리액트 상태로 옮겨 받아야 바뀌었을 때 다시 그린다.
+  const [currentTeamId, setCurrentTeamIdState] = useState(getCurrentTeamId)
+  useEffect(() => onCurrentTeamChange(setCurrentTeamIdState), [])
   // 브리핑 팝업은 한 번만 뜬다. `homeData` 를 다시 읽을 때마다 뜨면, 별 하나
   // 눌렀다고 팝업이 다시 올라온다.
   const [briefingSeen, setBriefingSeen] = useState(false)
   // 자동 열기는 상태가 아니라 ref 다. 상태로 두면 effect 안에서 setState 를
   // 부르게 되고 렌더가 한 번 더 돈다 — 어차피 화면에 아무것도 안 그리는 값이다.
   const autoOpenedRef = useRef(false)
-
-  /** 저장한 결과를 목록에 반영한다. 전체를 다시 읽으면 스크롤이 튄다. */
-  const applyDelegation = (meetingId, saved) => setData((current) => (current ? {
-    ...current,
-    today_schedule: current.today_schedule.map((s) => (
-      s.meeting_id === meetingId
-        ? { ...s, delegation: { delegated: saved.delegated, prompt: saved.prompt, sources: saved.sources } }
-        : s
-    )),
-  } : current))
 
   useEffect(() => {
     if (!favoriteMessage) {
@@ -201,13 +205,19 @@ export function HomePage() {
     }
   }
 
-  // 전역 레일은 **읽는 중에도 실패해도 자리에 있어야 한다.** 홈이 안 불러와졌다고
-  // 채팅·설정으로 갈 길까지 사라지면, 사용자는 새로고침 말고 할 수 있는 것이 없다.
+  // 사이드바 상단(로고+아이콘 줄)은 **읽는 중에도 실패해도 자리에 있어야 한다.**
+  // 홈이 안 불러와졌다고 채팅·설정으로 갈 길까지 사라지면, 사용자는 새로고침
+  // 말고 할 수 있는 것이 없다. 아이콘 줄은 `homeData` 가 아니라 자기 훅으로
+  // 따로 읽으므로 여기서도 그대로 뜬다.
   if (loading && !homeData) {
     return (
       <div className="home-layout">
-        <GlobalSidebar active="home" />
-        <Sidebar favoriteProjects={[]} recentProjects={[]} />
+        <Sidebar
+          favoriteProjects={[]}
+          recentProjects={[]}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
+        />
         <main className="home-main"><Loading label="홈을 불러오는 중입니다…" /></main>
       </div>
     )
@@ -216,8 +226,12 @@ export function HomePage() {
   if (error && !homeData) {
     return (
       <div className="home-layout">
-        <GlobalSidebar active="home" />
-        <Sidebar favoriteProjects={[]} recentProjects={[]} />
+        <Sidebar
+          favoriteProjects={[]}
+          recentProjects={[]}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
+        />
         <main className="home-main"><LoadError error={error} onRetry={reload} /></main>
       </div>
     )
@@ -226,6 +240,17 @@ export function HomePage() {
   const recentMeetings = homeData.recent_meetings ?? []
   const todaySchedule = homeData.today_schedule ?? []
   const summary = homeData.recent_meeting_summary
+
+  /*
+    팀 전환하기가 고른 팀만 남긴다.
+
+    회의·오늘 일정은 안 거른다 — 저 둘은 이미 지나갔거나 오늘 잡힌
+    **참석 대상**이지 "지금 보는 팀" 과 무관하다. 팀을 바꿔도 오늘 회의가
+    없어지면 정작 봐야 할 것을 놓친다. 거르는 것은 프로젝트 목록뿐이다.
+  */
+  const inCurrentTeam = (project) => !currentTeamId || project.team_id === currentTeamId
+  const favoriteProjects = (homeData.favorite_projects ?? []).filter(inCurrentTeam)
+  const recentProjects = (homeData.recent_projects ?? []).filter(inCurrentTeam)
 
   /*
     아무 데도 안 붙어 있는 사람.
@@ -249,6 +274,8 @@ export function HomePage() {
     동료들이 쓰는 판 옆에 빈 판을 하나 더 만들게 된다 — 이 화면이 막으려던
     바로 그 사고다.
   */
+  // 팀 전환하기로 고른 팀에 프로젝트가 없다고 해서 온보딩(첫 팀·프로젝트 만들기)을
+  // 다시 띄우면 안 된다 — 다른 팀엔 있을 수 있다. 판정은 거르기 전 값으로 한다.
   const nothingYet = recentMeetings.length === 0
     && (homeData.project_progress ?? []).length === 0
     && todaySchedule.length === 0
@@ -258,10 +285,11 @@ export function HomePage() {
 
   return (
     <div className="home-layout">
-      <GlobalSidebar active="home" user={{ name: homeData.user_name }} />
       <Sidebar
-        favoriteProjects={homeData.favorite_projects ?? []}
-        recentProjects={homeData.recent_projects ?? []}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+        favoriteProjects={favoriteProjects}
+        recentProjects={recentProjects}
         shortcuts={homeData.shortcuts}
         userName={homeData.user_name}
         avatarUrl={homeData.user_avatar_url}
@@ -342,6 +370,33 @@ export function HomePage() {
                       }
                       key={meeting.meeting_id}
                     >
+                      {/*
+                        회사 이름과 즐겨찾기 별은 **한 줄에 나란히 선 형제**다.
+
+                        별을 링크(`<a>`) 안에 넣으면 앵커 안에 단추가 들어가 HTML
+                        규칙에 어긋난다 — 스크린리더가 둘을 하나로 읽거나 키보드
+                        차례가 브라우저마다 갈린다. 대신 줄을 따로 두고, 카드 전체를
+                        누르는 것은 아래 링크가 덮개(`::after`)로 맡는다.
+
+                        폭도 이 줄이 정한다. 예전에는 별이 절대 위치라 이름 쪽에
+                        `max-width: 108px` 를 손으로 박아 비켜 갔는데, 그 숫자가
+                        별 크기·여백과 따로 놀아서 한쪽만 바뀌면 겹쳤다.
+                      */}
+                      <div className="project-card-head">
+                        {/* 회의가 자기 프로젝트 이름을 들고 온다. 프로젝트 목록에서
+                            찾을 필요가 없다 — 목록에 없는 프로젝트의 회의도 있다. */}
+                        <span className="meeting-company">{meeting.project_name}</span>
+                        <button
+                          className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
+                          type="button"
+                          aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
+                          disabled={pendingFavorites.includes(meeting.meeting_id)}
+                          onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
+                        >
+                          <img src={meeting.is_favorite ? starIcons.active : starIcons.inactive} alt="" />
+                        </button>
+                      </div>
+
                       <a
                         className="project-card-link"
                         href={href}
@@ -350,9 +405,6 @@ export function HomePage() {
                           goInApp(event, href)
                         }}
                       >
-                        {/* 회의가 자기 프로젝트 이름을 들고 온다. 프로젝트 목록에서
-                            찾을 필요가 없다 — 목록에 없는 프로젝트의 회의도 있다. */}
-                        <span className="meeting-company">{meeting.project_name}</span>
                         <strong>{meeting.title}</strong>
 
                         {/*
@@ -361,22 +413,15 @@ export function HomePage() {
                           이 뱃지**인데 서버(`recent_meetings[].missed`)만 주고
                           화면이 그리지 않았다. 다섯 장이 전부 똑같아 보였다.
                         */}
-                        <span className="card-foot">
+                        {/* 뱃지가 없어도 자리는 그린다. 줄이 사라지면 그 카드만
+                            위쪽 요소가 밀려 다섯 장이 어긋난다. */}
+                        <span className="missed-slot">
                           {meeting.missed ? (
                             <span className="missed-badge">불참한 회의</span>
                           ) : null}
-                          <time>{meeting.displayed_at}</time>
                         </span>
+                        <time>{meeting.displayed_at}</time>
                       </a>
-                      <button
-                        className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
-                        type="button"
-                        aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
-                        disabled={pendingFavorites.includes(meeting.meeting_id)}
-                        onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
-                      >
-                        <img src={meeting.is_favorite ? starIcons.active : starIcons.inactive} alt="" />
-                      </button>
                     </article>
                   )
                 })}
@@ -389,10 +434,19 @@ export function HomePage() {
               <div className="section-heading">
                 <h2>오늘 일정</h2>
                 {/*
-                  전체 일정 화면이 아직 없다. `href="/"` 짜리 화살표를 두면
-                  눌렀을 때 홈이 다시 뜨는데, 그건 "없다" 가 아니라 "고장" 으로
-                  읽힌다. 갈 곳이 생기면 그때 붙인다.
+                  전체 일정 화면은 아직 없다 — 화살표는 안 둔다. `+` 는
+                  화면 하나로 안 가고 팝업을 여는 것이라 이 사정과 무관하다
+                  (시안 `692:8292`).
                 */}
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label="회의 일정 추가"
+                  title="회의 일정 추가"
+                  onClick={() => setAddingMeeting(true)}
+                >
+                  <img src="/icons/AddIcon.svg" alt="" />
+                </button>
               </div>
               <div className="schedule-content">
                 {todaySchedule.length === 0 ? (
@@ -402,19 +456,42 @@ export function HomePage() {
 
                   return (
                     <div className="schedule-item" key={scheduleKey}>
+                      {/*
+                        시각은 회의 이름 **바깥**에 둔다.
+
+                        좁아지면 시각이 제 줄로 빠지고 이름과 버튼이 그 아래 한 줄에
+                        선다(시안 `754:5742`). 이름 상자 안에 있으면 그 상자 밖으로
+                        나갈 수 없어 이 배치가 안 나온다.
+
+                        `time_range` 는 참여자 시간대로 서버가 계산해 준다. 브라우저
+                        시간대로 다시 찍으면 같은 회의를 사람마다 다른 시각으로 본다.
+                      */}
+                      <time className="schedule-time">{schedule.time_range}</time>
                       <button
                         className={selectedScheduleKey === scheduleKey ? 'schedule-info selected' : 'schedule-info'}
                         type="button"
-                        onClick={() => setSelectedScheduleKey(scheduleKey)}
+                        onClick={() => {
+                          setSelectedScheduleKey(scheduleKey)
+                          // 상세가 있는 회의만 확인 팝업을 연다 — 회의 없이 시각만
+                          // 잡힌 일정(`meeting_id: null`)은 보여 줄 회의가 없다.
+                          if (schedule.meeting_id) {
+                            setConfirmingMeetingId(schedule.meeting_id)
+                          }
+                        }}
                       >
-                        {/* `time_range` 는 참여자 시간대로 서버가 계산해 준다.
-                            브라우저 시간대로 다시 찍으면 같은 회의를 사람마다
-                            다른 시각으로 본다. */}
-                        <time>{schedule.time_range}</time>
                         <div>
                           <strong>{schedule.title}</strong>
+                          {/*
+                            `·` 뒤를 붙임표 없는 공백으로 묶는다.
+
+                            좁은 칸에서 두 줄이 될 때 `글로벌 회의 도구 ·` / `Discord`
+                            로 갈려 **구분점만 줄 끝에 남았다.** 뒤 낱말과 함께
+                            넘기면 앞줄이 온전한 말로 끝난다.
+                          */}
                           <span>
-                            {schedule.project_name} · {schedule.location}
+                            {schedule.project_name}
+                            {' · '}
+                            {schedule.location}
                           </span>
                         </div>
                       </button>
@@ -434,7 +511,16 @@ export function HomePage() {
                         <button
                           className={schedule.delegation.delegated ? 'is-delegated' : ''}
                           type="button"
-                          onClick={() => setDelegateFor(schedule)}
+                          /*
+                            팝업이 아니라 화면으로 보낸다.
+
+                            회의 전에 해야 하는 준비가 자료 범위 네 칸에서
+                            **예상 논쟁점 · 내 입장 · Bordo 활동 설정**까지
+                            늘었다. 회의를 주소에 실어 보내므로 새로고침하거나
+                            링크를 복사해도 같은 회의가 열린다.
+                          */
+                          onClick={() => navigate(
+                            `/delegate-prep?meeting=${schedule.meeting_id}`)}
                         >
                           {schedule.delegation.delegated ? '대리 참석 중' : '회의에 참여하지 않아요'}
                         </button>
@@ -526,16 +612,8 @@ export function HomePage() {
         <AgentDock />
       </main>
 
-      {delegateFor ? (
-        <DelegateDialog
-          schedule={delegateFor}
-          onClose={() => setDelegateFor(null)}
-          onSaved={applyDelegation}
-        />
-      ) : null}
-
       {addingProject ? (
-        <CreateProjectDialog
+        <NewProjectDialog
           onClose={() => setAddingProject(false)}
           // 만든 프로젝트를 목록 맨 위에 얹는다. 홈 전체를 다시 읽으면 방금
           // 만든 것을 찾으려고 사용자가 목록을 훑어야 한다.
@@ -547,6 +625,22 @@ export function HomePage() {
             recent_projects: [project, ...(current.recent_projects ?? [])],
             project_progress: [project, ...(current.project_progress ?? [])],
           } : current))}
+        />
+      ) : null}
+
+      {addingMeeting ? (
+        <NewMeetingDialog
+          onClose={() => setAddingMeeting(false)}
+          // 새로 만든 회의가 오늘 일정·최근 회의 어디에 걸리는지는 서버
+          // 집계 규칙이다(시간대별 "오늘" 판정 등). 흉내 내지 않고 다시 읽는다.
+          onCreated={() => reload()}
+        />
+      ) : null}
+
+      {confirmingMeetingId ? (
+        <ConfirmedScheduleDialog
+          meetingId={confirmingMeetingId}
+          onClose={() => setConfirmingMeetingId(null)}
         />
       ) : null}
 

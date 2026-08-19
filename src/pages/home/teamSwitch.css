@@ -1,0 +1,148 @@
+/*
+ * 팀 전환하기(시안 `692:8230`). `np-backdrop` 은 `newProject.css` 를 그대로
+ * 쓰고, 대화상자 자체는 그쪽(`612px`)보다 작아 따로 둔다.
+ */
+
+.team-switch-dialog {
+  display: flex;
+  width: 424px;
+  max-width: 100%;
+  max-height: 80vh;
+  flex-direction: column;
+  gap: 16px;
+  padding: 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.team-switch-dialog,
+.team-switch-dialog * {
+  box-sizing: border-box;
+}
+
+.team-switch-dialog button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.team-switch-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.team-switch-head h2 {
+  margin: 0;
+  color: #000000;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.team-switch-current {
+  color: #60646c;
+  font-size: 12px;
+}
+
+.team-switch-current strong {
+  color: #60646c;
+  font-weight: 600;
+}
+
+.team-switch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.team-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.team-switch-row:last-child {
+  border-bottom: 0;
+}
+
+.team-switch-row:hover {
+  background: #fafafa;
+}
+
+/* `전체 보기` 줄(`team-switch-clear`)은 관리자 단추가 없는 단일
+   `<button className="team-switch-row team-switch-clear">` 라, 안쪽
+   자리 배치를 `team-switch-row-main` 과 함께 받는다. */
+.team-switch-row-main,
+.team-switch-clear {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+}
+
+/* 팀 관리자에게만 보이는 `Discord 설정` 링크. */
+.team-switch-admin {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: #002662;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.team-switch-admin:hover {
+  background: rgb(0 38 98 / 8%);
+}
+
+.team-switch-name {
+  overflow: hidden;
+  color: #000000;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-switch-row.is-current .team-switch-name {
+  color: #002662;
+}
+
+.team-switch-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: #60646c;
+  font-size: 12px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-switch-empty {
+  margin: 8px 0;
+  color: #92969d;
+  font-size: 13px;
+}
+
+.team-switch-close {
+  align-self: flex-end;
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: #60646c;
+  font-size: 13px;
+}
+
+.team-switch-close:hover {
+  background: #f3f4f6;
+}

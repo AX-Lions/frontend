@@ -117,6 +117,19 @@ const BADGE_SLIDE_RATIO = 0.3
 const EDGE_START_GAP = 6
 const EDGE_END_GAP = 16
 
+/**
+ * 자기 대리인과 오간 것을 붙이는 자리 — 노드 테두리에서 바깥으로.
+ *
+ * 대리인을 주인에게 접으면 「사람 ↔ 자기 대리인」 엣지는 자기 자신을 가리킨다.
+ * 그릴 선이 없다고 버리면 **"내가 내 대리인에게 지시한 기록" 이 판에서 통째로
+ * 사라진다** — 이 서비스에서 가장 자주 일어나는 일인데 안 보이게 된다.
+ * 그래서 선 대신 노드에 뱃지로 붙인다.
+ */
+const SELF_BADGE_GAP = 26
+
+/** 한 사람에게 자기 뱃지가 여럿일 때 바깥으로 쌓이는 간격. */
+const SELF_BADGE_STEP = 34
+
 const KIND_RANK = { USER: 0, AGENT: 1, SERVER: 2 }
 
 /** 요약표 세 열 중 가장 긴 열의 줄 수로 상자 높이를 잰다. */
@@ -261,9 +274,54 @@ function lineBetween(from, to, offset, slideRank) {
   }
 }
 
-/** 사람끼리 오간 것이 아니면 AI 선이다. 대리인·서버가 한쪽에라도 끼면 주황. */
+/**
+ * 사람끼리 오간 것이 아니면 AI 선이다. 대리인·서버가 한쪽에라도 끼면 주황.
+ *
+ * **접기 전의 노드를 넘겨야 한다.** 대리인을 주인에게 접고 나면 양 끝이 다
+ * `USER` 라, 접은 것을 넘기면 주황 선이 하나도 남지 않는다 — 대리인 노드를
+ * 없앤 이유가 통째로 사라진다.
+ */
 function isAiLink(from, to) {
   return from?.kind !== 'USER' || to?.kind !== 'USER'
+}
+
+/**
+ * 대리인을 주인에게 접는다.
+ *
+ * 판에 AI 프로필을 따로 세우지 않는다. `강다은의 Bordo` 가 노드로 서면 사람이
+ * 다섯인 회의가 노드 여덟 개가 되고, 정작 읽어야 하는 **"누가 누구에게 무엇을
+ * 보냈나"** 가 대리인 이름에 묻힌다. AI 가 날랐다는 것은 **선 색(주황)이 이미
+ * 말한다** — 노드를 하나 더 세워 같은 말을 두 번 할 이유가 없다.
+ *
+ * 답의 주어는 사람이다. 대리인은 `어떻게` 에 해당하고, 그건 색이 맡는다.
+ *
+ * 주인을 못 찾은 대리인은 **그대로 둔다.** 필터로 주인만 빠지는 경우가 있는데,
+ * 접을 곳이 없다고 지워 버리면 그 흐름이 통째로 사라진다 — 안 보이는 것과
+ * 없는 것은 다르다.
+ *
+ * @returns `{ kept, ownerOf }` — `ownerOf` 는 모든 노드 id 를 살아남는 id 로
+ *          옮기는 표다. 접히지 않은 노드는 자기 자신을 가리킨다.
+ */
+function collapseAgents(nodes) {
+  const userByOwner = new Map()
+  nodes.forEach((node) => {
+    if (node.kind === 'USER' && node.user_id) {
+      userByOwner.set(node.user_id, node.id)
+    }
+  })
+
+  const ownerOf = new Map()
+  nodes.forEach((node) => {
+    const owner = node.kind === 'AGENT' && node.user_id
+      ? userByOwner.get(node.user_id)
+      : undefined
+    ownerOf.set(node.id, owner ?? node.id)
+  })
+
+  return {
+    kept: nodes.filter((node) => ownerOf.get(node.id) === node.id),
+    ownerOf,
+  }
 }
 
 /**
@@ -276,7 +334,11 @@ function isAiLink(from, to) {
  * @returns `{ nodes, links, badges, stage, summary }`
  */
 export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {}) {
-  const ordered = orderNodes(nodes.filter(Boolean))
+  const raw = nodes.filter(Boolean)
+  // 접기 전 노드를 들고 있어야 선 색을 정할 수 있다. 접은 뒤에는 전부 사람이다.
+  const rawById = new Map(raw.map((node) => [node.id, node]))
+  const { kept, ownerOf } = collapseAgents(raw)
+  const ordered = orderNodes(kept)
   const angles = ringAngles(ordered.length)
   const { rx, ry } = ringRadii(angles)
   const summary = { width: SUMMARY_WIDTH, height: summaryHeight(summaryRows) }
@@ -320,30 +382,73 @@ export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {
   */
   const pairSlots = new Map()
   const pending = []
+  const selfPending = []
 
   arrows.forEach((arrow) => {
-    const from = byId.get(arrow.from_node_id)
+    const fromRaw = rawById.get(arrow.from_node_id)
+    const from = byId.get(ownerOf.get(arrow.from_node_id))
     if (!from) {
       return
     }
 
+    /*
+      접고 나면 같은 사람이 여러 번 나온다.
+
+      `[강다은, 강다은의 Bordo]` 로 간 화살표는 둘 다 `강다은` 이 된다. 안
+      걸러 내면 **같은 자리에 같은 선을 두 번 긋고**, 평행선 세는 값까지
+      부풀어 멀쩡한 옆 선들이 괜히 벌어진다.
+    */
+    const drawnTargets = new Set()
+    let selfHit = null
+
     // `to_node_ids` 는 여럿일 수 있다. 작업 플로우 한 건이 팀 전원에게 가면
     // 대상 수만큼 선이 그어진다 — 하나만 그리면 나머지 사람에게는 그 일이
     // 일어나지 않은 것으로 보인다.
-    ;(arrow.to_node_ids ?? []).forEach((toId, targetIndex) => {
-      const to = byId.get(toId)
-      if (!to || to.id === from.id) {
+    ;(arrow.to_node_ids ?? []).forEach((toId) => {
+      const toRaw = rawById.get(toId)
+      const to = byId.get(ownerOf.get(toId))
+      if (!to) {
         return
       }
+
+      // 색은 **접기 전** 종류로 정한다. 접은 뒤에는 양 끝이 다 사람이다.
+      const isAi = isAiLink(fromRaw, toRaw)
+
+      // 자기 대리인과 오간 것. 접고 나면 자기 자신을 가리켜 그릴 선이 없다.
+      if (to.id === from.id) {
+        selfHit = selfHit ?? { arrow, node: from, isAi }
+        return
+      }
+
+      if (drawnTargets.has(to.id)) {
+        return
+      }
+      drawnTargets.add(to.id)
 
       const pairKey = [from.id, to.id].sort().join('|')
       const slot = pairSlots.get(pairKey) ?? 0
       pairSlots.set(pairKey, slot + 1)
-      pending.push({ arrow, from, to, targetIndex, pairKey, slot })
+      /*
+        뱃지는 화살표당 하나다. 브로드캐스트에서 팔마다 같은 숫자를 붙이면
+        같은 일이 네 번 일어난 것처럼 읽힌다. **실제로 그린 첫 팔**에 붙인다 —
+        원래 순서의 첫 대상이 자기 대리인이라 안 그려질 수 있어서, 목록의
+        첫 칸을 기준으로 삼으면 그 화살표만 숫자가 통째로 빠진다.
+      */
+      pending.push({ arrow, from, to, isAi, pairKey, slot, isBadgeAnchor: drawnTargets.size === 1 })
     })
+
+    /*
+      선이 하나도 안 그려진 화살표만 자기 뱃지가 된다.
+
+      한 화살표가 자기 대리인과 남에게 같이 갔다면 숫자는 이미 선 쪽에 붙는다.
+      양쪽에 다 붙이면 **같은 건수가 두 번 일어난 것처럼 읽힌다.**
+    */
+    if (selfHit && drawnTargets.size === 0) {
+      selfPending.push(selfHit)
+    }
   })
 
-  const links = pending.map(({ arrow, from, to, targetIndex, pairKey, slot }) => {
+  const links = pending.map(({ arrow, from, to, isAi, pairKey, slot, isBadgeAnchor }) => {
     const total = pairSlots.get(pairKey) ?? 1
     // 선이 많아지면 간격을 좁힌다. 넓게 유지하면 바깥 선이 노드에서 떨어진다.
     const spread = total > 1
@@ -372,11 +477,9 @@ export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {
       arrow,
       fromId: from.id,
       toId: to.id,
-      isAi: isAiLink(from, to),
+      isAi,
       opacity: arrow.opacity ?? 1,
-      // 뱃지는 화살표당 하나다. 브로드캐스트에서 팔마다 같은 숫자를 붙이면
-      // 같은 일이 네 번 일어난 것처럼 읽힌다.
-      isBadgeAnchor: targetIndex === 0,
+      isBadgeAnchor,
       ...lineBetween(from, to, offset, rank * forward),
     }
   })
@@ -387,9 +490,44 @@ export function buildFlowLayout(nodes = [], arrows = [], { summaryRows = 0 } = {
       id: link.arrowId,
       arrow: link.arrow,
       isAi: link.isAi,
+      isSelf: false,
       point: link.midpoint,
       axis: link.axis,
     }))
+
+  /*
+    자기 대리인과 오간 것을 노드 바깥에 쌓는다.
+
+    링 중심의 **반대쪽**으로 민다. 안쪽으로 밀면 요약표·다른 선과 겹치는데,
+    바깥은 어차피 비어 있다. 한 사람에게 여럿이면 같은 방향으로 더 밀어 쌓는다.
+  */
+  const selfByNode = new Map()
+  selfPending
+    .filter((entry) => (entry.arrow.counts ?? []).length > 0)
+    .forEach((entry) => {
+      const list = selfByNode.get(entry.node.id) ?? []
+      list.push(entry)
+      selfByNode.set(entry.node.id, list)
+    })
+
+  selfByNode.forEach((entries, nodeId) => {
+    const node = byId.get(nodeId)
+    const outward = unit(node.x - centerX, node.y - centerY)
+    // 사람이 하나면 노드가 곧 중심이라 방향을 정할 수 없다. 아래로 내린다.
+    const dir = outward.length < 1e-6 ? { x: 0, y: 1 } : outward
+
+    entries.forEach((entry, index) => {
+      const reach = NODE_RADIUS + SELF_BADGE_GAP + index * SELF_BADGE_STEP
+      badges.push({
+        id: entry.arrow.id,
+        arrow: entry.arrow,
+        isAi: entry.isAi,
+        isSelf: true,
+        point: { x: node.x + dir.x * reach, y: node.y + dir.y * reach },
+        axis: 'row',
+      })
+    })
+  })
 
   /*
     무대 크기를 그린 것에 맞춰 잡는다.
