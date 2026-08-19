@@ -253,7 +253,6 @@ export function FlowBoardPage() {
     boardRef,
     handleBoardPointerDown,
     handleBoardPointerMove,
-    handleBoardWheel,
     isPanning,
     maxZoom,
     minZoom,
@@ -508,7 +507,6 @@ export function FlowBoardPage() {
           className={isPanning ? 'flow-board is-panning' : 'flow-board'}
           aria-label="회의 플로우보드"
           ref={attachBoard}
-          onWheel={handleBoardWheel}
           onPointerDown={handleBoardPointerDown}
           onPointerMove={handleBoardPointerMove}
           onPointerUp={stopBoardPan}
@@ -667,18 +665,30 @@ export function FlowBoardPage() {
           </div>
 
           {/*
-            `zoom > minZoom` 일 때만 그리던 탓에 기본 상태에서는 확대 버튼이
-            **화면에 아예 없었다.** 확대하려면 먼저 확대해야 하는 셈이었다.
+            확대한 동안에만 그린다(110% · 120%).
+
+            판이 이 화면의 전부라, 100% 로 보고 있을 때 그 위에 겹쳐 뜬 상자는
+            아무 일도 하지 않으면서 판만 가린다. 배율을 되돌릴 곳은 배율을
+            바꾼 뒤에 필요하다.
+
+            **대신 100% 에서 확대로 들어가는 길은 `Ctrl`(`Cmd`) + 휠 하나뿐이다.**
+            이건 알고 있는 사람만 쓰는 길이라, 확대를 처음 하려는 사람은 방법을
+            찾지 못한다. 예전에 같은 이유로 이 상자를 늘 그리도록 되돌린 적이
+            있다 — 그때와 달리 이번에는 판을 가리지 않는 쪽을 골랐다.
+
+            되돌릴 거리는 이 조건 하나다. `zoom > minZoom` 을 지우면 된다.
           */}
-          <div className="zoom-controls" aria-label="플로우보드 확대 축소">
-            <button type="button" aria-label="축소" data-tip="축소" onClick={zoomOut} disabled={zoom <= minZoom}>
-              -
-            </button>
-            <output aria-live="polite">{zoomPercent}%</output>
-            <button type="button" aria-label="확대" data-tip="확대" onClick={zoomIn} disabled={zoom >= maxZoom}>
-              +
-            </button>
-          </div>
+          {zoom > minZoom ? (
+            <div className="zoom-controls" aria-label="플로우보드 확대 축소">
+              <button type="button" aria-label="축소" data-tip="축소" onClick={zoomOut} disabled={zoom <= minZoom}>
+                -
+              </button>
+              <output aria-live="polite">{zoomPercent}%</output>
+              <button type="button" aria-label="확대" data-tip="확대" onClick={zoomIn} disabled={zoom >= maxZoom}>
+                +
+              </button>
+            </div>
+          ) : null}
         </section>
 
         {panel?.kind === 'briefing' ? (
