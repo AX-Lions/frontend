@@ -32,7 +32,7 @@ import {
   getRefreshToken,
   setTokens,
 } from './auth.js'
-import { serveMock, shouldMock } from '../mocks/index.js'
+import { isMockMode } from '../mocks/enabled.js'
 
 const BASE = '/api/v1'
 
@@ -163,8 +163,18 @@ export async function request(path, options = {}) {
     모든 호출이 이 함수를 지나가므로 여기가 유일한 갈림길이다.
 
     `login` · `signup` 도 이 함수를 쓰므로 로그인까지 서버 없이 된다.
+
+    ## `serveMock` 은 그때 가서 받는다
+
+    `mocks/index.js` 가 가상 데이터 전부(`data/**`)를 정적으로 끌어온다.
+    이 파일 위에서 그것을 정적으로 `import` 하면, 스위치가 꺼져 있는 사용자도
+    그 바이트를 전부 받는다(측정값 +38KB gzip, AX-Lions/frontend#22). `isMockMode`
+    는 `localStorage` 하나만 보는 가벼운 함수라 `mocks/enabled.js` 에서 따로
+    가져온다 — 진짜 무거운 것은 스위치를 켠 사람만 받도록 스위치를 켰을 때만
+    부른다.
   */
-  if (shouldMock()) {
+  if (isMockMode()) {
+    const { serveMock } = await import('../mocks/index.js')
     return serveMock(path, options)
   }
 

@@ -1,4 +1,3 @@
-import { isMockMode } from './enabled.js'
 import { appendTo, patch, patchedOf, withAppended } from './store.js'
 
 /**
@@ -34,6 +33,7 @@ import {
   meetingIndexes, meetings, projectMeetings, summaryTables, workIndexes,
 } from './data/meetings.js'
 import { flowEdges, meetingFlows, projectFlows } from './data/flow.js'
+import { PREP_STATUS_LABEL, preps } from './data/prep.js'
 import { teamMembers } from './data/home.js'
 import { inbox } from './data/inbox.js'
 import { TEAM } from './data/people.js'
@@ -121,6 +121,77 @@ function applyDelegations(home) {
     return saved ? { ...s, delegation: { ...s.delegation, ...saved } } : s
   })
   return { ...home, today_schedule: today }
+}
+
+/**
+ * 준비 화면에 이번에 저장한 것을 얹는다.
+ *
+ * **여기가 이 화면에서 제일 자주 어긋나는 자리다.** 입장을 쓰면 화면이 곧바로
+ * 서버를 다시 읽는데, 저장한 것을 안 얹으면 방금 쓴 글이 그 자리에서 사라진다.
+ * 오류도 안내도 없어서, 사용자는 저장이 안 된 것인지 화면이 고장 난 것인지
+ * 구별하지 못한다.
+ */
+function livePrep(meetingId) {
+  const base = preps[meetingId]
+  if (!base) {
+    /*
+      준비 데이터를 안 만들어 둔 회의.
+
+      **`null` 을 주면 화면이 통째로 오류가 된다.** 준비 화면은 회의 여덟 개
+      어디서나 열 수 있는데 자세한 것은 셋만 채워 뒀다. 나머지는 헤더만 채우고
+      「아직 예상된 논쟁점이 없어요」 로 그린다 — 실제로 그 회의는 예측이 아직
+      안 돈 상태이므로 거짓말이 아니다.
+
+      설정은 안 준다. 화면이 로딩으로 두고 기다린다 — **빈 객체를 주면 토글이
+      전부 꺼진 것처럼 그려지는데** 그건 「아무것도 공개 안 함」 이라는 뜻이라
+      실제와 정반대다.
+    */
+    const header = viewerMeetingPrepHeader(meetingId)
+    return header ? {
+      header,
+      debate: {
+        notice: '아직 예상된 논쟁점이 없어요. 회의 자료가 쌓이면 Bordo가 예상해 드려요.',
+        count: 0,
+        answered_count: 0,
+        points: [],
+      },
+      agent_setup: null,
+    } : null
+  }
+
+  const absence = patchedOf(`absence:${meetingId}`)
+  const delegated = absence ? absence.delegated : base.header.delegated
+  const setup = { ...base.agent_setup, ...(patchedOf(`setup:${meetingId}`) ?? {}) }
+
+  const points = base.debate.points.map((point) => {
+    const saved = patchedOf(`stance:${point.id}`)
+    if (!saved) {
+      return point
+    }
+    // 지운 경우다. `null` 을 얹어 `답변필요` 로 되돌린다.
+    const stance = saved.body ? {
+      id: `stance-${point.id}`,
+      option_key: saved.option_key ?? null,
+      body: saved.body,
+      updated_at: saved.updated_at,
+    } : null
+    const status = stance ? 'ANSWERED' : 'NEEDED'
+    return { ...point, stance, status, status_label: PREP_STATUS_LABEL[status] }
+  })
+
+  return {
+    header: {
+      ...base.header,
+      delegated,
+      badge: delegated ? 'Bordo 대리 참석 예정' : '참석 예정',
+    },
+    debate: {
+      ...base.debate,
+      points,
+      answered_count: points.filter((one) => one.status === 'ANSWERED').length,
+    },
+    agent_setup: setup,
+  }
 }
 
 /** `/meetings/{id}/flow` 처럼 id 가 낀 주소를 가른다. */
@@ -299,8 +370,7 @@ function resolve(path, method, body) {
     if (a === 'teams' && c === 'discord' && s[3] === 'status') return discordStatus(b)
 
     if (a === 'meetings' && b && !c) return meetings[b] ?? null
-    // 지금은 헤더만 채운다 — 예상 논쟁점 · Bordo 활동 설정은 이 팝업이 안 쓴다.
-    if (a === 'meetings' && c === 'prep') return { header: viewerMeetingPrepHeader(b) }
+    if (a === 'meetings' && c === 'prep') return livePrep(b)
     if (a === 'meetings' && c === 'flow') return meetingFlows[b] ?? null
     if (a === 'meetings' && c === 'summary-table') return summaryTables[b] ?? null
     if (a === 'meetings' && c === 'ai-briefing') return viewerBriefing(b)
@@ -389,6 +459,66 @@ function resolve(path, method, body) {
       }
     }
     if (path === '/auth/logout') return null
+
+    /*
+      준비 화면의 쓰기 넷.
+
+      **보낸 것을 담아 둔다.** 그냥 돌려주기만 하면 화면이 곧바로 다시 읽는
+      순간 방금 쓴 것이 사라진다 — 이 화면은 저장할 때마다 `/prep` 을 통째로
+      다시 읽기 때문에, 담아 두지 않으면 저장이 한 번도 눈에 보이지 않는다.
+    */
+    if (a === 'meetings' && c === 'absence') {
+      patch(`absence:${b}`, { delegated: method === 'POST' })
+      return method === 'DELETE' ? null : { delegated: true }
+    }
+    if (a === 'meetings' && c === 'agent-setup') {
+      const base = preps[b]?.agent_setup
+      if (!base) {
+        return null
+      }
+      /*
+        서버 규칙을 그대로 흉내 낸다.
+
+        `mode: "STANDING"` 은 **되돌리기**라 회의별 덮어쓰기를 통째로 지우고,
+        `mode` 를 안 보내면 **보낸 키만** 바뀐다. 여기서 전량 교체로 두면
+        가상 데이터에서만 지시가 안 지워지고 실서버에서는 지워진다 — 가상
+        데이터가 실서버보다 관대하면 확인하는 의미가 없다.
+      */
+      if (body?.mode === 'STANDING') {
+        patch(`setup:${b}`, {
+          mode: 'STANDING',
+          mode_label: '현재 설정 사용',
+          settings: base.standing_settings,
+          overridden_keys: [],
+          extra_note: '',
+          sources: null,
+        })
+      } else {
+        const next = {}
+        if (body?.settings) {
+          next.settings = { ...base.standing_settings, ...body.settings }
+          next.overridden_keys = Object.keys(body.settings).sort()
+          next.mode = 'ONCE'
+          next.mode_label = '이번에만 다르게 사용'
+        }
+        if (body?.sources !== undefined) {
+          next.sources = body.sources
+        }
+        if (body?.extra_note !== undefined) {
+          next.extra_note = body.extra_note
+        }
+        patch(`setup:${b}`, next)
+      }
+      return { ...base, ...(patchedOf(`setup:${b}`) ?? {}) }
+    }
+    if (a === 'debate-points' && c === 'stance') {
+      patch(`stance:${b}`, {
+        body: method === 'DELETE' ? '' : (body?.body ?? ''),
+        option_key: body?.option_key || null,
+        updated_at: new Date().toISOString(),
+      })
+      return method === 'DELETE' ? null : { id: `stance-${b}`, ...body }
+    }
 
     /*
       회원가입의 이메일 인증 · 초대 코드 확인(시안 `707:6492`).
@@ -681,10 +811,6 @@ function resolve(path, method, body) {
   }
 
   return undefined
-}
-
-export function shouldMock() {
-  return isMockMode()
 }
 
 /**

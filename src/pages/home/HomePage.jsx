@@ -370,6 +370,33 @@ export function HomePage() {
                       }
                       key={meeting.meeting_id}
                     >
+                      {/*
+                        회사 이름과 즐겨찾기 별은 **한 줄에 나란히 선 형제**다.
+
+                        별을 링크(`<a>`) 안에 넣으면 앵커 안에 단추가 들어가 HTML
+                        규칙에 어긋난다 — 스크린리더가 둘을 하나로 읽거나 키보드
+                        차례가 브라우저마다 갈린다. 대신 줄을 따로 두고, 카드 전체를
+                        누르는 것은 아래 링크가 덮개(`::after`)로 맡는다.
+
+                        폭도 이 줄이 정한다. 예전에는 별이 절대 위치라 이름 쪽에
+                        `max-width: 108px` 를 손으로 박아 비켜 갔는데, 그 숫자가
+                        별 크기·여백과 따로 놀아서 한쪽만 바뀌면 겹쳤다.
+                      */}
+                      <div className="project-card-head">
+                        {/* 회의가 자기 프로젝트 이름을 들고 온다. 프로젝트 목록에서
+                            찾을 필요가 없다 — 목록에 없는 프로젝트의 회의도 있다. */}
+                        <span className="meeting-company">{meeting.project_name}</span>
+                        <button
+                          className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
+                          type="button"
+                          aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
+                          disabled={pendingFavorites.includes(meeting.meeting_id)}
+                          onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
+                        >
+                          <img src={meeting.is_favorite ? starIcons.active : starIcons.inactive} alt="" />
+                        </button>
+                      </div>
+
                       <a
                         className="project-card-link"
                         href={href}
@@ -378,9 +405,6 @@ export function HomePage() {
                           goInApp(event, href)
                         }}
                       >
-                        {/* 회의가 자기 프로젝트 이름을 들고 온다. 프로젝트 목록에서
-                            찾을 필요가 없다 — 목록에 없는 프로젝트의 회의도 있다. */}
-                        <span className="meeting-company">{meeting.project_name}</span>
                         <strong>{meeting.title}</strong>
 
                         {/*
@@ -389,22 +413,15 @@ export function HomePage() {
                           이 뱃지**인데 서버(`recent_meetings[].missed`)만 주고
                           화면이 그리지 않았다. 다섯 장이 전부 똑같아 보였다.
                         */}
-                        <span className="card-foot">
+                        {/* 뱃지가 없어도 자리는 그린다. 줄이 사라지면 그 카드만
+                            위쪽 요소가 밀려 다섯 장이 어긋난다. */}
+                        <span className="missed-slot">
                           {meeting.missed ? (
                             <span className="missed-badge">불참한 회의</span>
                           ) : null}
-                          <time>{meeting.displayed_at}</time>
                         </span>
+                        <time>{meeting.displayed_at}</time>
                       </a>
-                      <button
-                        className={meeting.is_favorite ? 'favorite-mark active' : 'favorite-mark'}
-                        type="button"
-                        aria-label={meeting.is_favorite ? '즐겨찾기에서 제거' : '즐겨찾기에 추가'}
-                        disabled={pendingFavorites.includes(meeting.meeting_id)}
-                        onClick={(event) => toggleFavorite(event, meeting.meeting_id)}
-                      >
-                        <img src={meeting.is_favorite ? starIcons.active : starIcons.inactive} alt="" />
-                      </button>
                     </article>
                   )
                 })}
@@ -439,6 +456,17 @@ export function HomePage() {
 
                   return (
                     <div className="schedule-item" key={scheduleKey}>
+                      {/*
+                        시각은 회의 이름 **바깥**에 둔다.
+
+                        좁아지면 시각이 제 줄로 빠지고 이름과 버튼이 그 아래 한 줄에
+                        선다(시안 `754:5742`). 이름 상자 안에 있으면 그 상자 밖으로
+                        나갈 수 없어 이 배치가 안 나온다.
+
+                        `time_range` 는 참여자 시간대로 서버가 계산해 준다. 브라우저
+                        시간대로 다시 찍으면 같은 회의를 사람마다 다른 시각으로 본다.
+                      */}
+                      <time className="schedule-time">{schedule.time_range}</time>
                       <button
                         className={selectedScheduleKey === scheduleKey ? 'schedule-info selected' : 'schedule-info'}
                         type="button"
@@ -451,14 +479,19 @@ export function HomePage() {
                           }
                         }}
                       >
-                        {/* `time_range` 는 참여자 시간대로 서버가 계산해 준다.
-                            브라우저 시간대로 다시 찍으면 같은 회의를 사람마다
-                            다른 시각으로 본다. */}
-                        <time>{schedule.time_range}</time>
                         <div>
                           <strong>{schedule.title}</strong>
+                          {/*
+                            `·` 뒤를 붙임표 없는 공백으로 묶는다.
+
+                            좁은 칸에서 두 줄이 될 때 `글로벌 회의 도구 ·` / `Discord`
+                            로 갈려 **구분점만 줄 끝에 남았다.** 뒤 낱말과 함께
+                            넘기면 앞줄이 온전한 말로 끝난다.
+                          */}
                           <span>
-                            {schedule.project_name} · {schedule.location}
+                            {schedule.project_name}
+                            {' · '}
+                            {schedule.location}
                           </span>
                         </div>
                       </button>
