@@ -1,0 +1,123 @@
+/*
+ * 확인하지 않은 브리핑 팝업(시안 `666:5231` — `실시간 회의 팝업창`).
+ *
+ * 예전에는 제목·설명·닫기(×)가 한 줄에 놓인 `delegate-dialog` 를 빌려 썼다.
+ * 시안의 팝업은 그 모양이 아니다 — **가운데로 모은 두 줄과 버튼 두 개**뿐이고
+ * × 도 없다. 실시간 회의 팝업(`LiveMeetingPrompt`)과 같은 틀이라, 값도 같이
+ * 맞춘다: 404px · 라운드 24 · 안쪽 여백 32 · 버튼 라운드 16.
+ */
+
+.briefing-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.briefing-modal {
+  display: flex;
+  width: 404px;
+  max-width: 100%;
+  flex-direction: column;
+  gap: 32px;
+  padding: 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.08);
+}
+
+.briefing-modal-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+}
+
+.briefing-modal-body h2 {
+  margin: 0;
+  color: #1f1f1f;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.briefing-modal-body p {
+  margin: 0;
+  color: #60646c;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* 「항상 브리핑 보러가기」. 시안 홈 팝업(`37:478`)의 체크 한 줄이 이것이다. */
+.briefing-modal-always {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #60646c;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.briefing-modal-always input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #002662;
+  cursor: pointer;
+}
+
+.briefing-modal-error {
+  margin: 0;
+  color: #ff3333;
+  font-size: 13px;
+}
+
+.briefing-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.briefing-modal-actions button {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 12px;
+  border: 0;
+  border-radius: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    opacity 120ms ease;
+}
+
+.briefing-modal-actions button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.briefing-modal-later {
+  background: #f0f1f3;
+  color: #60646c;
+}
+
+.briefing-modal-later:hover:not(:disabled) {
+  background: #e5e7eb;
+}
+
+.briefing-modal-go {
+  background: #002662;
+  color: #ffffff;
+}
+
+.briefing-modal-go:hover:not(:disabled) {
+  background: #013080;
+}

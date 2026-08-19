@@ -1,0 +1,45 @@
+/*
+ * 아이콘 안내 말풍선.
+ *
+ * `position: fixed` 다. 아이콘 옆에 붙이면 사이드바처럼 `overflow: hidden` 인
+ * 상자 안에서 잘린다 — 이 앱의 사이드바가 전부 그렇다.
+ */
+
+.tooltip-bubble {
+  position: fixed;
+  z-index: 200;
+  max-width: 280px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #2f3033;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+  /* 가로 가운데를 아이콘 중심에 맞춘다. 좌표는 중심으로 오고, 폭은 글자가
+     정하므로 여기서 절반을 물러난다. */
+  transform: translateX(-50%);
+  /* 말풍선이 포인터를 가로채면 그 아래 아이콘에서 `pointerout` 이 나가
+     떴다 사라졌다를 반복한다. */
+  pointer-events: none;
+  animation: tooltip-in 120ms ease-out;
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tooltip-bubble {
+    animation: none;
+  }
+}

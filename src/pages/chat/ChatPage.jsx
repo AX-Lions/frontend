@@ -10,7 +10,10 @@ import { ChatSettingsPanel } from './ChatSettingsPanel.jsx'
 import {
   clearRoomUnread,
   confirmMessageImportant,
+  fetchAwayHandled,
   fetchImportant,
+  fetchPresence,
+  setPresence,
   fetchSidebar,
   markRead,
   toDirectRows,
@@ -82,6 +85,55 @@ export function ChatPage() {
 
   const sidebar = useResource((signal) => fetchSidebar(signal), [], { cacheKey: 'chat-sidebar' })
   const important = useResource((signal) => fetchImportant(signal), [], { cacheKey: 'chat-important' })
+
+  /*
+    자리 비움.
+
+    서버 값이라 화면이 혼자 들고 있지 않는다 — 창을 닫는 순간이 곧 자리를
+    비우는 순간이라, 브라우저에만 두면 내 Bordo 가 나설 일이 없어진다.
+
+    누르자마자 화면을 먼저 바꾸고(`pending`) 서버에 보낸다. 스위치는 눌린
+    티가 즉시 나야 하는 자리다 — 왕복을 기다리면 두 번 누른다.
+  */
+  const presence = useResource((signal) => fetchPresence(signal), [], { cacheKey: 'presence' })
+  const [pendingPresence, setPendingPresence] = useState(null)
+  const presenceStatus = pendingPresence ?? presence.data?.status ?? 'ACTIVE'
+
+  const changePresence = async (status) => {
+    if (status === presenceStatus) {
+      return
+    }
+    setPendingPresence(status)
+    try {
+      await setPresence(status)
+      // 자리 비움을 풀면 그 사이 쌓인 것이 곧바로 목록에 와야 한다.
+      awayHandled.reload()
+    } finally {
+      setPendingPresence(null)
+      presence.reload()
+    }
+  }
+
+  const awayHandled = useResource((signal) => fetchAwayHandled(signal), [], { cacheKey: 'chat-away' })
+
+  /*
+    자리를 비운 사이 Bordo 가 대신 나눈 대화.
+
+    서버가 방 기준으로 이미 묶어서 준다(`handled_count` 포함). 화면이 방마다
+    메시지를 받아 세게 두면 목록 하나 그리려고 방 수만큼 요청이 나간다.
+  */
+  const awayRooms = useMemo(
+    () => (awayHandled.data?.results ?? []).map((row) => ({
+      id: row.room_id,
+      name: row.title,
+      context: row.path_label || undefined,
+      message: row.last_reply.preview,
+      sentAt: row.last_reply.sent_at,
+      handledCount: row.handled_count,
+      avatars: row.avatar_urls ?? [],
+    })),
+    [awayHandled.data],
+  )
 
   const importantRooms = useMemo(
     // 중요 채팅은 **메시지 목록**으로 온다. 같은 방의 메시지가 여럿이면 방이
@@ -235,9 +287,12 @@ export function ChatPage() {
     <div className={fullscreen ? 'chat-page fullscreen' : 'chat-page'}>
       {fullscreen ? null : <GlobalSidebar active="chat" />}
       {fullscreen ? null : <ChatListPanel
-        importantRooms={importantRooms}
+        awayRooms={awayRooms}
+        presence={presenceStatus}
+        presenceBusy={Boolean(pendingPresence)}
         selectedChatId={selectedChatId}
         sidebar={sidebar.data}
+        onPresenceChange={changePresence}
         onCreatedRoom={(room) => {
           // 만들자마자 연다. 목록에 새 줄이 생기기만 하면 사용자는 어느 것이
           // 방금 만든 것인지 찾아야 한다.
@@ -282,7 +337,9 @@ export function ChatPage() {
           fullscreen={fullscreen}
           room={openRoom}
           roomId={selectedChatId}
+          presence={presenceStatus}
           onClose={() => setSelectedChatId(null)}
+          onPresenceChange={changePresence}
           onImportantChanged={refreshImportant}
           onOpenAgentSettings={() => setView('agent')}
           onOpenSettings={() => setView('room-settings')}

@@ -53,6 +53,15 @@ function goInApp(event, href) {
   값을 봐야 하므로 값은 공통 부모에 둔다.
 */
 export function Sidebar({
+  /*
+    아이콘 줄에서 켜진 것.
+
+    `홈` 으로 박혀 있었다. 이 사이드바는 홈 전용이었으니 맞는 말이었는데,
+    회의 일정·요청함이 같은 사이드바를 쓰게 되면서 **어느 화면에 있든 홈이
+    켜진 채로** 보였다. 시안(`666:5248`)은 요청함에서 요청함 아이콘이 켜져
+    있다 — 그것이 지금 어디인지 말해 주는 유일한 표시다.
+  */
+  active = 'home',
   isCollapsed = false,
   onToggleCollapse,
   recentProjects = [],
@@ -196,12 +205,13 @@ export function Sidebar({
       return <p className="project-nav-empty">{emptyLabel}</p>
     }
 
+    /* 이름이 옆에 적혀 있으므로 말풍선은 붙이지 않는다 — 같은 글이 아래에
+       한 번 더 뜰 뿐이다. 말풍선은 그림만 있는 단추의 몫이다. */
     return list.map((project) => (
       <a
         className="project-link"
         href={projectHref(project)}
         key={project.id}
-        title={project.name}
         onClick={(event) => goInApp(event, projectHref(project))}
       >
         <img className="doc-icon" src={icons.folder} alt="" aria-hidden="true" />
@@ -224,12 +234,13 @@ export function Sidebar({
           className="icon-button"
           type="button"
           aria-label={isCollapsed ? '사이드바 열기' : '사이드바 접기'}
+          data-tip={isCollapsed ? '사이드바 열기' : '사이드바 접기'}
           aria-expanded={!isCollapsed}
           onClick={onToggleCollapse}
         >
           <img src={icons.menu} alt="" />
         </button>
-        <a className="logo" href="/" aria-label="Bordo 홈" onClick={(event) => goInApp(event, '/')}>
+        <a className="logo" href="/" aria-label="Bordo 홈" data-tip="홈으로" onClick={(event) => goInApp(event, '/')}>
           <img src="/BordoLogo.svg" alt="Bordo" />
         </a>
       </div>
@@ -255,8 +266,8 @@ export function Sidebar({
                       key={item.id}
                       type="button"
                       className="sidebar-icon-btn sidebar-icon-live"
-                      aria-label="지금 진행 중인 회의"
-                      title="지금 진행 중인 회의"
+                      aria-label="진행 중인 회의 참여하기"
+                      data-tip="진행 중인 회의 참여하기"
                       onClick={openPrompt}
                     >
                       <img src="/icons/LiveMeetingIcon.svg" alt="" />
@@ -278,7 +289,7 @@ export function Sidebar({
                         aria-label={item.label}
                         aria-haspopup="menu"
                         aria-expanded={meetingMenuOpen}
-                        title={item.label}
+                        data-tip={item.label}
                         onClick={() => setMeetingMenuOpen((open) => !open)}
                       >
                         <img src={item.icon} alt="" />
@@ -327,15 +338,15 @@ export function Sidebar({
                   )
                 }
 
-                const isActive = item.id === 'home'
+                const isActive = item.id === active
                 return (
                   <a
                     key={item.id}
                     className={isActive ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
                     href={item.href}
-                    aria-label={item.label}
+                    aria-label={item.tip ?? item.label}
                     aria-current={isActive ? 'page' : undefined}
-                    title={item.label}
+                    data-tip={item.tip ?? item.label}
                     onClick={(event) => goInApp(event, item.href)}
                   >
                     <img src={item.icon} alt="" />
@@ -356,7 +367,7 @@ export function Sidebar({
               className={searchOpen ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
               aria-label="검색"
               aria-expanded={searchOpen}
-              title="검색"
+              data-tip="검색"
               onClick={() => setSearchOpen((open) => {
                 const next = !open
                 if (next) {
@@ -388,7 +399,7 @@ export function Sidebar({
           <nav className="project-nav" aria-label="프로젝트">
             <div className="section-title">
               <span>프로젝트</span>
-              <button type="button" aria-label="프로젝트 추가" onClick={onAddProject}>
+              <button type="button" aria-label="프로젝트 추가" data-tip="프로젝트 추가" onClick={onAddProject}>
                 <img src={icons.add} alt="" />
               </button>
             </div>
@@ -439,7 +450,7 @@ export function Sidebar({
                 Discord 바로가기
               </a>
             ) : (
-              <span className="quick-link-off" title="팀이 아직 Discord 서버와 연결되지 않았습니다">
+              <span className="quick-link-off" data-tip="팀이 아직 Discord 서버와 연결되지 않았습니다">
                 Discord 미연결
               </span>
             )}
