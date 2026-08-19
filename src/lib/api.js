@@ -32,7 +32,7 @@ import {
   getRefreshToken,
   setTokens,
 } from './auth.js'
-import { serveMock, shouldMock } from '../mocks/index.js'
+import { isMockMode } from '../mocks/enabled.js'
 
 const BASE = '/api/v1'
 
@@ -163,8 +163,18 @@ export async function request(path, options = {}) {
     모든 호출이 이 함수를 지나가므로 여기가 유일한 갈림길이다.
 
     `login` · `signup` 도 이 함수를 쓰므로 로그인까지 서버 없이 된다.
+
+    ## `serveMock` 은 그때 가서 받는다
+
+    `mocks/index.js` 가 가상 데이터 전부(`data/**`)를 정적으로 끌어온다.
+    이 파일 위에서 그것을 정적으로 `import` 하면, 스위치가 꺼져 있는 사용자도
+    그 바이트를 전부 받는다(측정값 +38KB gzip, AX-Lions/frontend#22). `isMockMode`
+    는 `localStorage` 하나만 보는 가벼운 함수라 `mocks/enabled.js` 에서 따로
+    가져온다 — 진짜 무거운 것은 스위치를 켠 사람만 받도록 스위치를 켰을 때만
+    부른다.
   */
-  if (shouldMock()) {
+  if (isMockMode()) {
+    const { serveMock } = await import('../mocks/index.js')
     return serveMock(path, options)
   }
 
@@ -239,6 +249,32 @@ export async function signup(payload) {
     setTokens(body)
   }
   return body
+}
+
+/*
+  이메일 인증 · 팀 초대 코드 확인(회원가입, 시안 `707:6492`).
+
+  **아직 백엔드에 없는 주소다.** 지금 가입은 이메일·비밀번호·이름만 받고
+  인증 절차가 없고, 초대 코드는 가입 뒤 `POST /teams/join` 으로만 받는다
+  (`home.api.js` 의 `joinTeam`). 시안은 가입 화면 안에서 이메일을 인증하고
+  초대 코드까지 확인하는 것을 전제로 하므로, 화면이 계약을 먼저 정한다
+  (`CLAUDE.md`) — 백엔드가 이 셋을 받으면 그 순간부터 실제로 동작한다.
+  그 전까지는 가상 데이터 모드에서만 확인할 수 있다.
+*/
+export function sendSignupEmailCode(email) {
+  return request('/auth/signup/email-code', { method: 'POST', auth: false, body: { email } })
+}
+
+export function confirmSignupEmailCode(email, code) {
+  return request('/auth/signup/email-code/confirm', {
+    method: 'POST', auth: false, body: { email, code },
+  })
+}
+
+export function verifyInviteCode(code) {
+  return request('/auth/signup/invite-code/verify', {
+    method: 'POST', auth: false, body: { code },
+  })
 }
 
 export async function logout() {

@@ -1,4 +1,4 @@
-import { agentName } from './data/people.js'
+import { TEAM, agentName } from './data/people.js'
 import { home as baseHome, teams } from './data/home.js'
 import { briefings as baseBriefings, meetings } from './data/meetings.js'
 import { chatSidebar as baseSidebar } from './data/chat.js'
@@ -10,6 +10,7 @@ import {
 } from './data/agent.js'
 import { VIEWERS } from './data/viewers.js'
 import { currentViewer } from './session.js'
+import { patchedOf } from './store.js'
 
 /**
  * 고른 사람의 눈으로 응답을 다시 만든다.
@@ -46,13 +47,29 @@ function bits(viewer) {
   return VIEWERS[viewer.email] ?? VIEWERS.__fallback
 }
 
-/** `GET /auth/me` · `GET /users/me` */
+/**
+ * `GET /auth/me` · `GET /users/me`
+ *
+ * 연결 상태 둘(`discord_linked` · `mcp_token_issued_at`)은 **이번 방문에 바꾼
+ * 것을 얹어서** 준다. 안 얹으면 Discord 를 잇거나 토큰을 발급한 직후 화면이
+ * 다시 읽는 순간 「안 이어짐」 으로 돌아간다 — 눌렀는데 아무 일도 안 일어난
+ * 것처럼 보인다.
+ *
+ * 처음 값은 사람마다 다르다. 다은님은 Discord 담당이라 이어 둔 것으로,
+ * 재민님은 MCP 를 붙여 본 것으로 둔다 — **연결됨 상태와 안 됨 상태를 둘 다**
+ * 볼 수 있어야 카드가 제대로 확인된다.
+ */
 export function viewerMe() {
   const v = currentViewer()
+  const own = bits(v)
+  const saved = patchedOf(`connections:${v.id}`) ?? {}
   return {
     ...v,
     project_role: 'MEMBER',
     notification: { mention: true, schedule: true, digest: false },
+    discord_linked: own.discordLinked ?? false,
+    mcp_token_issued_at: own.mcpIssuedAt ?? null,
+    ...saved,
   }
 }
 
@@ -123,6 +140,52 @@ export function viewerHome() {
 /** `GET /teams` — 팀은 모두 같다. */
 export function viewerTeams() {
   return teams
+}
+
+function pad(n) {
+  return String(n).padStart(2, '0')
+}
+
+/** `8월 18일 14:00 - 15:00` — 서버 `meeting_when()` 과 같은 모양이다. */
+function meetingWhen(scheduledAt, durationMin) {
+  const start = new Date(scheduledAt)
+  const end = new Date(start.getTime() + durationMin * 60000)
+  const hhmm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return `${start.getMonth() + 1}월 ${start.getDate()}일 ${hhmm(start)} - ${hhmm(end)}`
+}
+
+/**
+ * `GET /meetings/{id}/prep` 의 `header` — 확정된 일정 확인 팝업(시안 `697:9393`)이 쓴다.
+ *
+ * `when` · `badge` 는 클라이언트가 다시 조합하지 않는다. 화면마다 "대리 참석
+ * 예정" 문구가 갈리는 것을 막으려고 서버가 완성해 내려주는 값이라, 목도 같은
+ * 모양으로 미리 완성해 둔다.
+ *
+ * 목 세계는 팀이 하나뿐이라(`TEAM`) `team_name` 은 고정값이다. 실제 서버는
+ * `meeting.project.team.name` 을 읽는다.
+ */
+export function viewerMeetingPrepHeader(meetingId) {
+  const meeting = meetings[meetingId]
+  if (!meeting) {
+    return null
+  }
+  const v = currentViewer()
+  const row = attendanceOf(meetingId, v.id)
+  const delegated = row?.delegated ?? false
+  return {
+    meeting_id: meeting.id,
+    title: meeting.title,
+    project_name: meeting.project_name,
+    team_name: TEAM.name,
+    scheduled_at: meeting.scheduled_at,
+    when: meetingWhen(meeting.scheduled_at, meeting.duration_min),
+    location: meeting.discord_channel_id ? 'Discord' : '서비스',
+    status: meeting.status,
+    delegated,
+    badge: delegated
+      ? `${agentName(v.name)} 대리 참석 ${meeting.status === 'ACTIVE' ? '중' : '예정'}`
+      : '참석 예정',
+  }
 }
 
 /**

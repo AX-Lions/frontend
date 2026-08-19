@@ -1,0 +1,962 @@
+/* 회의 대리 참석 준비 (Figma `685:7160`).
+
+   색과 치수는 시안에서 그대로 가져왔다. 전역 토큰(`--text` · `--line`)과 값이
+   달라 여기서 따로 둔다 — 전역을 이 화면에 맞춰 바꾸면 홈과 플로우가 같이
+   움직인다. 시안이 쓰는 것은 남색 계열의 옅은 면(`#002662` 를 5% · 2% 로 깐 것)
+   이라 회색 토큰으로는 나오지 않는다. */
+.prep-layout {
+  --prep-ink: #1f1f1f;
+  --prep-muted: #60646c;
+  --prep-line: #e5e7eb;
+  --prep-navy: #002662;
+  --prep-tint: #f2f4f7; /* #002662 5% over white */
+  --prep-tint-soft: #fafbfc; /* #002662 2% over white */
+  --prep-orange: #ff9d42;
+  --prep-orange-bg: #ffefe0;
+  --prep-orange-card: #fff8f2;
+
+  min-height: 100vh;
+  background: #ffffff;
+  color: var(--prep-ink);
+}
+
+/* ─────────────────────────────────────────── 상단 */
+
+.prep-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 27px 24px 0;
+}
+
+.prep-menu {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 28px;
+  height: 28px;
+  padding: 6px 5px;
+}
+
+.prep-menu span {
+  display: block;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--prep-ink);
+}
+
+.prep-logo {
+  font-size: 20px;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--prep-navy);
+  text-decoration: none;
+}
+
+.prep-back {
+  font-size: 12px;
+  color: var(--prep-muted);
+  text-decoration: none;
+}
+
+.prep-back:hover {
+  color: var(--prep-ink);
+}
+
+/* ─────────────────────────────────────────── 본문 틀 */
+
+.prep-main {
+  width: min(100%, 1274px);
+  margin: 0 auto;
+  padding: 64px 24px 80px;
+}
+
+.prep-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.prep-head-title h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.prep-head-title p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--prep-muted);
+}
+
+/* 회의정보 (Figma `692:7436`) — 두 줄 + 뱃지를 32px 로 벌린다. */
+.prep-head-meeting {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+/* 클래스로 감싼다. `.prep-head-meeting span` 처럼 태그로 잡으면 옆에 선
+   `.prep-badge` 까지 같이 잡혀 뱃지 글자가 14px 로 커진다 — 선택자가 더
+   구체적이라 뱃지 자기 규칙을 이긴다. */
+.prep-head-meeting-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prep-head-meeting-text strong {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 19px;
+}
+
+.prep-head-meeting-text span {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 17px;
+}
+
+.prep-badge {
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--prep-orange-bg);
+  color: var(--prep-orange);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.prep-notice,
+.prep-error {
+  margin: 16px 0 0;
+  font-size: 13px;
+}
+
+.prep-notice {
+  color: var(--prep-orange);
+}
+
+.prep-error {
+  color: var(--accent);
+}
+
+/* 시안은 1274px 폭에 627 + 615 두 단이다. 좁아지면 한 단으로 접는다 —
+   두 단을 유지하면 논쟁점 제목이 두세 줄로 접혀 목록이 읽히지 않는다. */
+.prep-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 627fr) minmax(0, 615fr);
+  gap: 32px;
+  margin-top: 32px;
+}
+
+@media (max-width: 1100px) {
+  .prep-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.prep-section-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.prep-section-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prep-section-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--prep-muted);
+}
+
+/* ─────────────────────────────────────────── 예상 논쟁점 */
+
+.prep-contentions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prep-contentions .prep-section-head {
+  margin-bottom: 32px;
+}
+
+.prep-contention {
+  border-radius: 8px;
+}
+
+/* 면은 줄이 갖는다. 버튼마다 면을 주면 상태 버튼 뒤가 다른 색이 된다. */
+.prep-contention-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--prep-tint);
+}
+
+/* 제목 쪽이 넓어야 한다. 화살표만 누르게 두면 제목을 눌러 본 사람에게는
+   아무 일도 안 일어난다. */
+.prep-contention-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.prep-contention-chevron {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.prep-contention-no {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prep-contention-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+}
+
+/* 상태 뱃지는 누르는 자리다 — 셋 다 그 논쟁점의 입장 칸을 연다.
+
+   시안(`685:7160`)은 면을 흰색 하나로 두고 **글자색만** 바꾼다. 흐릴수록 끝난
+   것이고 진할수록 손이 남은 것이라, 색 자체가 무엇부터 봐야 하는지를 말한다.
+   면을 칠해 강조하면 그 순서가 사라진다. */
+.prep-status {
+  flex: none;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.prep-status.is-answered {
+  color: #92969d;
+}
+
+.prep-status.is-answering {
+  color: var(--prep-navy);
+}
+
+.prep-status.is-needs_answer {
+  color: var(--prep-ink);
+}
+
+/* 눌리는 것임을 손이 닿을 때 알려 준다. 시안에는 없는 상태지만, 없으면
+   글자색만 다른 라벨로 보여 아무도 누르지 않는다. */
+.prep-status:hover {
+  background: var(--prep-orange-bg);
+  color: var(--prep-orange);
+}
+
+.prep-status:focus-visible,
+.prep-contention-toggle:focus-visible {
+  outline: 2px solid var(--prep-orange);
+  outline-offset: 2px;
+}
+
+.prep-chevron {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-right: 1.6px solid var(--prep-ink);
+  border-bottom: 1.6px solid var(--prep-ink);
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+
+.prep-chevron.open {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+/* 펼친 본문은 테두리로 묶는다. 없으면 어디까지가 이 논쟁점의 근거이고
+   어디부터 다음 줄인지가 흐려진다 — 근거가 길수록 심해진다. */
+.prep-contention-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid var(--prep-line);
+  border-radius: 8px;
+}
+
+.prep-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.prep-option {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--prep-tint-soft);
+}
+
+.prep-option strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prep-option span {
+  font-size: 14px;
+}
+
+.prep-prediction {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prep-prediction-head {
+  margin: 0;
+  color: var(--prep-orange);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prep-prediction-body {
+  margin: 0;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--prep-line);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.prep-evidences {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prep-evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--prep-tint-soft);
+}
+
+.prep-evidence-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prep-evidence-head strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prep-evidence-head span {
+  font-size: 13px;
+  color: var(--prep-muted);
+}
+
+.prep-evidence-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.prep-evidence-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.prep-evidence-text strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prep-evidence-text span {
+  font-size: 14px;
+}
+
+/* 갈 곳이 아직 없어 링크가 아니다. 눌릴 것처럼 보이면 눌러 보게 된다. */
+.prep-evidence-link {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--prep-muted);
+  font-size: 12px;
+}
+
+.prep-stance-open {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border: 1px solid var(--prep-line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--prep-ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prep-stance-open:hover {
+  border-color: var(--prep-orange);
+  color: var(--prep-orange);
+}
+
+.prep-mock-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--prep-muted);
+}
+
+/* ─────────────────────────────────────────── 나의 입장 */
+
+.prep-stance {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prep-stance .prep-section-head {
+  margin-bottom: 32px;
+}
+
+.prep-input {
+  position: relative;
+  padding: 17px;
+  border: 1px solid var(--prep-line);
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.prep-input textarea {
+  display: block;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--prep-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.prep-input textarea:focus {
+  outline: none;
+}
+
+.prep-input:focus-within {
+  border-color: var(--prep-orange);
+}
+
+/* 보내기 단추는 상태가 둘이다 (Figma `737:5595`).
+
+     내용 없음   옅은 면 + 회색 화살표   — 눌러도 보낼 것이 없다
+     내용 있음   주황 면 + 흰 화살표     — 지금 보낼 수 있다
+
+   흐리게(`opacity`) 처리하지 않는 이유는, 그것이 **못 쓰는 것**과 **아직 할
+   일이 남은 것**을 같은 모양으로 만들기 때문이다. 색을 바꾸면 글을 다 쓴 순간
+   단추가 켜지면서 다음에 무엇을 눌러야 하는지가 눈에 들어온다. */
+.prep-send {
+  display: flex;
+  position: absolute;
+  right: 17px;
+  bottom: 17px;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--prep-orange);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.prep-send:disabled {
+  background: var(--prep-tint);
+  color: #b8bbc0;
+  cursor: default;
+}
+
+.prep-stance-saved {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.prep-stance-label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--prep-muted);
+}
+
+/* 이미 적어 둔 입장은 색으로 구별한다. 빈 칸과 같은 흰 면이면 무엇이
+   저장된 것이고 무엇이 아직 안 쓴 칸인지 눈으로 갈리지 않는다. */
+/* 한 논쟁점의 답 여러 장. 라벨과의 간격(8px)보다 넓게 벌려 **어디까지가
+   이 논쟁점의 답인지**가 눈으로 갈리게 한다. */
+.prep-stance-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prep-stance-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  /* 오른쪽만 4px 인 것은 `⋮` 가 그 자리를 쓰기 때문이다. */
+  padding: 8px 4px 16px 16px;
+  border: 1px solid var(--prep-orange);
+  border-radius: 16px;
+  background: var(--prep-orange-card);
+}
+
+.prep-stance-card p {
+  flex: 1;
+  min-width: 0;
+  margin: 5px 0 0;
+  font-size: 12px;
+  line-height: 14px;
+  word-break: break-word;
+}
+
+/* `⋮` 와 그 아래 붙는 메뉴. 카드가 아니라 버튼을 기준으로 띄운다 — 카드
+   기준이면 글이 길어질수록 메뉴가 버튼에서 멀어진다. */
+.prep-stance-menu-anchor {
+  position: relative;
+  flex: none;
+}
+
+.prep-stance-more {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--prep-muted);
+  cursor: pointer;
+}
+
+.prep-stance-more:hover,
+.prep-stance-more[aria-expanded='true'] {
+  background: #ffffff;
+  color: var(--prep-ink);
+}
+
+.prep-stance-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  padding: 4px 9px 4px 4px;
+  border: 1px solid var(--prep-line);
+  border-radius: 8px;
+  background: #ffffff;
+  /* 시안에는 그림자가 없지만 흰 카드 위에 흰 메뉴가 겹치면 경계가 테두리
+     한 줄뿐이라 떠 있는 것으로 안 읽힌다. 아주 옅게만 준다. */
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+}
+
+.prep-stance-menu button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #000000;
+  font: inherit;
+  font-size: 12px;
+  line-height: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* 시안의 아이콘 칸은 16px 그림에 사방 4px 를 둘러 24px 다. `svg` 는 대체
+   요소라 `box-sizing` 을 정해 두지 않으면 그 여백만큼 칸이 커져 메뉴 높이가
+   시안(34px)보다 낮게 눌린다. */
+.prep-stance-menu button svg {
+  flex: none;
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  padding: 4px;
+  color: var(--prep-muted);
+}
+
+.prep-stance-menu button:hover svg {
+  color: var(--prep-ink);
+}
+
+/* ─────────────────────────────────────────── Bordo 활동 설정 */
+
+.prep-divider {
+  margin: 64px 0;
+  border: none;
+  border-top: 1px solid var(--prep-line);
+}
+
+.prep-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+}
+
+.prep-settings > .prep-section-head h2 {
+  font-size: 20px;
+}
+
+.prep-apply-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 32px;
+}
+
+.prep-apply {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--prep-tint);
+}
+
+.prep-apply div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prep-apply strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.prep-apply span {
+  font-size: 13px;
+  color: var(--prep-muted);
+}
+
+.prep-apply button {
+  flex: none;
+  border: none;
+  background: transparent;
+  color: var(--prep-ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prep-apply button:disabled {
+  color: var(--prep-muted);
+  cursor: default;
+}
+
+.prep-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 32px;
+  padding: 24px;
+  border: 1px solid var(--prep-line);
+  border-radius: 16px;
+}
+
+.prep-detail,
+.prep-prompts {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.prep-detail h3,
+.prep-prompts h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.prep-detail-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--prep-tint-soft);
+}
+
+.prep-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.prep-detail-row div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.prep-detail-row strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prep-detail-row span {
+  font-size: 12px;
+  color: var(--prep-muted);
+}
+
+.prep-switch {
+  position: relative;
+  flex: none;
+  width: 51px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--prep-line);
+  cursor: pointer;
+}
+
+.prep-switch.on {
+  background: var(--prep-orange);
+}
+
+.prep-switch:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.prep-switch-text {
+  position: absolute;
+  top: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+/* 손잡이가 가는 쪽 반대편에 글자가 남아야 읽힌다. */
+.prep-switch .prep-switch-text {
+  right: 8px;
+  color: var(--prep-muted);
+}
+
+.prep-switch.on .prep-switch-text {
+  right: auto;
+  left: 8px;
+  color: #ffffff;
+}
+
+.prep-switch-knob {
+  position: absolute;
+  top: 3.5px;
+  left: 3.5px;
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  background: #ffffff;
+  transition: left 120ms ease;
+}
+
+.prep-switch.on .prep-switch-knob {
+  left: 30.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prep-switch-knob {
+    transition: none;
+  }
+}
+
+.prep-scope-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--prep-muted);
+}
+
+.prep-scope-note a {
+  color: var(--prep-ink);
+}
+
+.prep-prompt-card {
+  padding: 9px 17px;
+  border: 1px solid var(--prep-orange);
+  border-radius: 16px;
+  background: var(--prep-orange-card);
+}
+
+.prep-prompt-card p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.prep-empty-inline,
+.prep-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--prep-muted);
+}
+
+.prep-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 펼친 설정을 맺는 단추. 이 화면에서 유일하게 채워진 단추라, 다 정하고 나면
+   다음에 누를 것이 하나로 보인다. */
+.prep-done {
+  align-self: flex-start;
+  padding: 11px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--prep-orange);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prep-done:disabled {
+  background: var(--prep-tint);
+  color: #b8bbc0;
+  cursor: default;
+}
+
+.prep-cancel {
+  align-self: flex-start;
+  padding: 10px 16px;
+  border: 1px solid var(--prep-line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--prep-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prep-cancel:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─────────────────────────────────────────── 완료 모달 */
+
+.prep-complete-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 17, 21, 0.45);
+  z-index: 100;
+}
+
+.prep-complete-dialog {
+  position: relative;
+  width: min(100%, 400px);
+  padding: 32px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 24px 48px rgba(15, 17, 21, 0.2);
+  text-align: center;
+}
+
+.prep-complete-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--prep-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.prep-complete-close:hover {
+  background: var(--prep-tint);
+  color: var(--prep-ink);
+}
+
+.prep-complete-dialog h2 {
+  margin: 8px 0 12px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--prep-ink);
+}
+
+.prep-complete-dialog p {
+  margin: 0 0 24px;
+  color: var(--prep-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.prep-complete-home {
+  width: 100%;
+  padding: 13px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--prep-orange);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prep-complete-home:hover {
+  background: #f58c26;
+}

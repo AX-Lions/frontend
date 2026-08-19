@@ -12,6 +12,9 @@ import { daysAgo } from '../people.js'
  * 제출 마감을 문서 근거로 답했고, 인원 배치 기한은 어디에도 없어 유보했다.
  */
 export const viewer = {
+  // MCP 를 붙여 본 사람. 카드의 **이미 발급됨** 쪽을 보는 자리.
+  discordLinked: true,
+  mcpIssuedAt: '2026-08-17T22:10:00+09:00',
   agentRoomId: '9e0a7c34-6b25-4d81-a3f9-5c17b8e20d46',
   favoriteMeetings: ['4eb1040f-18d7-4841-bc72-360846888c3d'],
   delegatePrompt:

@@ -393,3 +393,24 @@ export const teams = {
     },
   ],
 }
+
+// ─────────────────────────────────────────── GET /teams/{team_id}/members
+//
+// 새 프로젝트 팝업의 `참여자 선택` 후보. 시간대가 다른 사람이 섞여 있어야
+// 하루를 자르는 기준이 사람마다 다르다는 전제가 화면에서 보인다 —
+// `people.js` 가 이미 한 명을 베를린에 두고 있으므로 그대로 쓴다.
+
+export const teamMembers = {
+  count: PEOPLE.length,
+  results: PEOPLE.map((who, index) => ({
+    user_id: who.id,
+    name: who.name,
+    avatar_url: who.avatar_url,
+    team_role: index === 0 ? 'OWNER' : 'MEMBER',
+    project_role: ['frontend', 'backend', 'frontend', 'design', 'backend'][index] ?? 'member',
+    timezone: who.timezone,
+    delegation_enabled: index % 2 === 0,
+    agent_status: index % 2 === 0 ? 'ACTIVE' : 'IDLE',
+    last_sync_at: minutesAgo(30 + index * 7),
+  })),
+}

@@ -7,6 +7,10 @@ import { FlowCanvas } from './FlowCanvas'
 import { FlowEdgePanel, FlowNodePanel } from './FlowInspectorPanel'
 import { FlowNavigationSidebar } from './FlowNavigationSidebar'
 import { FlowRail } from './FlowRail'
+// 팀 전환하기는 홈에서 먼저 생겼다. 회의 화면에도 같은 팝업이 필요해져
+// 여기서 그대로 가져다 쓴다 — 팝업 하나 때문에 `pages/home` 전체를
+// `shared` 로 옮기면 그쪽에 남는 `NewProjectDialog` 등도 다 옮겨야 한다.
+import { TeamSwitchDialog } from '../home/TeamSwitchDialog.jsx'
 import { icons, toneLabels } from './flowBoard.api'
 import { fetchBriefing, toneOf } from './flowBoard.data'
 import { buildFlowLayout } from './flowLayout'
@@ -53,6 +57,7 @@ function rememberMeetingInUrl(meetingId) {
 export function FlowBoardPage() {
   const entryParams = new URLSearchParams(window.location.search)
   const [mode, setMode] = useState(MEETING_MODE)
+  const [switchingTeam, setSwitchingTeam] = useState(false)
 
   /*
     주소의 회의·프로젝트를 **계속 지켜본다.**
@@ -343,7 +348,7 @@ export function FlowBoardPage() {
 
   return (
     <div className="flow-board-page">
-      <FlowRail />
+      <FlowRail collapsed={ui.isFlowSidebarCollapsed} />
 
       <FlowNavigationSidebar
         activeCategory={mode}
@@ -365,6 +370,7 @@ export function FlowBoardPage() {
         onParticipantToggle={toggleExcluded(setExcludedParticipants)}
         onScroll={(event) => ui.setIsSidebarScrolled(event.currentTarget.scrollTop > 0)}
         onSidebarToggle={ui.toggleFlowSidebar}
+        onTeamSwitch={() => setSwitchingTeam(true)}
         onTimeOrderToggle={ui.toggleTimeOrder}
         participantKeyword={ui.participantKeyword}
         participants={participantRows}
@@ -568,6 +574,8 @@ export function FlowBoardPage() {
           />
         ) : null}
       </main>
+
+      {switchingTeam ? <TeamSwitchDialog onClose={() => setSwitchingTeam(false)} /> : null}
     </div>
   )
 }

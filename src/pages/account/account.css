@@ -288,6 +288,144 @@
   }
 }
 
+/* ── Discord 연결 · 개인 AI 연결(MCP) 공용 */
+
+.account-primary-button {
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-primary-button:disabled {
+  background: var(--button);
+  color: var(--muted);
+  cursor: default;
+}
+
+.account-outline-button {
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-outline-button:hover:not(:disabled) {
+  background: var(--sidebar);
+}
+
+.account-danger-button {
+  padding: 9px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-danger-button:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.account-outline-button:disabled,
+.account-danger-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.account-button-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* 연결됨/발급 시각 같은 짧은 상태 표시. 뒤에 붙는 알약 뱃지는 스위치 색과 맞춘다. */
+.account-meta {
+  margin: 0 0 14px;
+  font-size: 13px;
+}
+
+.account-meta span {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sidebar);
+  border: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.account-token-row,
+.account-cmd-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.account-token-row code {
+  flex: 1;
+  height: 42px;
+  line-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--sidebar);
+  font: 13px ui-monospace, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-cmd-row code {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--sidebar);
+  font: 12px/1.5 ui-monospace, Consolas, monospace;
+  word-break: break-all;
+}
+
+.account-copy {
+  flex: none;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.account-copy:hover {
+  background: var(--sidebar);
+}
+
+/* 힌트·노트보다 눈에 띄어야 한다 — 다시 못 보는 값을 안 챙기고 넘어가면 안 된다. */
+.account-warn {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg));
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.account-label {
+  margin: 16px 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* ── 다른 화면으로 */
 
 /*

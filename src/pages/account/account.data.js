@@ -37,6 +37,27 @@ export async function patchAgentSettings(patch) {
   return saved?.settings ?? saved
 }
 
+/** 내 Discord 계정 연결. 팀 서버(길드) 연결과는 다른 API다 — 이건 자기 계정만 건드린다. */
+export function linkDiscord(connectCode) {
+  return api.post('/me/discord/link', { connect_code: connectCode })
+}
+
+export function unlinkDiscord() {
+  return api.delete('/me/discord/link')
+}
+
+/**
+ * MCP 토큰 발급(재발급). 사용자당 활성 1개 — 다시 부르면 이전 토큰이 그 자리에서 죽는다.
+ * 원문(`token`)은 이 응답에만 실린다. 저장하지 않고 화면 상태로만 잠깐 들고 있는다.
+ */
+export function issueMcpToken() {
+  return api.post('/me/mcp-token')
+}
+
+export function revokeMcpToken() {
+  return api.delete('/me/mcp-token')
+}
+
 /** 화면에 뿌릴 말투 목록. `value` 는 서버의 `AgentTone` 값과 같아야 한다. */
 export const TONES = [
   {
