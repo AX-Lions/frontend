@@ -372,6 +372,23 @@ export function ChatListPanel({
             />
             {isOpen(team.id) ? (
               <div className="nested-team">
+                {/*
+                  팀 단체방.
+
+                  팀 줄에서 방을 여는 길을 없앴으므로 방 자체는 여기 둔다.
+                  안 두면 **열 수 없는 방의 미읽음이 팀 뱃지에 영영 남는다** —
+                  서버 팀 합계에 그 방 몫이 들어 있기 때문이다.
+
+                  프로젝트보다 위에 두는 이유는 팀 전체에 오는 말이라서다.
+                  프로젝트 사이에 끼면 프로젝트 하나로 읽힌다.
+                */}
+                {team.groupRoom ? (
+                  <ChatPreview
+                    chat={team.groupRoom}
+                    selected={selectedChatId === team.groupRoom.id}
+                    onSelect={() => onSelectChat(team.groupRoom.id)}
+                  />
+                ) : null}
                 {team.projects.length === 0 ? (
                   <p className="chat-list-empty">이 팀에는 아직 프로젝트가 없습니다.</p>
                 ) : null}

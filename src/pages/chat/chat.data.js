@@ -233,19 +233,66 @@ export function deletePrompt(promptId) {
  * 각 층에서 필요한 것만 뽑는다.
  */
 export function toTeamRows(sidebar) {
-  return (sidebar?.teams ?? []).map((team) => ({
-    id: team.team_id,
-    name: team.team_name,
-    unread: team.unread_count,
-    marked: team.has_important,
-    projects: (team.projects ?? []).map((project) => ({
+  return (sidebar?.teams ?? []).map((team) => {
+    const projects = (team.projects ?? []).map((project) => ({
       id: project.project_id,
       name: project.project_name,
       unread: project.unread_count,
       marked: project.has_important,
       rooms: (project.rooms ?? []).map(toPreview),
-    })),
-  }))
+    }))
+    return {
+      id: team.team_id,
+      name: team.team_name,
+      unread: team.unread_count,
+      marked: team.has_important,
+      groupRoom: toTeamGroupRoom(team, projects),
+      projects,
+    }
+  })
+}
+
+/**
+ * 팀 단체방을 목록에 세울 수 있는 모양으로.
+ *
+ * ## 왜 서버가 준 것을 그대로 못 쓰는가
+ *
+ * 사이드바는 팀 단체방을 **`group_chat_room_id` 하나로만** 준다. 방 객체가
+ * 트리에 없어서 제목도 미리보기도 미읽음도 따로 오지 않는다.
+ *
+ * 그런데 팀 뱃지에는 그 방 몫이 **이미 들어 있다**(서버 `chat/views.py` 의
+ * `team_unread`). 그래서 이 방을 목록에서 빼면 열 수 없는 방의 숫자가
+ * 뱃지에 남아 **영영 안 꺼진다.** 사용자가 할 수 있는 일이 없는 숫자다.
+ *
+ * ## 미읽음은 빼서 알아낸다
+ *
+ * 서버가 `팀 합계 = 팀 단체방 + 프로젝트 합계` 로 만들므로, 화면에 보이는
+ * 프로젝트 합계를 빼면 남는 것이 곧 이 방 몫이다. 중요 표시도 같은 논리다 —
+ * 팀에 표시가 섰는데 어느 프로젝트에도 없으면 이 방에 선 것이다.
+ *
+ * 제목은 여기서 짓지 않고 빈 값으로 둔다. 방을 열면 `fetchRoom` 이 서버가
+ * 만든 이름을 가져온다 — 화면이 이름을 조립하면 규칙이 두 군데로 갈린다.
+ */
+function toTeamGroupRoom(team, projects) {
+  if (!team?.group_chat_room_id) {
+    return null
+  }
+  const seen = projects.reduce((sum, project) => sum + (project.unread || 0), 0)
+  return {
+    id: team.group_chat_room_id,
+    type: 'TEAM',
+    name: team.team_name,
+    context: '팀 전체',
+    message: '',
+    sentAt: null,
+    unread: Math.max(0, (team.unread_count || 0) - seen),
+    marked: Boolean(team.has_important) && !projects.some((project) => project.marked),
+    avatars: [],
+    avatar: null,
+    bordo: false,
+    stacked: true,
+    members: [],
+  }
 }
 
 /** 어느 팀·프로젝트에도 안 매달린 1:1 · 동료 대리인 방. */
