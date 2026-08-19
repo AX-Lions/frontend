@@ -334,6 +334,9 @@ export function DelegatePrepPage() {
     누르면 적어 뒀던 지시를 빈 값으로 덮어쓴다.
   */
   const [extraDraft, setExtraDraft] = useState(null)
+  //  「저장했습니다」 는 잠깐만 띄운다. 계속 남으면 지금 저장한 것인지
+  //  아까 저장한 것인지 구별이 안 된다.
+  const [noteSaved, setNoteSaved] = useState(false)
   const [draft, setDraft] = useState(null)
   const [busy, setBusy] = useState('')
   const [notice, setNotice] = useState('')
@@ -641,6 +644,30 @@ export function DelegatePrepPage() {
     } catch (caught) {
       setError(caught?.message || '적용하지 못했습니다.')
       return false
+    } finally {
+      setBusy('')
+    }
+  }
+
+  /**
+   * 「추가 설정」만 저장한다.
+   *
+   * `mode` 를 안 보낸다 — 서버는 **보낸 키만** 바꾼다. 자료 범위나 활동 설정을
+   * 건드릴 이유가 없다.
+   */
+  const saveExtraNote = async () => {
+    if (busy || !meetingId) {
+      return
+    }
+    setBusy('note')
+    setError('')
+    try {
+      await saveAgentSetup(meetingId, { extra_note: extraPrompt.trim() })
+      setExtraDraft(null)
+      await prep.reload()
+      setNoteSaved(true)
+    } catch (caught) {
+      setError(caught?.message || '추가 설정을 저장하지 못했습니다.')
     } finally {
       setBusy('')
     }
@@ -1220,12 +1247,30 @@ export function DelegatePrepPage() {
               rows={2}
               maxLength={1000}
               placeholder="원하시는 설정을 입력해주세요."
-              onChange={(event) => setExtraDraft(event.target.value)}
+              onChange={(event) => { setExtraDraft(event.target.value); setNoteSaved(false) }}
             />
           </div>
+          {/*
+            **적은 자리에 저장 단추를 둔다.**
+
+            전에는 저장할 단추가 `이번에만 다르게 사용` 을 눌렀을 때만 나왔다.
+            `현재 설정 사용` 으로 맡긴 사람은 추가 지시를 적어 놓고 나가면
+            **그대로 사라졌다** — 적는 칸은 늘 열려 있는데 담을 곳이 그때만
+            있었던 셈이다.
+          */}
+          <div className="prep-extra-actions">
+            <button
+              type="button"
+              className="prep-extra-save"
+              disabled={!setup || Boolean(busy) || extraPrompt === (setup?.extra_note ?? '')}
+              onClick={saveExtraNote}
+            >
+              {busy === 'note' ? '저장하는 중…' : '추가 설정 저장'}
+            </button>
+            {noteSaved ? <span className="prep-extra-saved" role="status">저장했습니다</span> : null}
+          </div>
           <p className="prep-scope-note">
-            적으신 내용은 <strong>{customOpen ? '설정 완료' : '적용하기'}</strong>를 누를 때
-            이 회의의 사전 지시로 함께 저장됩니다.
+            적으신 내용은 <strong>추가 설정 저장</strong>으로 이 회의에만 남습니다.
             <strong> 현재 설정 사용</strong>을 누르면 평소 설정으로 되돌아가면서 함께 지워집니다.
           </p>
         </div>
