@@ -313,7 +313,6 @@ export function DelegatePrepPage() {
 
   const [openId, setOpenId] = useState(null)
   const [menuFor, setMenuFor] = useState(null)
-  const [editing, setEditing] = useState(false)
   const [customOpen, setCustomOpen] = useState(false)
   const [stanceText, setStanceText] = useState('')
   /*
@@ -524,7 +523,6 @@ export function DelegatePrepPage() {
       왼쪽 목록이 말하고 있어서, 글만 따라오면 사용자는 알아채지 못한다.
     */
     setStanceText('')
-    setEditing(false)
     setEditingId(null)
     setMenuFor(null)
   }
@@ -546,7 +544,6 @@ export function DelegatePrepPage() {
   const editEntry = (entry) => {
     setOpenId(entry.rowId)
     setStanceText(entry.text)
-    setEditing(true)
     setEditingId(entry.id)
     setMenuFor(null)
     window.requestAnimationFrame(() => stanceInputRef.current?.focus())
@@ -688,7 +685,6 @@ export function DelegatePrepPage() {
       await prep.reload()
       setWritten(null)
       setStanceText('')
-      setEditing(false)
       setEditingId(null)
 
       /*
@@ -745,7 +741,6 @@ export function DelegatePrepPage() {
       await prep.reload()
       setWritten(null)
       setEditingId(null)
-      setEditing(false)
     } catch (caught) {
       setError(caught?.message || '지우지 못했습니다.')
     } finally {
@@ -837,7 +832,15 @@ export function DelegatePrepPage() {
               일이 실제로 일어난다. `답변완료` 로 두면 목록만 보고는 그것을
               알 수 없다.
             */
-            const answering = open && (!latest || editing)
+            /*
+              **고치는 중인지는 `editingId` 하나로 본다.**
+
+              전에는 `editing` 불리언과 `editingId` 가 같은 사실을 둘로 들고
+              있었고 뱃지는 불리언만 봤다. 둘이 어긋나면 **고치는 중인데
+              `답변완료` 로 보였다** — 고치다 만 채 회의에 들어가는 것을 잡으려고
+              만든 표시인데 정작 그때 안 떴다.
+            */
+            const answering = open && (!latest || editingId === latest?.id)
             const status = answering
               ? 'ANSWERING'
               : (latest ? 'ANSWERED' : 'NEEDS_ANSWER')
