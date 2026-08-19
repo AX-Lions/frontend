@@ -37,7 +37,7 @@
  * 중요하다.
  */
 
-import { ME, PROJECTS, agentName, daysAgo, minutesAgo, person } from './people.js'
+import { ME, PROJECTS, agentName, daysAgo, minutesAgo, person, teamOf } from './people.js'
 
 /*
   오늘 나눈 대화는 `todayAt()` 이 아니라 `minutesAgo()` 로 센다.
@@ -155,7 +155,7 @@ export const agentConversations = {
     },
     {
       id: 'f052a6c4-8b71-4e39-9c05-3d7a1e64b8f0',
-      title: `${PROJECTS.academy.name} 발표 순서`,
+      title: `${teamOf(PROJECTS.academy).name} 발표 순서`,
       last_message_preview: '시연 스크립트에서 디자인 설명이 들어갈 자리를 표시해 두겠습니다.',
       last_message_at: daysAgo(3, 16, 16),
       message_count: 4,
@@ -285,7 +285,7 @@ export const conversationMessages = {
       {
         id: '83e52ca9-f5b0-4e4d-b68a-923d7156bcf8',
         role: 'USER',
-        body: `${PROJECTS.academy.name} 회의에서 발표 순서 정해졌습니까?`,
+        body: `${teamOf(PROJECTS.academy).name} 회의에서 발표 순서 정해졌습니까?`,
         sent_at: daysAgo(3, 16, 12),
         run: { status: 'DONE', run_id: 'a04b7cd9-06ed-425b-a187-9d53e1046f2a' },
       },

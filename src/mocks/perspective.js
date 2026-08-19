@@ -1,4 +1,4 @@
-import { TEAM, agentName } from './data/people.js'
+import { agentName } from './data/people.js'
 import { home as baseHome, teams } from './data/home.js'
 import { briefings as baseBriefings, meetings } from './data/meetings.js'
 import { chatSidebar as baseSidebar } from './data/chat.js'
@@ -161,8 +161,9 @@ function meetingWhen(scheduledAt, durationMin) {
  * 예정" 문구가 갈리는 것을 막으려고 서버가 완성해 내려주는 값이라, 목도 같은
  * 모양으로 미리 완성해 둔다.
  *
- * 목 세계는 팀이 하나뿐이라(`TEAM`) `team_name` 은 고정값이다. 실제 서버는
- * `meeting.project.team.name` 을 읽는다.
+ * `team_name` 은 회의가 들고 온 값을 그대로 쓴다. 실제 서버도
+ * `meeting.project.team.name` 을 읽는다 — 여기서 `TEAM` 을 박아 두면 다른 팀
+ * 회의(학술제)에 해커톤 팀 이름이 붙는다.
  */
 export function viewerMeetingPrepHeader(meetingId) {
   const meeting = meetings[meetingId]
@@ -176,7 +177,7 @@ export function viewerMeetingPrepHeader(meetingId) {
     meeting_id: meeting.id,
     title: meeting.title,
     project_name: meeting.project_name,
-    team_name: TEAM.name,
+    team_name: meeting.team_name,
     scheduled_at: meeting.scheduled_at,
     when: meetingWhen(meeting.scheduled_at, meeting.duration_min),
     location: meeting.discord_channel_id ? 'Discord' : '서비스',
