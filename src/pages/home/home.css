@@ -131,7 +131,6 @@ body,
 .section-title button:hover,
 .nav-subtitle:hover,
 .project-link:hover,
-.quick-links a:hover,
 .profile-link:hover,
 .section-arrow:hover {
   background: #e9eaed;
@@ -141,7 +140,6 @@ body,
 .section-title button:active,
 .nav-subtitle:active,
 .project-link:active,
-.quick-links a:active,
 .profile-link:active,
 .section-arrow:active {
   background: #dfe1e5;
@@ -416,23 +414,6 @@ body,
   flex: 0 0 24px;
 }
 
-.quick-links {
-  display: grid;
-  gap: 8px;
-  margin: 32px 8px 0;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.quick-links a {
-  display: flex;
-  align-items: center;
-  min-height: 32px;
-  border-radius: 8px;
-  padding: 7px 8px;
-  transition: background 160ms ease;
-}
-
 .profile-link {
   display: flex;
   align-items: center;
@@ -479,17 +460,6 @@ body,
   color: #92969d;
   font-size: 12px;
   line-height: 1.5;
-}
-
-/* 아직 연결되지 않은 바로가기. 링크처럼 보이면 눌러 보고 실망한다. */
-.quick-link-off {
-  display: flex;
-  align-items: center;
-  min-height: 32px;
-  border-radius: 8px;
-  padding: 7px 8px;
-  color: #92969d;
-  cursor: default;
 }
 
 .home-main {
@@ -1531,7 +1501,6 @@ h1 {
 }
 
 .project-link:focus-visible,
-.quick-links a:focus-visible,
 .profile-link:focus-visible,
 .ai-brief-button:focus-visible,
 .icon-button:focus-visible,
@@ -1630,15 +1599,6 @@ h1 {
   .project-link {
     min-height: 28px;
     padding-block: 2px;
-  }
-
-  .quick-links {
-    gap: 4px;
-    margin-top: 18px;
-  }
-
-  .quick-links a {
-    min-height: 28px;
   }
 
   .profile-link {
@@ -1949,10 +1909,6 @@ h1 {
   .project-link {
     gap: 6px;
     font-size: 12px;
-  }
-
-  .quick-links {
-    margin-inline: 6px;
   }
 
   .home-main {

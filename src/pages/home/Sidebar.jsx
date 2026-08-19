@@ -220,11 +220,9 @@ export function Sidebar({
     ))
   }
 
-  // `GET /home` 의 `shortcuts` 가 방 id 와 Discord 주소를 이미 들고 온다.
-  // 여기서 채팅 사이드바를 한 번 더 부르면 홈 첫 화면에 요청이 하나 더 는다.
-  const agentRoomId = shortcuts?.agent_room_id ?? null
+  // `GET /home` 의 `shortcuts` 가 Discord 주소를 이미 들고 온다. 여기서
+  // 채팅 사이드바를 한 번 더 부르면 홈 첫 화면에 요청이 하나 더 는다.
   const discord = shortcuts?.discord ?? null
-  const agentHref = agentRoomId ? `/chat?room=${agentRoomId}` : '/chat'
 
   return (
     <>
@@ -430,31 +428,6 @@ export function Sidebar({
               ? renderProjects(shownFavorite, needle ? '찾는 이름이 없습니다.' : '즐겨찾기한 프로젝트가 없습니다.')
               : null}
           </nav>
-
-          <div className="quick-links">
-            {/* `Bordo 바로가기` 는 **내 대리인과의 채팅**이다. 이름만 보고
-                홈으로 보내면 이미 홈에 있는 사람이 누른 것이라 아무 일도
-                안 일어난 것처럼 보인다. */}
-            <a href={agentHref} onClick={(event) => goInApp(event, agentHref)}>
-              Bordo 바로가기
-            </a>
-
-            {/*
-              Discord 주소는 서버가 조립해 준다. 팀이 아직 연결되지 않았으면
-              `connected: false` 로만 온다 — 그때 링크를 그럴듯하게 띄워 두면
-              눌렀을 때 Discord 첫 화면으로 튕긴다. 갈 곳이 없다는 것을
-              그대로 말한다.
-            */}
-            {discord?.connected && discord.url ? (
-              <a href={discord.url} target="_blank" rel="noreferrer noopener">
-                Discord 바로가기
-              </a>
-            ) : (
-              <span className="quick-link-off" data-tip="팀이 아직 Discord 서버와 연결되지 않았습니다">
-                Discord 미연결
-              </span>
-            )}
-          </div>
 
           {/* 하단 프로필. `사용자 이름` 하드코딩에 목적지도 `/` 였다.
               이름은 `GET /home` 의 `user_name` 을 그대로 쓴다. */}
