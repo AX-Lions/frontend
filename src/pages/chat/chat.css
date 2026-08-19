@@ -36,6 +36,10 @@
   --chat-sidebar-selected: #dfe1e5;
   --chat-orange: rgba(255, 157, 66, 0.7);
   --chat-point: #002662;
+  /* 팀·프로젝트가 어디까지를 감싸는지 그리는 세로선. 팀 쪽이 한 단계 진하다 —
+     같은 색이면 두 선이 한 겹으로 보여 층이 다시 사라진다. */
+  --chat-rail-team: #c7ccd4;
+  --chat-rail-project: #dfe3e9;
   display: grid;
   width: 100%;
   height: 100vh;
@@ -799,14 +803,55 @@
   transform: rotate(180deg);
 }
 
-/* 트랙이 `auto` 면 **내용 크기로 커진다.** 안쪽 줄이 `width: 100%` 라 서로를
-   키워, 목록이 패널 밖으로 나가도 `overflow-x: hidden` 이라 닿을 수 없다.
-   `minmax(0, 1fr)` 로 칸을 넘지 않게 못 박는다. */
+/*
+  펼친 팀·프로젝트가 **어디까지를 감싸는지** 그리는 세로선.
+  ──────────────────────────────────────────────────────
+  다 펼치면 팀 · 프로젝트 · 방이 한 덩어리로 흘러내려서, 이 방이 어느
+  프로젝트 것인지 · 그 프로젝트가 어느 팀 것인지를 들여쓰기 8px 로만 읽어야
+  했다. 팀이 둘이 되면서는 아예 못 읽는다 — 아래쪽 팀 이름이 위쪽 팀의 방
+  목록 바로 다음 줄에 붙어 나와, 경계가 어디였는지 알 수 없다.
+
+  선은 **제목 글자의 왼쪽 끝**에서 내려온다. 접기 화살표나 상자 모서리가 아니라
+  이름이 시작하는 자리라야, 선을 눈으로 따라 올라갔을 때 무엇이 감싸고 있는지가
+  바로 읽힌다.
+
+      팀 이름 ┐
+              ├ 프로젝트 이름 ┐
+              │               ├ 방
+              │               └ 방
+              └ 프로젝트 이름 …
+
+  선이 지나갈 자리를 만드느라 안쪽 들여쓰기를 8px 에서 16px 로 넓혔다. 8px 로
+  두면 선이 아래층 카드 위로 올라타서, 구분하려고 그은 선이 오히려 글자를 가린다.
+*/
 .nested-team {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
-  padding-left: 8px;
+  padding-left: 16px;
+}
+
+/* `top` 이 음수인 것은 머리글과의 격자 간격(12px)을 되짚어 올라가기 위해서다.
+   선이 이름 바로 밑에서 시작하지 않으면 무엇에서 뻗어 나온 선인지 끊긴다. */
+.nested-team::before,
+.project-chat-list::before {
+  position: absolute;
+  top: -12px;
+  bottom: 0;
+  left: 12px;
+  width: 2px;
+  border-radius: 999px;
+  content: '';
+}
+
+.nested-team::before {
+  background: var(--chat-rail-team);
+}
+
+.project-chat-list::before {
+  top: -8px;
+  background: var(--chat-rail-project);
 }
 
 .project-team {
@@ -823,10 +868,11 @@
 }
 
 .project-chat-list {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 4px;
-  padding-left: 8px;
+  padding-left: 16px;
 }
 
 .chat-room {
