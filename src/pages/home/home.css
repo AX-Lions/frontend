@@ -953,9 +953,34 @@ h1 {
   gap: 24px;
 }
 
+/*
+  제목과 상태 뱃지가 자리를 나누는 방식.
+  ── 좁아질 때 **누가 먼저 줄을 내리는지**가 규칙이다 ──
+
+  둘 다 폭이 못 박혀 있었다(제목 217px · 상태 83px). 카드가 아무리 넓어도
+  제목은 217px 안에서 줄을 내렸고, `불참한 회의` 는 83px 이 모자라 여섯
+  글자가 두 줄로 갈렸다 — 양쪽 다 남는 자리를 못 쓰고 있었다.
+
+  이제 둘 다 **내용만큼** 차지하고 남는 자리는 제목이 가져간다. 그리고 좁아질
+  때는 이 순서로 준다.
+
+      1. 제목이 먼저 줄어든다 (`flex-shrink: 1000`)
+      2. 제목이 `min-width` 에 닿으면 더는 못 줄어든다
+      3. 그때부터 남은 몫이 상태 칸으로 넘어가 뱃지가 줄을 내린다
+
+  `flex-shrink` 를 1000 대 1 로 벌려 놓는 것이 2번을 만든다. flex 는 줄어드는
+  양을 **비율로 나누므로**, 같은 값이면 둘이 동시에 조금씩 줄어 제목이 두 줄이
+  되기도 전에 뱃지부터 갈라진다. 뱃지가 먼저 갈라지면 안 되는 이유는, 그것이
+  이 카드에서 **가장 먼저 읽혀야 하는 한 마디**이기 때문이다 — 제목은 두 줄이
+  되어도 읽히지만 `불참한 / 회의` 는 한 덩이로 안 읽힌다.
+*/
 .summary-title-stack {
   display: grid;
-  width: 217px;
+  /* 남는 자리를 가져가고, 좁아지면 여기부터 준다. */
+  flex: 1 1 auto;
+  flex-shrink: 1000;
+  /* 제목이 더는 못 줄어드는 바닥. 여기 닿은 뒤에야 뱃지가 줄을 내린다. */
+  min-width: 120px;
   gap: 12px;
 }
 
@@ -964,12 +989,15 @@ h1 {
   font-size: 16px;
   font-weight: 600;
   line-height: 1.35;
+  /* 아주 좁아졌을 때 긴 낱말 하나가 칸을 밀어내지 않게. */
+  overflow-wrap: anywhere;
 }
 
 .summary-state {
   display: flex;
-  width: 83px;
-  flex: 0 0 83px;
+  /* 내용만큼만. 제목이 바닥에 닿기 전까지는 사실상 안 줄어든다. */
+  flex: 0 1 auto;
+  min-width: 0;
   flex-direction: column;
   align-items: flex-end;
   gap: 12px;
@@ -978,13 +1006,16 @@ h1 {
 .summary-badge {
   display: inline-flex;
   justify-content: center;
-  width: 100%;
+  /* 100% 였다. 상태 칸이 83px 로 묶여 있어 여섯 글자가 두 줄로 갈렸다. */
+  width: auto;
   border-radius: 8px;
   background: #ffe6e6;
   padding: 4px 11px;
   color: #ff3333;
   font-size: 12px;
   line-height: 1.35;
+  /* 낱말 안에서는 안 자른다. `불참한 회의` 가 갈린다면 띄어쓰기에서만. */
+  word-break: keep-all;
 }
 
 /* 참석한 회의까지 붉게 칠하면 뱃지가 경고로 읽혀 `불참` 이 눈에 안 들어온다. */
