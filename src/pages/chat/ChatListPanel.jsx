@@ -171,27 +171,33 @@ export function ChatListPanel({
           </IconButton>
           {/* 톱니와 반짝이가 **같은 화면**을 열고 있었다. 톱니를 누른 사람은
               채팅 설정을 기대하는데 대리인 설정이 떴다. 둘을 가른다. */}
-          <IconButton label="AI 대리인 설정" onClick={onOpenAgentSettings}>
-            <Icon src={icons.ai} />
-          </IconButton>
+          {/*
+            말풍선이 가리키는 것이 이 버튼이라, 이 버튼을 감싼 자리를 기준으로
+            띄운다.
+
+            예전에는 패널 전체를 기준으로 `top: 71px; right: 64px` 이었다. 헤더
+            높이와 아이콘 위치를 손으로 잰 값이라, 그 사이에 무엇이 하나만 끼어도
+            **아무것도 안 가리키는 알약이 공중에 뜬다.** 실제로 그렇게 됐다.
+          */}
+          <span className="chat-tip-anchor">
+            <IconButton label="AI 대리인 설정" onClick={onOpenAgentSettings}>
+              <Icon src={icons.ai} />
+            </IconButton>
+
+            {promptVisible ? (
+              <div className="chat-tip" role="note">
+                <p>당신의 Bordo를 입맛에 맞게 조정해보세요!</p>
+                <button type="button" aria-label="안내 닫기" onClick={() => setPromptVisible(false)}>
+                  ×
+                </button>
+              </div>
+            ) : null}
+          </span>
           <IconButton label="채팅 설정" onClick={onOpenChatSettings}>
             <Icon src={icons.setting} />
           </IconButton>
         </div>
       </header>
-
-      {promptVisible ? (
-        <div className="chat-tip">
-          <p>
-            당신의 Bordo를 입맛에 맞게
-            <br />
-            조정해보세요!
-          </p>
-          <button type="button" aria-label="닫기" onClick={() => setPromptVisible(false)}>
-            ×
-          </button>
-        </div>
-      ) : null}
 
       {tool === 'search' ? (
         <div className="chat-list-search">
