@@ -11,8 +11,8 @@ import { FlowRail } from './FlowRail'
 // 여기서 그대로 가져다 쓴다 — 팝업 하나 때문에 `pages/home` 전체를
 // `shared` 로 옮기면 그쪽에 남는 `NewProjectDialog` 등도 다 옮겨야 한다.
 import { TeamSwitchDialog } from '../home/TeamSwitchDialog.jsx'
-import { icons } from './flowBoard.api'
-import { fetchBriefing } from './flowBoard.data'
+import { icons, toneLabels } from './flowBoard.api'
+import { fetchBriefing, toneOf } from './flowBoard.data'
 import { buildFlowLayout } from './flowLayout'
 
 /**
@@ -108,6 +108,15 @@ export function FlowBoardPage() {
   const [activeChip, setActiveChip] = useState(null)
   const [activeSummaryItem, setActiveSummaryItem] = useState(null)
 
+  /*
+    고른 것이 아니라 **끈 것**을 담는다.
+
+    고른 것을 담으면 목록이 도착하기 전에는 "아직 모른다"(null)와 "아무것도 안
+    골랐다"(빈 배열)를 구별해야 하고, 목록이 오는 순간 effect 로 초기화해야 한다.
+    끈 것을 담으면 처음이 빈 배열 하나뿐이라 그 단계가 통째로 없어진다.
+  */
+  const [excludedContents, setExcludedContents] = useState([])
+
   const me = useMe()
   const meeting = useFlowBoardMeeting(pickedMeetingId, urlMeetingId, urlProjectId)
   const meetingId = meeting.data?.meetingId ?? null
@@ -189,23 +198,81 @@ export function FlowBoardPage() {
   const timelineItems = useMemo(() => timeline.data?.results ?? [], [timeline.data])
 
   /*
-    참여자·내용 종류 필터가 화면에서 사라져 **거르지 않은 조회 하나만 남았다.**
+    조회는 **늘 거르지 않은 한 번**이다.
 
-    필터를 없앤 것은 이 화면이 답해야 하는 질문이 "누가 무엇을 걸러 놓았나" 가
-    아니라 "내가 없는 동안 무슨 일이 있었지" 이기 때문이다. 순서대로 훑는 것이
-    그 답에 훨씬 곧게 닿는다. 필터 목록을 따로 받아 오던 `useFlowOptions` 도
-    같이 없앴다 — 그 훅이 존재한 이유가 필터 칸을 채우는 것 하나뿐이었다.
+    내용 종류 필터가 남아 있지만 조건으로 서버에 싣지 않고 화면에서 건다.
+    이유는 두 가지다.
+
+    ① 서버에 실으면 응답이 바뀌어 **노드가 사라지고 링이 다시 잡힌다.**
+       종류 하나를 껐다 켤 때마다 사람들이 자리를 바꿔 앉으면, 판이 무엇을
+       거른 것인지가 아니라 판이 통째로 바뀐 것으로 읽힌다.
+    ② 거른 응답에서 종류 목록을 뽑으면 `의견` 을 끄는 순간 `의견` 칸 자체가
+       사라져 **다시 켤 방법이 없다.** 예전에는 그것 때문에 거르지 않은 조회를
+       하나 더 두었는데(`useFlowOptions`), 화면에서 거르면 그 조회가 필요 없다.
+
+    맥락 재생과 장치도 하나로 합쳐진다 — 둘 다 "어느 엣지를 그릴지" 한 집합으로
+    말한다.
   */
   const flow = useFlowGraph({ mode, meetingId, projectId })
+
+  /*
+    내용 종류 필터.
+
+    목록은 **거르지 않은 조회**에서 받는다(위 주석 ①②). 판에 한 번도 안 나온
+    종류는 애초에 칸이 없다 — 서버가 그렇게 준다.
+  */
+  const allContents = useMemo(
+    () => flow.data?.filter_options?.content_types ?? [],
+    [flow.data],
+  )
+  const pickedContents = useMemo(
+    () => allContents.filter((value) => !excludedContents.includes(value)),
+    [allContents, excludedContents],
+  )
+
+  const contentRows = allContents.map((value) => ({
+    value,
+    name: toneLabels[toneOf(value)] ?? value,
+    tone: toneOf(value),
+    checked: !excludedContents.includes(value),
+  }))
+
+  const toggleContent = (value) => setExcludedContents((current) => (
+    current.includes(value) ? current.filter((v) => v !== value) : [...current, value]
+  ))
+
+  // 전부 끄면 그릴 것이 없다. 판이 비는 것이 맞고, 그때는 안내를 겹쳐 띄운다.
+  const nothingPicked = allContents.length > 0 && pickedContents.length === 0
+
+  /*
+    종류 필터를 통과한 줄.
+
+    `seq` 는 **거르기 전 회의 전반의 번호 그대로**다. 걸러 놓고 1부터 다시
+    매기면 우측 패널 카드의 번호와 갈리고, 무엇보다 `요청사항만 보기` 로
+    3번이었던 것이 1번이 되어 회의 어디쯤 이야기였는지가 사라진다.
+  */
+  const pickedTimeline = useMemo(
+    () => timelineItems
+      .filter((item) => !excludedContents.includes(item.content_type))
+      /*
+        `order` 는 **거른 뒤 목록에서 몇 번째 줄인지**다. 재생은 보이는 줄을
+        순서대로 짚으므로 진행 상태를 이 값으로 재야 한다. 화면에 찍히는 번호는
+        그대로 `seq`(회의 전반 순번)다 — 둘을 한 값으로 묶으면 필터를 거는 순간
+        둘 중 하나가 반드시 틀린다.
+      */
+      .map((item, index) => ({ ...item, order: index + 1 })),
+    [timelineItems, excludedContents],
+  )
 
   /*
     맥락 재생.
 
     좌측 목록의 `총 몇 건` 만 알면 되므로 대본 자체는 넘기지 않는다 — 훅이
     목록을 들고 있으면 회의를 바꿀 때마다 배열 신원이 바뀌어 타이머가 괜히
-    다시 걸린다.
+    다시 걸린다. 거른 목록을 기준으로 센다 — 화면에 안 보이는 줄을 기다리며
+    판이 0.5초씩 멈춰 있으면 재생이 멎은 것으로 보인다.
   */
-  const playback = useFlowPlayback(timelineItems.length)
+  const playback = useFlowPlayback(pickedTimeline.length)
   const { stop: stopPlayback } = playback
 
   /*
@@ -219,24 +286,31 @@ export function FlowBoardPage() {
   }, [meetingId, mode, stopPlayback])
 
   /*
-    지금 판에 보여야 하는 엣지.
+    지금 판에 보여야 하는 엣지. **종류 필터와 맥락 재생이 같은 집합에 실린다.**
 
-    재생 중이 아니면 `null` — 거르지 않는다는 뜻이다. 재생이 **끝났을 때도**
-    `null` 이라 끝까지 누적된 판이 그대로 남는다.
+    둘을 따로 두면 "필터로 꺼진 것" 과 "아직 재생이 안 닿은 것" 을 판이 두 가지
+    방식으로 지우게 되고, 겹쳤을 때 어느 쪽이 이기는지가 코드 두 군데에 흩어진다.
 
-    `step` 이 0 이면 빈 `Set` 이다. 화살표가 하나도 없는 판에서 시작해야
+    아무것도 안 거르고 재생도 안 하면 `null` 이다 — 거르지 않는다는 뜻이라
+    배치가 예전과 한 글자도 다르지 않게 나온다. 재생이 **끝났을 때도** 필터만
+    남으므로 끝까지 누적된 판이 그대로 있다.
+
+    재생 중 `step` 이 0 이면 빈 `Set` 이다. 화살표가 하나도 없는 판에서 시작해야
     "지워졌다가 하나씩 쌓인다" 가 눈에 보인다.
   */
   const visibleEdgeIds = useMemo(() => {
-    if (!playback.isPlaying) {
+    const script = playback.isPlaying
+      ? pickedTimeline.slice(0, playback.step)
+      : pickedTimeline
+    if (!playback.isPlaying && excludedContents.length === 0) {
       return null
     }
     const shown = new Set()
-    timelineItems.slice(0, playback.step).forEach((item) => {
+    script.forEach((item) => {
       (item.related_edge_ids ?? [item.edge_id]).forEach((id) => shown.add(id))
     })
     return shown
-  }, [playback.isPlaying, playback.step, timelineItems])
+  }, [playback.isPlaying, playback.step, pickedTimeline, excludedContents])
 
   /*
     엣지 하나가 회의 전반에서 몇 번째인지.
@@ -415,6 +489,10 @@ export function FlowBoardPage() {
       return
     }
     setMode(next)
+    // 종류 목록이 모드마다 통째로 다르다(회의 6종 ↔ 작업 5종). 끈 것을 들고
+    // 넘어가면 **다른 모드에는 있지도 않은 코드가 조건에 남아**, 목록에서는
+    // 전부 켜져 보이는데 판은 걸러진 채로 그려진다.
+    setExcludedContents([])
     setActiveSummaryItem(null)
     ui.setActiveTimelineItem(null)
     setPanel(null)
@@ -575,13 +653,19 @@ export function FlowBoardPage() {
       <FlowNavigationSidebar
         activeCategory={mode}
         activeEdgeId={ui.activeTimelineItem?.edge_id ?? null}
+        contentFilters={contentRows}
         icons={icons}
         isCollapsed={ui.isFlowSidebarCollapsed}
+        isContentCollapsed={ui.isContentCollapsed}
         isScrolled={ui.isSidebarScrolled}
+        isTimelineCollapsed={ui.isTimelineCollapsed}
         onCategorySelect={switchMode}
+        onContentCollapseToggle={ui.toggleContentCollapse}
+        onContentToggle={toggleContent}
         onScroll={(event) => ui.setIsSidebarScrolled(event.currentTarget.scrollTop > 0)}
         onSidebarToggle={ui.toggleFlowSidebar}
         onTeamSwitch={() => setSwitchingTeam(true)}
+        onTimelineCollapseToggle={ui.toggleTimelineCollapse}
         onTimelineSelect={selectTimelineItem}
         /*
           `start` 만 갈아 끼운다. 재생을 시작할 때 읽던 자리를 접는 것은 판을
@@ -590,8 +674,12 @@ export function FlowBoardPage() {
         */
         playback={{ ...playback, start: startPlayback }}
         teamName={meeting.data?.detail?.project_name}
-        timeline={timelineItems}
-        timelineEmptyText={mode === WORK_MODE ? '이 기간에 오간 작업이 없습니다.' : '이 회의에서 오간 내용이 없습니다.'}
+        timeline={pickedTimeline}
+        /* 껐기 때문에 빈 것과 원래 없는 것은 다르다. 앞엣것을 `오간 내용이
+           없습니다` 로 말하면 사용자는 자기가 끈 것을 잊고 고장으로 읽는다. */
+        timelineEmptyText={nothingPicked
+          ? '내용 종류가 전부 꺼져 있습니다.'
+          : (mode === WORK_MODE ? '이 기간에 오간 작업이 없습니다.' : '이 회의에서 오간 내용이 없습니다.')}
       />
 
       <main className={panel ? 'flow-workspace has-record-panel' : 'flow-workspace'}>
@@ -760,7 +848,12 @@ export function FlowBoardPage() {
               {flow.error && !flow.data ? (
                 <div className="board-status"><LoadError error={flow.error} onRetry={flow.reload} /></div>
               ) : null}
-              {!flow.loading && !flow.error && layout.nodes.length === 0 ? (
+              {/* 종류를 전부 끄면 그릴 것이 없다. 판이 빈 것과 조회가 실패한 것을
+                  구별해 주지 않으면 사용자는 자기가 끈 것을 잊고 고장으로 읽는다. */}
+              {nothingPicked ? (
+                <div className="board-status"><Empty>내용 종류가 전부 꺼져 있습니다. 하나 이상 켜 주세요.</Empty></div>
+              ) : null}
+              {!flow.loading && !flow.error && !nothingPicked && layout.nodes.length === 0 ? (
                 <div className="board-status">
                   <Empty>{mode === WORK_MODE ? '이 기간에 오간 작업이 없습니다.' : '이 회의에서 오간 내용이 없습니다.'}</Empty>
                 </div>

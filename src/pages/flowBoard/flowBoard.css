@@ -264,7 +264,8 @@
 }
 
 .categories,
-.timeline-section {
+.timeline-section,
+.filter-section {
   margin-top: 24px;
 }
 
@@ -317,6 +318,119 @@
 
 .timeline-head h2 {
   flex: 0 0 auto;
+}
+
+/*
+  목록을 접는 화살표. 제목 **왼쪽**에 선다.
+
+  회의가 길면 시간순 인덱스가 스무 줄을 넘어, 그 아래 `내용` 필터가 스크롤
+  바깥으로 밀린다. 접을 수 없으면 필터를 한 번 만지려고 매번 목록 끝까지
+  내려가야 한다.
+
+  접었을 때 `-90도` 돌려 오른쪽을 향하게 한다 — 걷어낸 `필터링` 머리가 쓰던
+  방식과 같다. 사이드바 안에서 접기 표시가 두 가지면 같은 동작으로 안 읽힌다.
+*/
+.section-collapse {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  transition: background 120ms ease;
+}
+
+.section-collapse img {
+  width: 12px;
+  height: 12px;
+  transition: transform 120ms ease;
+}
+
+.section-collapse.is-collapsed img {
+  transform: rotate(-90deg);
+}
+
+.section-collapse:hover {
+  background: #e9eaed;
+}
+
+.section-collapse:active {
+  background: #cfd2d7;
+}
+
+/*
+  아이콘이 붙은 내용 종류 필터.
+
+  `시간순 인덱스` 와 같은 머리줄(`timeline-head`)을 쓴다. 두 목록의 제목 줄이
+  같은 모양이어야 접기 화살표가 같은 자리에 서고, 하나를 접어 본 사람이 다른
+  하나도 접을 수 있다는 것을 안다.
+*/
+.check-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 120ms ease;
+}
+
+.check-row:hover {
+  background: #e9eaed;
+}
+
+.check-row:active {
+  background: #dfe1e5;
+}
+
+.check-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/*
+  체크박스는 아이콘 두 장으로 그린다. 진짜 input 은 숨기되 지우지 않는다 —
+  라벨 클릭·키보드 조작·스크린리더가 그대로 살아 있어야 한다.
+*/
+.check-row input {
+  position: absolute;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.checked-icon,
+.unchecked-icon {
+  position: absolute;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.checked-icon {
+  display: none;
+}
+
+.unchecked-icon {
+  display: block;
+}
+
+.check-row input:checked ~ .checked-icon {
+  display: block;
+}
+
+.check-row input:checked ~ .unchecked-icon {
+  display: none;
 }
 
 .timeline-play,
