@@ -61,9 +61,9 @@ export function fetchCandidates({ query, type } = {}, signal) {
 /**
  * 방 하나를 그 자체로 읽는다.
  *
- * 사이드바는 **팀 단체방을 id 로만** 내려준다(`group_chat_room_id`). 트리 어디에도
- * 방 객체가 없어서, `모두 채팅 바로가기` 로 연 방은 제목을 그릴 수가 없었다.
- * 열린 방은 목록과 별개로 한 번 더 읽는다.
+ * 사이드바 트리에 없는 방도 열릴 수 있다 — 주소(`/chat?room=<id>`)로 들어온
+ * 방, 팀 단체방(`group_chat_room_id` 만 오고 방 객체가 없다)이 그렇다. 트리에서
+ * 못 찾은 방은 제목 칸이 비어 어느 대화인지 알 수 없으므로 한 번 더 읽는다.
  */
 export function fetchRoom(roomId, signal) {
   return api.get(`/chat/rooms/${roomId}`, undefined, { signal })
@@ -238,13 +238,11 @@ export function toTeamRows(sidebar) {
     name: team.team_name,
     unread: team.unread_count,
     marked: team.has_important,
-    groupRoomId: team.group_chat_room_id,
     projects: (team.projects ?? []).map((project) => ({
       id: project.project_id,
       name: project.project_name,
       unread: project.unread_count,
       marked: project.has_important,
-      groupRoomId: project.group_chat_room_id,
       rooms: (project.rooms ?? []).map(toPreview),
     })),
   }))
