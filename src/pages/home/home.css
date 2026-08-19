@@ -843,8 +843,18 @@ h1 {
   min-height: 279px;
 }
 
+/*
+  머리글의 `+` · `>` 는 **글자 바로 옆**이다.
+
+  `space-between` 이라 아이콘이 카드 오른쪽 끝까지 밀려나 있었다. 넓은 카드
+  에서는 `오늘 일정` 과 `+` 가 400px 넘게 떨어져, 그 `+` 가 이 카드의 것인지
+  옆 카드의 것인지 눈으로 이어지지 않았다. 문구 오른쪽에 붙여 한 덩이로
+  읽히게 한다.
+*/
 .schedule-panel .section-heading,
 .summary-panel .section-heading {
+  justify-content: flex-start;
+  gap: 4px;
   margin-bottom: 0;
 }
 
