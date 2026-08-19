@@ -26,6 +26,14 @@ import './GlobalSidebar.css'
  * 빼 달라는 요청이었다. 요청함은 지금 홈의 아이콘 줄(`Sidebar`)에만 남는다.
  * 검색 아이콘도 같은 이유로 뺐다.
  *
+ * ## 순서·아이콘이 홈과 다르다
+ *
+ * `globalNavItems` 의 순서(홈·채팅·회의·요청함)는 홈 아이콘 줄(시안
+ * `666:5059`)을 따른 것이다. 이 레일은 시안이 따로 있고(`576:4858` —
+ * `채팅` 이 맨 아래) 회의 아이콘 그림도 다르다 — 홈 쪽은 마이크,
+ * 이 레일은 클립보드다. `globalNavItems` 를 고치면 홈까지 같이 바뀌므로
+ * 여기서만 순서를 다시 짜고 아이콘을 덮어쓴다.
+ *
  * ## 홈에는 이 레일이 없다
  *
  * 홈 화면(시안 `666:5059`)은 로고 밑에 아이콘 줄을 붙여 넣은 모양이라, 별도
@@ -35,7 +43,15 @@ import './GlobalSidebar.css'
  * 준비)은 지금처럼 이 레일 하나로 다닌다.
  */
 
-const railNavItems = globalNavItems.filter((item) => item.id !== 'inbox')
+const RAIL_ORDER = ['home', 'meeting', 'chat']
+const railNavItems = RAIL_ORDER
+  .map((id) => globalNavItems.find((item) => item.id === id))
+  .filter(Boolean)
+
+/** 이 레일에서만 다른 그림을 쓰는 아이콘(시안 `576:4858`). */
+const RAIL_ICON_OVERRIDE = {
+  meeting: '/icons/GlobalMeetingIcon.svg',
+}
 
 /*
   프로필은 누르면 켜졌다 꺼지기만 하고 **아무 데도 가지 않았다.** 프로필을
@@ -95,7 +111,7 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
                 title={item.label}
                 onClick={(event) => onNavigate?.(event, item)}
               >
-                <img src={item.icon} alt="" />
+                <img src={RAIL_ICON_OVERRIDE[item.id] ?? item.icon} alt="" />
                 {item.id === 'chat' && chatBadge > 0 ? (
                   <span className="global-sidebar-badge">{chatBadge > 99 ? '99+' : chatBadge}</span>
                 ) : null}

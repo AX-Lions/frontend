@@ -42,7 +42,6 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -58,10 +57,15 @@
     transform 120ms ease;
 }
 
+/*
+  뱃지는 원 밖으로 살짝 걸친다. `.global-sidebar-link` 에 `overflow: hidden`
+  이 없어야 이 자리가 잘리지 않는다 — 전에는 링크에도 걸려 있어서(아바타를
+  원으로 자르던 규칙과 같이 쓰고 있었다) 뱃지 절반이 통째로 잘려 나갔다.
+*/
 .global-sidebar-badge {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -4px;
+  right: -4px;
   display: flex;
   min-width: 16px;
   height: 16px;
@@ -105,6 +109,7 @@
   width: 48px;
   height: 48px;
   padding: 6px;
+  overflow: hidden;
   border-radius: 999px;
   background: transparent;
   transition:
