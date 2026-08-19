@@ -258,9 +258,13 @@ export function ChatRoom({
             <Icon src={icons.search} />
           </IconButton>
           {/* 전체 화면은 목록을 접는 것이다. 예전에는 버튼 색만 바뀌고
-              화면은 그대로였다. */}
+              화면은 그대로였다.
+
+              켜져 있을 때는 아이콘도 줄이는 쪽으로 바꾼다. 버튼 색만으로는
+              지금이 켜진 것인지 이 버튼이 그냥 눌린 것인지 알 수 없어,
+              나가는 길을 찾느라 다시 한 번 눌러 보게 된다. */}
           <IconButton label={fullscreen ? '전체 화면 끄기' : '전체 화면'} active={fullscreen} onClick={onToggleFullscreen}>
-            <Icon src={icons.fullscreen} />
+            <Icon src={fullscreen ? icons.exitFullscreen : icons.fullscreen} />
           </IconButton>
           <div className="room-menu-wrap">
             <IconButton
