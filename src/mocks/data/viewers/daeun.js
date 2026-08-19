@@ -16,6 +16,8 @@ import { daysAgo, minutesAgo } from '../people.js'
  * 근거 없이 답해 버리면 잘못을 바로잡을 사람이 그 자리에 없다.
  */
 export const viewer = {
+  // Discord 담당이라 계정을 이어 뒀다. 카드의 **연결됨** 쪽을 보는 자리.
+  discordLinked: true,
   agentRoomId: '4a91c6d8-2e57-4b03-9f68-7d0e5a2c39b1',
   favoriteMeetings: ['4eb1040f-18d7-4841-bc72-360846888c3d'],
   delegatePrompt:
