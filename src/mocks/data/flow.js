@@ -45,6 +45,7 @@ const MEETING_REGULAR = '4eb1040f-18d7-4841-bc72-360846888c3d'
 const MEETING_SYNC = 'cdcd5cda-d887-47dc-91aa-4bb7393d461b'
 const MEETING_BOOTH = '2f5c1d47-9b0a-4e3c-8f61-7a4d2c9e0b13'
 const MEETING_POSTER = '0a3f6cd2-71b5-4d8e-9c4a-2f7b8e15d093'
+const MEETING_REHEARSAL = '9d3e7b28-4c15-4a6f-b072-51e8f6a3c4d9'
 
 /** 뱃지 라벨. 서버가 완성해 주는 값이라 화면은 이걸 그대로 읽는다. */
 const CONTENT_LABEL = {
@@ -916,6 +917,124 @@ const MEETING_SYNC_EDGES = [
   연합학술제 킥오프. 다른 프로젝트에도 회의가 있어야 프로젝트를 옮겨 다니는
   것이 화면에서 의미를 갖는다.
 */
+/*
+  **판이 커졌을 때를 보는 회의.**
+
+  다른 회의는 노드가 넷에서 여덟인데, 그 규모에서는 겹침도 잘림도 안 나온다.
+  여기는 사람 다섯이 전원 참석하고 그중 셋이 대리인을 보내, 노드가 여덟에
+  화살표가 열둘이다.
+
+  ## 무엇을 보려고 만드나
+
+  - 노드가 많을 때 배치가 겹치지 않는가
+  - 한 쌍 사이에 종류가 넷일 때 뱃지가 넘치지 않는가 (`rehearsal-5` 묶음)
+  - **긴 이름이 잘리는가** — `유수인의 Bordo` 는 열 자인데, 대리인 호칭이
+    길어지면(`{이름}의 Bordo`) 노드 폭을 넘는다. 여기서만 확인할 수 있다
+  - 한 사람이 여럿에게 동시에 보낼 때 (`rehearsal-1` 은 넷에게)
+
+  실제로 있을 법한 회의로 둔다. 억지 데이터로 채우면 배치는 확인되지만
+  「이런 회의가 실제로 있나」 를 의심하게 되어 시연에 못 쓴다.
+*/
+const MEETING_REHEARSAL_EDGES = [
+  {
+    id: 'rehearsal-1',
+    from: '서재민', to: ['유수인', '임수연', '최비성', '강다은'], type: 'SCHEDULE',
+    surface: 'SERVICE', at: daysAgo(4, 10, 0), agenda: 'slot',
+    says: [
+      ['서재민', '리허설은 금요일 오전 10시입니다. 그날 오전은 다들 현장에 있어야 합니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-2',
+    from: '유수인', to: ['서재민'], type: 'OPINION', surface: 'SERVICE',
+    at: daysAgo(4, 10, 12),
+    says: [
+      ['유수인', '시안 최종본은 목요일 저녁에 올리겠습니다. 리허설 때는 그걸로 봅니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-3',
+    from: '임수연', to: ['유수인'], type: 'REQUEST', surface: 'SERVICE',
+    at: daysAgo(4, 10, 25),
+    says: [
+      ['임수연', '시안에서 간격 토큰만 먼저 주실 수 있을까요. 화면 네 개가 그것에 걸려 있습니다.'],
+      ['유수인', '오늘 안에 그 부분만 따로 보내겠습니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-4',
+    from: '최비성', to: ['서재민', '임수연'], type: 'CHANGE', surface: 'DISCORD',
+    at: daysAgo(4, 10, 40),
+    says: [
+      ['최비성', '준비 화면 계약을 바꿨습니다. 저장이 셋으로 갈립니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-5',
+    from: '강다은의 Bordo', to: ['서재민'], type: 'OPINION', surface: 'DISCORD',
+    at: daysAgo(4, 10, 52),
+    says: [
+      ['강다은의 Bordo', '강다은 님은 이 시간대에 자리를 비웁니다. 리허설 시각은 확정으로 전달받았습니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-6',
+    from: '강다은의 Bordo', to: ['서재민'], type: 'SCHEDULE', surface: 'DISCORD',
+    at: daysAgo(4, 11, 4),
+    says: [
+      ['강다은의 Bordo', '봇 배포는 목요일 밤으로 잡아 두겠다고 미리 적어 두셨습니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-7',
+    from: '강다은의 Bordo', to: ['서재민'], type: 'ETC', surface: 'DISCORD',
+    at: daysAgo(4, 11, 15),
+    says: [
+      ['강다은의 Bordo', '포털 권한 두 개는 본인 확인이 필요해 보류했습니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-8',
+    from: '강다은의 Bordo', to: ['서재민'], type: 'REQUEST', surface: 'DISCORD',
+    at: daysAgo(4, 11, 26),
+    says: [
+      ['강다은의 Bordo', '돌아오시면 Intent 설정을 확인해 달라고 남겨 두었습니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-9',
+    from: '유수인의 Bordo', to: ['임수연', '최비성'], type: 'CHANGE', surface: 'SERVICE',
+    at: daysAgo(4, 11, 38), agenda: 'tokenCleanup',
+    says: [
+      ['유수인의 Bordo', '간격 값은 다음 주로 미루기로 정해 두셨습니다. 오늘 확정하지 않습니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-10',
+    from: '최비성의 Bordo', to: ['서재민'], type: 'ETC', surface: 'SERVICE',
+    at: daysAgo(4, 11, 50),
+    says: [
+      ['최비성의 Bordo', '이 건은 기록이 오래되어 현재 상태를 확신할 수 없습니다. 본인 확인이 필요합니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-11',
+    from: '서재민', to: ['유수인', '임수연', '최비성', '강다은'], type: 'CONCLUSION',
+    surface: 'SERVICE', at: daysAgo(4, 12, 2), agenda: 'slot',
+    says: [
+      ['서재민', '리허설 금요일 10시 확정. 시안은 목요일 저녁, 배포는 목요일 밤입니다.'],
+    ],
+  },
+  {
+    id: 'rehearsal-12',
+    from: '임수연', to: ['서재민'], type: 'OPINION', surface: 'SERVICE',
+    at: daysAgo(4, 12, 14),
+    says: [
+      ['임수연', '화면 쪽은 목요일 낮까지 맞추겠습니다.'],
+    ],
+  },
+]
+
 const MEETING_BOOTH_EDGES = [
   {
     id: 'meeting-booth-1',
@@ -1598,6 +1717,18 @@ const posterMeeting = flowFor({
   edges: MEETING_POSTER_EDGES,
 })
 
+const rehearsalMeeting = flowFor({
+  head: {
+    meeting_id: MEETING_REHEARSAL,
+    meeting_label: `${dayLabel(daysAgo(4))} 연합학술제 발표 리허설 일정 조율`,
+    category: 'MEETING',
+  },
+  // 사람 다섯 + 대리인 셋. 다른 회의의 두 배다.
+  nodeNames: ['서재민', '유수인', '임수연', '최비성', '강다은',
+    '강다은의 Bordo', '유수인의 Bordo', '최비성의 Bordo'],
+  edges: MEETING_REHEARSAL_EDGES,
+})
+
 export const meetingFlows = {
   [MEETING_GLOBAL]: globalMeeting.flow,
   [MEETING_DESIGN]: designMeeting.flow,
@@ -1605,6 +1736,7 @@ export const meetingFlows = {
   [MEETING_SYNC]: syncMeeting.flow,
   [MEETING_BOOTH]: boothMeeting.flow,
   [MEETING_POSTER]: posterMeeting.flow,
+  [MEETING_REHEARSAL]: rehearsalMeeting.flow,
 }
 
 /** `GET /projects/{id}/flow` */
@@ -1662,6 +1794,7 @@ export const flowEdges = {
   ...syncMeeting.details,
   ...boothMeeting.details,
   ...posterMeeting.details,
+  ...rehearsalMeeting.details,
   ...bordoWork.details,
   ...academyWork.details,
 }

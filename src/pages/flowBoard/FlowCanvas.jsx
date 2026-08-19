@@ -90,8 +90,8 @@ function FlowNode({ node, isMine, isSelected, onSelect }) {
       {node.kind === 'AGENT' ? (
         <span className="flow-node-agent">
           <img className="flow-node-spark" src="/icons/BordoSparkle.svg" alt="" />
-          <span className="flow-node-agent-name">
-            {ownerLabel(node.name)}
+          <span className="flow-node-agent-name" title={node.name}>
+            <span className="flow-node-agent-owner">{ownerLabel(node.name)}</span>
             <b>Bordo</b>
           </span>
         </span>
