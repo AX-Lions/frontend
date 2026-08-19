@@ -167,7 +167,7 @@ const DEMO = [
 
 export const STATUS_LABEL = {
   ANSWERED: '답변완료',
-  ANSWERING: '답변중...',
+  ANSWERING: '답변 중',
   NEEDS_ANSWER: '답변필요',
 }
 
