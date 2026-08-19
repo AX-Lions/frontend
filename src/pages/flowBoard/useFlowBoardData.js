@@ -6,6 +6,7 @@ import {
   fetchMe,
   fetchMeeting,
   fetchMeetingFlow,
+  fetchParticipantFlow,
   fetchProjectFlow,
   fetchProjectMeetings,
   fetchSummaryTable,
@@ -221,6 +222,22 @@ export function useEdgeDetails(edgeIds) {
  * 여기에 붙은 `.catch(() => null)` 까지 그쪽이 물려받아, 개인 설정이 오류
  * 대신 **빈 입력칸**을 그리게 된다. 부르는 곳이 다르면 키도 달라야 한다.
  */
+/**
+ * 판에서 고른 사람·대리인 한 명의 상세(시안 `601:9055`).
+ *
+ * 실서버에는 아직 이 경로가 없다. `.catch(() => null)` 로 **오류가 아니라
+ * 없음**으로 내린다 — 패널이 붉은 오류 상자 대신 "아직 서버에 없습니다" 를
+ * 그리게 하려는 것이다. 고장과 미구현은 사용자가 할 수 있는 일이 다르다.
+ */
+export function useParticipantFlow(meetingId, nodeId) {
+  return useResource(
+    (signal) => (meetingId && nodeId
+      ? fetchParticipantFlow(meetingId, nodeId, signal).catch(() => null)
+      : Promise.resolve(null)),
+    [meetingId, nodeId],
+  )
+}
+
 export function useMe() {
   return useResource((signal) => fetchMe(signal).catch(() => null), [], { cacheKey: 'flow-me' })
 }
