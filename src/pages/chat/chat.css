@@ -159,31 +159,84 @@
   object-fit: contain;
 }
 
+/*
+  말풍선을 매다는 자리. 이 안에 `AI 대리인 설정` 버튼이 있다.
+
+  아이콘 줄의 다른 버튼들과 나란히 서야 하므로 `inline-flex` 다. 블록이면
+  아이콘 하나가 제 줄로 빠진다.
+*/
+.chat-tip-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+/*
+  이 버튼 바로 밑에 매단다.
+
+  예전에는 패널 전체를 기준으로 `top: 71px; right: 64px` 이었다 — 헤더 높이와
+  아이콘 위치를 손으로 잰 값이라, 그 사이에 무엇이 하나만 끼어도 아무것도
+  안 가리키는 알약이 공중에 떴다.
+
+  `right: 0` 으로 오른쪽 끝을 버튼에 맞춘다. 가운데에 맞추면 폭이 넓어 패널
+  밖으로 밀려난다 — 이 버튼이 오른쪽 끝에서 두 번째다.
+*/
 .chat-tip {
   position: absolute;
-  top: 71px;
-  right: 64px;
+  top: calc(100% + 10px);
+  right: 0;
   z-index: 2;
   display: flex;
+  /*
+    폭 기준을 글에서 잡는다.
+
+    `position: absolute` 상자는 **감싼 자리의 폭 안에서** 줄어들려고 한다.
+    여기 감싼 자리는 아이콘 버튼 하나(32px)라, 그냥 두면 알약이 32px 폭에
+    맞춰 세로로 길쭉해진다. `max-content` 로 그 제약에서 빼내고, 대신 최대
+    폭만 정해 너무 길어지지 않게 한다.
+  */
+  width: max-content;
+  max-width: 230px;
   align-items: flex-start;
+  gap: 2px;
+  padding: 6px 6px 6px 14px;
+  border: 1px dashed var(--chat-line);
+  border-radius: 16px;
+  background: #ffffff;
 }
 
+/* 꼬리. 어느 단추에 대한 말인지 모양으로도 말한다. */
+.chat-tip::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  border-top: 1px dashed var(--chat-line);
+  border-left: 1px dashed var(--chat-line);
+  background: #ffffff;
+  transform: rotate(45deg);
+}
+
+/*
+  `width: 220px` + `white-space: nowrap` + 수동 `<br>` 조합이었다. 셋이 서로
+  어긋나서 글자를 한 자만 고쳐도 줄이 깨졌다. 최대 폭만 주고 줄바꿈은 맡긴다.
+*/
 .chat-tip p {
   margin: 0;
-  width: 220px;
-  padding: 4px 16px;
-  border: 1px dashed var(--chat-line);
-  border-radius: 999px;
-  background: #ffffff;
+  color: var(--chat-ink);
   font-size: var(--chat-fs-meta);
-  line-height: 1.2;
-  text-align: center;
-  white-space: nowrap;
+  line-height: 1.35;
 }
 
+/* 보이는 것은 그대로 두고 누를 자리만 넓힌다. 14px 은 겨냥하기 어렵다. */
 .chat-tip button {
-  width: 14px;
-  height: 14px;
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
   color: var(--chat-subtle);
   font-size: var(--chat-fs-meta);
   line-height: 1;
@@ -892,7 +945,16 @@ button.team-shortcut:active {
   --settings-soft: #fafafb;
   --settings-point: #ff9d42;
   --settings-active: #002662;
-  --settings-switch-on: #00d8a7;
+  /*
+    켜진 스위치는 `AI/포인트컬러` 다.
+
+    초록(#00d8a7)이었는데, 이 화면에서만 다른 계열이었다. 판의 대리인 화살표 ·
+    대리인 노드 · 자리 비움 스위치가 모두 이 주황이라, 「Bordo 가 대신 나선다」는
+    같은 사실이 화면마다 다른 색으로 말해지고 있었다.
+  */
+  --settings-switch-on: var(--settings-point);
+  /* 켜진 스위치에 마우스를 올렸을 때. 포인트컬러를 8% 어둡게 한 값이다. */
+  --settings-switch-on-hover: #eb903d;
   display: grid;
   width: 100%;
   height: 100vh;
@@ -1087,7 +1149,7 @@ button.team-shortcut:active {
 }
 
 .settings-switch.on:hover {
-  background: #00c79a;
+  background: var(--settings-switch-on-hover);
 }
 
 /* 위계에서 벗어난 유일한 자리다. 24px 짜리 스위치 안에 `OFF` 세 글자가
@@ -1638,14 +1700,6 @@ button.team-shortcut:active {
 
 .composer-file {
   display: none;
-}
-
-.composer-important.on {
-  background: var(--chat-orange);
-}
-
-.composer-important.on img {
-  filter: brightness(0) invert(1);
 }
 
 /* ─────────────────────────────── 그 날 요약 */

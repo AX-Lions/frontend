@@ -132,6 +132,45 @@ export function FlowBoardPage() {
   const options = useFlowOptions(mode, meetingId, projectId)
   const meetingList = useProjectMeetings(projectId, ui.isMeetingMenuOpen)
 
+  /*
+    회의 목록은 바깥을 눌러도 닫혀야 한다.
+
+    열린 목록이 판 왼쪽 위를 덮고 있어, 안 닫히면 그 아래에 있는 것을 대신
+    가로챈다 — 사용자는 왜 안 눌리는지 모른 채 같은 자리를 다시 누른다.
+    `Escape` 도 같은 이유로 받는다. 키보드로 연 사람에게는 그쪽이 먼저다.
+
+    `pages/home/Sidebar.jsx` 의 회의 드롭다운이 같은 모양을 쓴다.
+
+    판 드래그와는 부딪히지 않는다. `useFlowBoard` 의 `BOARD_INTERACTIVE` 에
+    `.meeting-menu` 와 `.meeting-title button` 이 들어 있어, 팝업 안을 누르는
+    것은 패닝으로 먹히지 않는다.
+  */
+  const meetingMenuRef = useRef(null)
+  // `ui` 를 통째로 의존성에 넣으면 `useFlowBoardUi` 가 렌더마다 새 객체를 주므로
+  // 리스너를 매 렌더 떼었다 다시 단다. 꺼내 쓰는 둘만 본다.
+  const { isMeetingMenuOpen, setIsMeetingMenuOpen } = ui
+  useEffect(() => {
+    if (!isMeetingMenuOpen) {
+      return undefined
+    }
+    const close = (event) => {
+      if (!meetingMenuRef.current?.contains(event.target)) {
+        setIsMeetingMenuOpen(false)
+      }
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        setIsMeetingMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [isMeetingMenuOpen, setIsMeetingMenuOpen])
+
   const filterOptions = options.data?.filter_options
   const allParticipants = useMemo(
     () => (filterOptions?.participants ?? []).map((p) => p.id),
@@ -475,7 +514,7 @@ export function FlowBoardPage() {
           onPointerUp={stopBoardPan}
           onPointerCancel={stopBoardPan}
         >
-          <header className="meeting-title">
+          <header className="meeting-title" ref={meetingMenuRef}>
             {/*
               사이드바를 접으면 여는 단추가 여기로 온다.
 

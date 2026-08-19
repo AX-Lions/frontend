@@ -284,6 +284,7 @@ export function ChatPage() {
           roomId={selectedChatId}
           onClose={() => setSelectedChatId(null)}
           onImportantChanged={refreshImportant}
+          onOpenAgentSettings={() => setView('agent')}
           onOpenSettings={() => setView('room-settings')}
           onToggleFullscreen={() => setFullscreen((on) => !on)}
         />
