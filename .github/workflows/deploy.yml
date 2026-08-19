@@ -52,7 +52,7 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: [self-hosted, Linux, ARM64, bordo-frontend]
+    runs-on: [self-hosted, Linux, X64, bordo-frontend]
     timeout-minutes: 10
     env:
       TARGET: /home/zanviq/bordo/frontend
