@@ -100,6 +100,10 @@ export function ConfirmedScheduleDialog({ meetingId, schedule, onClose }) {
               <img className="cs-edit" src="/icons/ChangeMark.svg" alt="" aria-hidden="true" />
             </div>
 
+            {/* 제목과 본문을 가르는 선. 홈 「오늘 일정」·요약 카드가 쓰는 것과
+                같은 선이라, 이 팝업이 그 줄에서 열렸다는 것이 이어져 읽힌다. */}
+            <hr className="summary-divider" />
+
             <div className="cs-info">
               <div className="cs-meta">
                 <strong>{shown.team_name} · {shown.project_name}</strong>

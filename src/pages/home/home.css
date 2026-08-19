@@ -1001,6 +1001,17 @@ h1 {
   border-top: 1px solid #e5e7eb;
 }
 
+/*
+  오늘 일정 줄 사이의 같은 구분선.
+
+  바깥 여백은 지운다 — `.schedule-content` 가 이미 `gap: 16px` 로 줄을
+  벌려 놓아서, 요약 카드용 여백(16/14px)이 그대로 붙으면 선 하나가 줄
+  하나만큼의 자리를 차지한다.
+*/
+.schedule-content .summary-divider {
+  margin: 0;
+}
+
 .summary-block {
   display: grid;
   gap: 6px;

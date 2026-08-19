@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Sidebar } from './Sidebar.jsx'
 import { AgentDock } from './AgentDock.jsx'
 import { BriefingPrompt } from './BriefingPrompt.jsx'
@@ -441,81 +441,92 @@ export function HomePage() {
               <div className="schedule-content">
                 {todaySchedule.length === 0 ? (
                   <Empty>오늘 잡힌 일정이 없습니다.</Empty>
-                ) : todaySchedule.map((schedule) => {
+                ) : todaySchedule.map((schedule, index) => {
                   const scheduleKey = schedule.meeting_id ?? `${schedule.at}-${schedule.project_id}`
 
                   return (
-                    <div className="schedule-item" key={scheduleKey}>
-                      <button
-                        className={selectedScheduleKey === scheduleKey ? 'schedule-info selected' : 'schedule-info'}
-                        type="button"
-                        onClick={() => {
-                          setSelectedScheduleKey(scheduleKey)
-                          // 상세가 있는 회의만 확인 팝업을 연다 — 회의 없이 시각만
-                          // 잡힌 일정(`meeting_id: null`)은 보여 줄 회의가 없다.
-                          if (schedule.meeting_id) {
-                            setConfirmingMeetingId(schedule.meeting_id)
-                          }
-                        }}
-                      >
-                        {/* `time_range` 는 참여자 시간대로 서버가 계산해 준다.
-                            브라우저 시간대로 다시 찍으면 같은 회의를 사람마다
-                            다른 시각으로 본다. */}
-                        <time>{schedule.time_range}</time>
-                        <div>
-                          <strong>{schedule.title}</strong>
-                          <span>
-                            {schedule.project_name} · {schedule.location}
-                          </span>
-                        </div>
-                      </button>
-                      {/*
-                        `참여하기` 가 아니라 **불참 등록** 버튼이다.
+                    /*
+                      줄 사이에 구분선을 둔다.
 
-                        회의에 들어갈 사람은 Discord 를 이미 열어 두고 있다.
-                        이 화면에서 눌러야 하는 것은 오히려 그 반대 —
-                        "못 간다, 대리인이 대신 가라" 다. 이 서비스가 답하려는
-                        질문이 "내가 없는 동안 무슨 일이 있었지" 이므로,
-                        **없을 것을 미리 등록하는 자리**가 첫 화면에 있어야 한다.
+                      한 줄이 시각 · 제목 · 프로젝트 · 단추로 넉 줄짜리 덩이라,
+                      간격만으로 나누면 **아래 줄의 시각이 위 줄에 딸린 것처럼**
+                      읽힌다. 맨 위에는 안 붙인다 — 제목 밑에 선이 하나 더
+                      생겨 머리글이 두 겹으로 보인다.
+                    */
+                    <Fragment key={scheduleKey}>
+                      {index > 0 ? <hr className="summary-divider" /> : null}
+                      <div className="schedule-item">
+                        <button
+                          className={selectedScheduleKey === scheduleKey ? 'schedule-info selected' : 'schedule-info'}
+                          type="button"
+                          onClick={() => {
+                            setSelectedScheduleKey(scheduleKey)
+                            // 상세가 있는 회의만 확인 팝업을 연다 — 회의 없이 시각만
+                            // 잡힌 일정(`meeting_id: null`)은 보여 줄 회의가 없다.
+                            if (schedule.meeting_id) {
+                              setConfirmingMeetingId(schedule.meeting_id)
+                            }
+                          }}
+                        >
+                          {/* `time_range` 는 참여자 시간대로 서버가 계산해 준다.
+                              브라우저 시간대로 다시 찍으면 같은 회의를 사람마다
+                              다른 시각으로 본다. */}
+                          <time>{schedule.time_range}</time>
+                          <div>
+                            <strong>{schedule.title}</strong>
+                            <span>
+                              {schedule.project_name} · {schedule.location}
+                            </span>
+                          </div>
+                        </button>
+                        {/*
+                          `참여하기` 가 아니라 **불참 등록** 버튼이다.
 
-                        참석자가 아닌 회의는 `delegation` 이 `null` 이라 버튼을
-                        내리지 않고 회의로 가는 링크만 남긴다.
-                      */}
-                      {schedule.delegation ? (
-                        <button
-                          className={schedule.delegation.delegated ? 'is-delegated' : ''}
-                          type="button"
-                          /*
-                            팝업이 아니라 화면으로 보낸다.
+                          회의에 들어갈 사람은 Discord 를 이미 열어 두고 있다.
+                          이 화면에서 눌러야 하는 것은 오히려 그 반대 —
+                          "못 간다, 대리인이 대신 가라" 다. 이 서비스가 답하려는
+                          질문이 "내가 없는 동안 무슨 일이 있었지" 이므로,
+                          **없을 것을 미리 등록하는 자리**가 첫 화면에 있어야 한다.
 
-                            회의 전에 해야 하는 준비가 자료 범위 네 칸에서
-                            **예상 논쟁점 · 내 입장 · Bordo 활동 설정**까지
-                            늘었다. 회의를 주소에 실어 보내므로 새로고침하거나
-                            링크를 복사해도 같은 회의가 열린다.
-                          */
-                          onClick={() => navigate(
-                            `/delegate-prep?meeting=${schedule.meeting_id}`)}
-                        >
-                          {schedule.delegation.delegated ? '대리 참석 중' : '회의에 참여하지 않아요'}
-                        </button>
-                      ) : schedule.action?.url ? (
-                        <button
-                          type="button"
-                          onClick={() => window.open(schedule.action.url, '_blank', 'noopener')}
-                        >
-                          {schedule.action.label ?? '회의 참여하기'}
-                        </button>
-                      ) : (
-                        // 링크가 없는 회의는 서비스 안에서 연다. 비활성 버튼을
-                        // 두면 그 회의만 갈 데가 없어 보인다.
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/flow-board?meeting=${schedule.meeting_id}`)}
-                        >
-                          {schedule.action?.label ?? '보러가기'}
-                        </button>
-                      )}
-                    </div>
+                          참석자가 아닌 회의는 `delegation` 이 `null` 이라 버튼을
+                          내리지 않고 회의로 가는 링크만 남긴다.
+                        */}
+                        {schedule.delegation ? (
+                          <button
+                            className={schedule.delegation.delegated ? 'is-delegated' : ''}
+                            type="button"
+                            /*
+                              팝업이 아니라 화면으로 보낸다.
+
+                              회의 전에 해야 하는 준비가 자료 범위 네 칸에서
+                              **예상 논쟁점 · 내 입장 · Bordo 활동 설정**까지
+                              늘었다. 회의를 주소에 실어 보내므로 새로고침하거나
+                              링크를 복사해도 같은 회의가 열린다.
+                            */
+                            onClick={() => navigate(
+                              `/delegate-prep?meeting=${schedule.meeting_id}`)}
+                          >
+                            {schedule.delegation.delegated ? '대리 참석 중' : '회의에 참여하지 않아요'}
+                          </button>
+                        ) : schedule.action?.url ? (
+                          <button
+                            type="button"
+                            onClick={() => window.open(schedule.action.url, '_blank', 'noopener')}
+                          >
+                            {schedule.action.label ?? '회의 참여하기'}
+                          </button>
+                        ) : (
+                          // 링크가 없는 회의는 서비스 안에서 연다. 비활성 버튼을
+                          // 두면 그 회의만 갈 데가 없어 보인다.
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/flow-board?meeting=${schedule.meeting_id}`)}
+                          >
+                            {schedule.action?.label ?? '보러가기'}
+                          </button>
+                        )}
+                      </div>
+                    </Fragment>
                   )
                 })}
               </div>
