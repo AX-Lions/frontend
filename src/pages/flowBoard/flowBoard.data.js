@@ -108,6 +108,28 @@ export function fetchEdge(edgeId, signal) {
   return api.get(`/flow-edges/${edgeId}`, undefined, { signal })
 }
 
+/**
+ * 판에서 사람·대리인 하나를 눌렀을 때 열리는 우측 패널의 내용(시안 `601:9055`).
+ *
+ * ## 이 저장소가 계약을 먼저 정한다
+ *
+ * 백엔드에 아직 없는 자리다. 화면이 무엇을 그려야 하는지가 먼저 정해졌으므로
+ * (`주요 발언` · 종류별 개수 · `전달한 내용` · `전달받은 내용`) 그 모양을
+ * 목으로 확정하고 여기 적어 둔다 — `frontend/CLAUDE.md` 의 작업 순서다.
+ * 서버에 붙기 전까지 실서버에서는 404 가 나고, 패널은 그때 "아직 서버에
+ * 없습니다" 를 그대로 보여 준다.
+ *
+ * 대리인 노드 id 는 `{user_id}:agent` 라 `:` 가 들어간다. 경로 조각 하나로
+ * 보내야 하므로 감싸 준다 — 안 감싸면 서버에 따라 조각이 둘로 쪼개진다.
+ */
+export function fetchParticipantFlow(meetingId, nodeId, signal) {
+  return api.get(
+    `/meetings/${meetingId}/participants/${encodeURIComponent(nodeId)}/flow`,
+    undefined,
+    { signal },
+  )
+}
+
 /** 헤더의 회의 선택(▼)이 띄울 목록. */
 export function fetchProjectMeetings(projectId, signal) {
   return api.get(`/projects/${projectId}/meetings`, undefined, { signal })

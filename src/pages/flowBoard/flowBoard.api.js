@@ -17,6 +17,9 @@ export const icons = {
   expandLeftDouble: '/icons/Expand_left_double.svg',
   expandRight: '/icons/Expandright.svg',
   home: '/icons/HomeIcon.svg',
+  /* 접힌 사이드바를 다시 여는 단추. 홈 사이드바(`Sidebar.jsx`)가 쓰는 것과
+     같은 그림이라 두 화면에서 같은 동작으로 읽힌다. */
+  menu: '/icons/menuIcon.svg',
   search: '/icons/Search.svg',
   teamSwitch: '/icons/TeamSwitch.svg',
   unchecked: '/icons/unchecked.svg',

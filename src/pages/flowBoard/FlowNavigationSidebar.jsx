@@ -72,13 +72,14 @@ export function FlowNavigationSidebar({
           `팀변경아이콘`이다. 아무 동작이 없던 자리를 새로고침으로 오해해서는
           안 된다.
         */}
-        <button className="team-switch" type="button" aria-label="팀 전환하기" onClick={onTeamSwitch}>
+        <button className="team-switch" type="button" aria-label="팀 전환하기" data-tip="팀 전환하기" onClick={onTeamSwitch}>
           <img src={icons.teamSwitch} alt="" />
         </button>
         <button
           className="sidebar-toggle"
           type="button"
           aria-label={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+          data-tip={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
           aria-expanded={!isCollapsed}
           onClick={onSidebarToggle}
         >
