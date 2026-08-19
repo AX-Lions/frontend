@@ -1545,8 +1545,22 @@ function buildParticipantFlows(edges, agendas) {
       headline,
       counts: [
         { key: 'utterance', label: '발언', count: utterances },
+        /*
+          **이 숫자는 「이 사람이 보낸 건수」 가 아니라 「이 알약을 누르면 펼쳐지는
+          카드 수」다.** 그래서 `sent` 와 `received` 를 합쳐 세고, 종류 목록도 둘의
+          합집합으로 둔다.
+
+          패널은 `전달한 내용` 과 `전달받은 내용` 을 둘 다 그리고, 이 알약 줄은
+          **그 둘을 함께 거르는 필터**다. 보낸 것만 세면 받기만 한 종류에는 알약이
+          아예 없어서, 알약을 하나라도 켜는 순간 그 묶음이 화면에서 빠지고 다시
+          부를 단추가 없다. 남는 알약도 숫자와 실제로 펼쳐지는 카드 수가 어긋난다.
+        */
         ...CONTENT_ORDER
-          .map((type) => ({ type, n: sentSpecs.filter((spec) => spec.type === type).length }))
+          .map((type) => ({
+            type,
+            n: sentSpecs.filter((spec) => spec.type === type).length
+              + receivedSpecs.filter((spec) => spec.type === type).length,
+          }))
           .filter(({ n }) => n > 0)
           .map(({ type, n }) => ({
             key: type,
