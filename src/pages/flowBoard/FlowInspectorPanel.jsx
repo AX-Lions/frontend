@@ -202,7 +202,17 @@ export function FlowNodePanel({ meetingId, node, onClose, participant }) {
 
   return (
     <PanelShell
-      title={node.name}
+      /*
+        `서재민` 이 아니라 `서재민의 회의록`.
+
+        이름만 적혀 있으면 그 사람의 프로필처럼 보인다 — 실제 내용은 **이
+        회의에서** 그 사람이 주고받은 것이라, 회의가 바뀌면 통째로 달라진다.
+        제목이 그 범위를 말해야 패널만 보고도 무엇을 읽는지 안다.
+
+        대리인은 이름이 이미 `유수인의 Bordo` 라 `의` 를 한 번 더 붙이면
+        `유수인의 Bordo의 회의록` 이 된다. 그쪽은 조사를 뺀다.
+      */
+      title={isAgent ? `${node.name} 회의록` : `${node.name}의 회의록`}
       subtitle={isAgent ? 'AI 대리인' : (attendance ?? '참여자')}
       onClose={onClose}
     >
