@@ -1036,15 +1036,24 @@ export function FlowBoardPage() {
           ) : null}
         </section>
 
-        {playback.isPlaying || playback.isFinished ? (
+        {(playback.isPlaying || playback.isFinished) && !panel ? (
           /*
-            재생이 끝나도 닫지 않는다.
+            재생이 끝나도 닫지 않고, `panel` 이 비어 있을 때만 보인다.
 
             전에는 `isPlaying` 이 꺼지는 순간(끝까지 다 본 순간) 이 패널도
             같이 사라졌다 — 방금 다 본 회의록을 다시 훑어볼 새도 없이
             치워지는 것이라, 사람이 직접 닫기 전까지는(`onClose` 가 부르는
             `stopPlayback`) 열어 둔다. `isFinished` 는 `useFlowPlayback.js`
             참고 — "끝까지 봤다" 를 `isPlaying` 과 별도로 들고 있는 값이다.
+
+            `!panel` 조건은 나중에 추가됐다. 처음에는 재생 중·직후에 아래 네
+            패널을 통째로 걸러 뒀는데, 그러면 회의록이 펼쳐진 채로 캔버스의
+            다른 노드·화살표·뱃지를 눌러도 `setPanel` 만 조용히 불리고 아무
+            것도 안 떴다 — 상세를 보려고 누른 사람에게는 **눌러도 반응이
+            없는 화면**이었다. 이제는 반대로 회의록 쪽을 `panel` 이 비었을
+            때만 그려서, 뭔가 고르면 그 패널이 회의록 자리를 대신 차지하고
+            (아래 네 패널이 `!panel` 없이도 걸리지 않는다), 그 패널을 닫으면
+            (`setPanel(null)`) 회의록으로 돌아온다.
           */
           <FlowPlaybackLog
             onClose={stopPlayback}
@@ -1053,14 +1062,7 @@ export function FlowBoardPage() {
           />
         ) : null}
 
-        {/*
-          아래 네 패널은 재생 중이거나 방금 끝났을 때는 안 연다 — 그 자리는
-          위 「전체 회의록」이 쓰고 있다. 캔버스에서 노드·화살표를 눌러도
-          `setPanel` 자체는 그대로 불리므로(누르는 동작을 막지는 않는다),
-          여기서 안 걸러 두면 재생이 끝난 뒤 무언가를 누르는 순간 두 패널이
-          동시에 뜬다.
-        */}
-        {!playback.isPlaying && !playback.isFinished && panel?.kind === 'briefing' ? (
+        {panel?.kind === 'briefing' ? (
           briefing ? (
             <FlowBriefingSidebar
               activeChip={activeChip}
@@ -1087,7 +1089,7 @@ export function FlowBoardPage() {
           )
         ) : null}
 
-        {!playback.isPlaying && !playback.isFinished && panel?.kind === 'agenda' ? (
+        {panel?.kind === 'agenda' ? (
           <FlowAgendaPanel
             column={panel.column}
             icons={icons}
@@ -1107,7 +1109,7 @@ export function FlowBoardPage() {
           />
         ) : null}
 
-        {!playback.isPlaying && !playback.isFinished && panel?.kind === 'node' && selectedNode ? (
+        {panel?.kind === 'node' && selectedNode ? (
           <FlowNodePanel
             meetingId={meetingId}
             node={selectedNode}
@@ -1117,7 +1119,7 @@ export function FlowBoardPage() {
           />
         ) : null}
 
-        {!playback.isPlaying && !playback.isFinished && panel?.kind === 'edge' ? (
+        {panel?.kind === 'edge' ? (
           <FlowEdgePanel
             /*
               화살표가 바뀌면 **패널을 새로 만든다.**
