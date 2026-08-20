@@ -144,11 +144,18 @@
   font-weight: 600;
 }
 
+/*
+  단추가 셋(`불참` · `취소` · `회의 보기`)이라 한 줄에 안 들어간다.
+
+  팝업 폭이 361px 인데 `회의 보기` 만 174px 다. 셋을 한 줄에 두면 넘쳐서
+  **가로 스크롤바가 생기고 `회의 보기` 가 잘렸다.** 불참 단추를 위 줄에
+  통째로 앉히고, 원래 있던 두 개는 아래 줄에서 예전 폭을 그대로 쓴다.
+*/
 .cs-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  height: 57px;
 }
 
 .cs-actions button {
@@ -229,8 +236,11 @@
   색으로 먼저 보인다.
 */
 .cs-absence {
-  width: 174px;
-  flex: none;
+  /* 위 줄을 통째로 쓴다. `order` 로 올리는 이유는 DOM 순서(취소 → 불참 →
+     회의 보기)를 바꾸면 Tab 순서가 화면과 어긋나기 때문이다. */
+  order: -1;
+  flex: 0 0 100%;
+  width: 100%;
   background: #ff5a1f;
   color: #ffffff;
   transition:
@@ -252,9 +262,4 @@
   outline-offset: 2px;
 }
 
-@media (max-width: 480px) {
-  .cs-absence {
-    width: auto;
-    flex: 1;
-  }
-}
+
