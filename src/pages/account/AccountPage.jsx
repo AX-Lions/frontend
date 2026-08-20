@@ -124,6 +124,9 @@ export function AccountPage() {
   const loading = (me.loading && !me.data) || (agent.loading && !agent.data)
   const failure = (me.error && !me.data) || (agent.error && !agent.data)
 
+  // 레일 하단 프로필(`GlobalSidebar`)도 홈 사이드바와 같은 사람을 그려야 한다.
+  const sidebarUser = { name: me.data?.name, avatarUrl: me.data?.avatar_url }
+
   // `null` 이면 아직 안 고쳤다는 뜻이라 서버 값을 보여 준다. 빈 문자열로 두면
   // 이름을 지운 상태와 구별할 수 없다.
   const name = draftName ?? me.data?.name ?? ''
@@ -287,7 +290,7 @@ export function AccountPage() {
   if (loading) {
     return (
       <div className="account-page">
-        <GlobalSidebar active="account" />
+        <GlobalSidebar active="account" user={sidebarUser} />
         <Loading label="설정을 불러오는 중입니다…" />
       </div>
     )
@@ -296,7 +299,7 @@ export function AccountPage() {
   if (failure) {
     return (
       <div className="account-page">
-        <GlobalSidebar active="account" />
+        <GlobalSidebar active="account" user={sidebarUser} />
         <LoadError
           error={me.error ?? agent.error}
           onRetry={() => { me.reload(); agent.reload() }}
@@ -307,7 +310,7 @@ export function AccountPage() {
 
   return (
     <div className="account-page">
-      <GlobalSidebar active="account" />
+      <GlobalSidebar active="account" user={sidebarUser} />
 
       <main className="account-main">
         <header className="account-header">

@@ -60,34 +60,29 @@ const MEETING_IDS = {
  * 모두 같은 id 를 보게 되어, 칩을 눌러 목록을 걸렀을 때 판에서도 같은 화살표가
  * 켜진다.
  */
+/*
+  `flow.js` 의 `MEETING_GLOBAL_EDGES` 실제 엣지 id 를 종류별로 묶은 것이다.
+  예전에는 이 자리가 flow.js 어디에도 없는 UUID 를 손으로 적어 둔 자리였다 —
+  칩을 눌러도 판의 화살표는 하나도 강조되지 않았고, 확인 카드를 눌러도 갈
+  곳이 없었다. `crosscheck.mjs` 가 이 연결은 보지 않아 조용히 어긋나 있었다.
+*/
 const EDGES = {
-  OPINION: [
-    '234b09bc-8060-4790-96ae-e13923ed407e',
-    '022067fc-5a42-44bb-96f6-74839b58dd41',
-    'b8ada828-137c-46ab-abcc-a96b793711ad',
-  ],
-  REQUEST: [
-    'ad6aec74-a042-411b-949f-981e3f95d79a',
-    '7cca9f5c-8c93-426c-b5cb-9aad7543d472',
-    'e0cfc42f-391a-442d-9422-53c52d0fa6e1',
-  ],
-  CHANGE: [
-    'd69da90d-098b-4c06-a083-6c0c6265a618',
-    'edfe8900-5a38-4eeb-a3ba-aa813ac869e9',
-  ],
-  SCHEDULE: ['84029327-adfb-4845-a315-27f275b80d92'],
-  CONCLUSION: ['1b1833e3-7c4d-4f7f-a101-9779ba318776'],
-  ETC: ['db0ccbc8-424d-470b-8108-3e02e578b078'],
+  OPINION: ['meeting-edge-1', 'meeting-edge-2', 'meeting-edge-3', 'meeting-edge-9', 'meeting-edge-15', 'meeting-edge-29'],
+  REQUEST: ['meeting-edge-4', 'meeting-edge-5', 'meeting-edge-33'],
+  CHANGE: ['meeting-edge-6', 'meeting-edge-7', 'meeting-edge-30'],
+  SCHEDULE: ['meeting-edge-8', 'meeting-edge-13', 'meeting-edge-17', 'meeting-edge-18', 'meeting-edge-32'],
+  CONCLUSION: ['meeting-edge-14', 'meeting-edge-19', 'meeting-edge-31'],
+  ETC: ['meeting-edge-10', 'meeting-edge-11', 'meeting-edge-16'],
 }
 
-/** 안건 id. 브리핑의 `agenda_id` 와 인덱스의 `id` 가 같은 값을 봐야 한다. */
+/**
+ * 안건 id. 브리핑의 `agenda_id` 와 인덱스의 `id` 가 같은 값을 봐야 한다.
+ * `flow.js` 의 `AGENDAS` 에 있는 실제 id 를 그대로 옮겨 적는다 — 여기서
+ * 새 UUID 를 지어내면 안건을 눌러도 강조될 화살표가 없다.
+ */
 const AGENDA_IDS = {
   slot: '6f156c00-027e-4f89-8272-6c811c2d39e5',
-  designDeadline: '1fde0c91-5d7f-4e2a-bdcb-cef8f7882771',
-  scheduleExtension: '85eef546-d408-4251-8cd5-5ae6558778c8',
-  qaWindow: 'c3b2a1d0-7e64-4f18-9a25-0d7b8c6e4f31',
-  discordScope: '5a90e2f7-1c48-4b63-8d07-e2f95a1b6c84',
-  nextAgenda: '7e41c9b5-3d82-4a70-91ef-6b0c4d28a5f3',
+  release: '1d92a6b7-3f50-4c81-b269-7a0e4d5c83f1',
 }
 
 /**
@@ -659,8 +654,11 @@ export const briefings = {
         id: 'bc-1',
         title: '디자인 시안 마감 변경',
         body: '최종 시안 마감이 8/20 → 8/18 로 이틀 앞당겨졌어요.',
-        edge_id: EDGES.CHANGE[0],
-        agenda_id: AGENDA_IDS.designDeadline,
+        edge_id: 'meeting-edge-30',
+        agenda_id: AGENDA_IDS.release,
+        // 이 변경이 실제로 바꾼 달력 일정(`calendar.js` 의 `evt-4`). 「실제
+        // 일정에서 보기」가 이 id 로 `/meeting-schedule` 을 연다.
+        calendar_event_id: 'evt-4',
         confirmed_at: null,
         occurred_at: daysAgo(1, 20, 41),
       },
@@ -668,8 +666,9 @@ export const briefings = {
         id: 'bc-2',
         title: '개발 일정 1주 연장',
         body: 'API 연동 완료일이 8/23 → 8/30 으로 변경됐어요. 시안 일정과 맞물려 있어 디자인 쪽 확인이 필요해요.',
-        edge_id: EDGES.CHANGE[1],
-        agenda_id: AGENDA_IDS.scheduleExtension,
+        edge_id: 'meeting-edge-32',
+        agenda_id: AGENDA_IDS.release,
+        calendar_event_id: 'evt-7',
         confirmed_at: null,
         occurred_at: daysAgo(1, 21, 4),
       },
@@ -743,34 +742,34 @@ export const briefings = {
     ],
     used_answers: [
       {
-        edge_id: EDGES.OPINION[0],
+        edge_id: 'meeting-edge-29',
         agenda_id: AGENDA_IDS.slot,
         excerpt: '오전 슬롯은 피해 주세요. 저는 오후 2시 이후가 가능합니다.',
         reason: null,
       },
       {
-        edge_id: EDGES.OPINION[1],
-        agenda_id: AGENDA_IDS.designDeadline,
+        edge_id: 'meeting-edge-30',
+        agenda_id: AGENDA_IDS.release,
         excerpt: '디자인 시안은 8월 18일을 넘기지 않습니다.',
         reason: null,
       },
       {
-        edge_id: EDGES.CONCLUSION[0],
-        agenda_id: AGENDA_IDS.designDeadline,
+        edge_id: 'meeting-edge-31',
+        agenda_id: AGENDA_IDS.release,
         excerpt: '색상 토큰은 확정본이 있어 이번 수정 범위에 들어가지 않습니다.',
         reason: null,
       },
     ],
     deferred_answers: [
       {
-        edge_id: EDGES.SCHEDULE[0],
-        agenda_id: AGENDA_IDS.scheduleExtension,
+        edge_id: 'meeting-edge-32',
+        agenda_id: AGENDA_IDS.release,
         excerpt: '개발 일정 연장은 제가 정할 수 없습니다.',
         reason: 'allow_schedule_change=false',
       },
       {
-        edge_id: EDGES.REQUEST[2],
-        agenda_id: AGENDA_IDS.qaWindow,
+        edge_id: 'meeting-edge-33',
+        agenda_id: AGENDA_IDS.release,
         excerpt: 'QA 기간을 3일로 줄여도 되는지는 저장된 근거가 없어 답을 미뤘습니다.',
         reason: 'no_saved_answer',
       },
@@ -884,7 +883,18 @@ export const briefings = {
     meeting_id: MEETING_IDS.academyKickoff,
     narrative: `${agentName(ME.name)}가 대신 참석해 부스 당번 이야기에서 "발표자는 당번에서 뺀다" 로 답했습니다. 초록 마감일은 학술제 측 양식이 아직 안 와서 유보했습니다.`,
     location_chips: [],
-    needs_confirmation: [],
+    needs_confirmation: [
+      {
+        id: 'bc-a1',
+        title: '부스 당번을 2교대로 나눔',
+        body: '부스 운영 이틀을 오전·오후 2교대로 나눠 인원을 배치했어요.',
+        edge_id: 'meeting-booth-4',
+        agenda_id: null,
+        calendar_event_id: 'evt-3',
+        confirmed_at: null,
+        occurred_at: daysAgo(5, 20, 12),
+      },
+    ],
     requests_to_me: [
       {
         id: 'br-a1',
@@ -911,7 +921,7 @@ export const briefings = {
     ],
     used_answers: [
       {
-        edge_id: null,
+        edge_id: 'meeting-booth-5',
         agenda_id: null,
         excerpt: '발표자는 부스 당번에서 빼는 것으로 알고 있습니다.',
         reason: null,
@@ -919,7 +929,7 @@ export const briefings = {
     ],
     deferred_answers: [
       {
-        edge_id: null,
+        edge_id: 'meeting-booth-6',
         agenda_id: null,
         excerpt: '초록 마감일은 제가 답할 근거가 없습니다.',
         reason: 'no_evidence',

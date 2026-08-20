@@ -141,13 +141,17 @@ export const viewer = {
     '0a3f6cd2-71b5-4d8e-9c4a-2f7b8e15d093': {
       narrative:
         '자리를 비우신 70분 동안 서재민의 Bordo가 한 가지를 대신 답했습니다. 제출 마감을 묻는 질문에 제출 안내 문서의 금요일 18시를 그대로 인용했습니다. 반면 부스 인원 배치 기한은 어느 문서에도 없어 유보하고 본인 확인으로 넘겼습니다 — 없는 기한을 지어냈다면 팀 전체가 그것을 기준으로 움직였을 것입니다. 회의 결과로 포스터 서체가 두 번째 안으로 확정됐고, 인원 배치는 초안 상태로 서재민 님 확인을 기다리고 있습니다.',
+      // 필드 이름을 `briefings.js` 의 `needs_answer` 와 맞춘다 — 다르면
+      // `FlowBriefingSidebar` 가 못 읽어 빈 카드만 남는다.
       needs_answer: [
         {
-          id: 'na-poster-1',
-          question: '부스 인원 배치는 언제까지 확정하면 됩니까?',
-          asked_by: '유수인',
-          reason: '어느 문서에도 기한이 없어 대리인이 답하지 못했습니다.',
+          question_id: 'a4c7e0b3-8d15-4f92-9b6c-2e8a5d1f0c93',
+          asker_name: '유수인',
+          title: '부스 인원 배치 기한',
+          body: '부스 인원 배치는 언제까지 확정하면 됩니까? 어느 문서에도 기한이 없어 대리인이 답하지 못했습니다.',
           asked_at: daysAgo(6, 20, 15),
+          meta: '유수인 · 20:15',
+          chat_room_id: '9e0a7c34-6b25-4d81-a3f9-5c17b8e20d46',
           answered_at: null,
         },
       ],

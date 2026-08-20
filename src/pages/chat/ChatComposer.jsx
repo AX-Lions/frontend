@@ -159,7 +159,7 @@ export function ChatComposer({ notice, roomId, onSent, onOpenAgentSettings }) {
         <button
           type="button"
           aria-label="AI 대리인 설정"
-          title="AI 대리인 설정"
+          data-tip="AI 대리인 설정"
           onClick={onOpenAgentSettings}
         >
           <Icon src={icons.filter} />

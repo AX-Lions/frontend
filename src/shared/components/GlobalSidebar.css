@@ -142,16 +142,26 @@
   object-fit: cover;
 }
 
+/*
+  아바타가 없을 때. `home.css` 의 같은 이름 규칙과 값을 맞춘다 — 홈
+  사이드바와 이 레일이 같은 사람을 같은 모양으로 그려야 한다.
+*/
+.profile-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 1px solid #ffe6e6;
+  border-radius: 50%;
+  background: #fdf1f1;
+  color: #002662;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+}
+
 .global-sidebar-user.active {
   box-shadow: inset 0 0 0 2px #002662;
-}
-
-/* 지금 진행 중인 회의가 있을 때 `회의` 자리에 대신 뜨는 아이콘. 옅은 색으로
-   눈에 띄게 해 둔다 — 다른 아이콘과 똑같아 보이면 놓치기 쉽다. */
-.global-sidebar-live {
-  background: rgba(255, 100, 80, 0.12);
-}
-
-.global-sidebar-live:hover {
-  background: rgba(255, 100, 80, 0.2);
 }

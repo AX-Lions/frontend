@@ -7,7 +7,7 @@ import {
   setMessageImportant,
 } from './chat.data.js'
 import { formatTime } from './chat.format.js'
-import { BordoAvatar, RequestIcon } from './chat.ui.jsx'
+import { BordoAvatar, PersonAvatar, RequestIcon } from './chat.ui.jsx'
 
 /**
  * 메시지 한 줄과 거기서 할 수 있는 일.
@@ -255,7 +255,7 @@ export function ChatMessageRow({ message, focused, myAgentRoom, onChanged, onImp
       {message.sender?.is_agent || !message.sender?.avatar_url ? (
         <BordoAvatar />
       ) : (
-        <img className="chat-avatar" src={message.sender.avatar_url} alt="" />
+        <PersonAvatar className="chat-avatar" src={message.sender.avatar_url} />
       )}
       <div>
         <strong>{message.sender?.name ?? ''}</strong>

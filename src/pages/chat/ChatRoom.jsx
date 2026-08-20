@@ -203,6 +203,38 @@ export function ChatRoom({
   const header = room ?? toPreview(detail.data)
 
   const [roomTool, setRoomTool] = useState('')
+  const roomMenuRef = useRef(null)
+  /*
+    `메뉴`(햄버거) 드롭다운은 바깥을 눌러도 닫혀야 한다.
+
+    전에는 같은 단추를 다시 누르거나 안의 항목 셋 중 하나를 눌러야만 닫혔다
+    — 판 옆이나 대화창 아무 데나 눌러서는 안 닫혀 계속 떠 있었다.
+    `FlowBoardPage.jsx` 의 회의 목록 드롭다운과 같은 사정으로 **캡처
+    단계**에서 듣는다 — 그쪽에 적어 둔 이유(넓은 화살표 히트 영역의
+    `stopPropagation()`)는 여기 없지만, 다른 곳에서 같은 문제가 생기지
+    않도록 처음부터 같은 방식으로 맞춘다.
+  */
+  useEffect(() => {
+    if (roomTool !== 'menu') {
+      return undefined
+    }
+    const close = (event) => {
+      if (!roomMenuRef.current?.contains(event.target)) {
+        setRoomTool('')
+      }
+    }
+    const onKey = (event) => {
+      if (event.key === 'Escape') {
+        setRoomTool('')
+      }
+    }
+    document.addEventListener('pointerdown', close, true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', close, true)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [roomTool])
   // 달력에서 고른 날. 서버는 `date` 와 `before` 를 함께 못 받는다 — 날짜로 뛰는
   // 것과 위로 이어 보는 것은 기준점이 다르다.
   const [jumpDate, setJumpDate] = useState(null)
@@ -389,7 +421,7 @@ export function ChatRoom({
           대화를 닫아 목록만 남긴다. 브라우저 뒤로가기를 부르면 채팅 화면 자체를
           떠나 버리는데, 이 자리의 화살표가 뜻하는 것은 **대화에서 나오기**다.
         */}
-        <button className="back-button" type="button" aria-label="뒤로가기" onClick={onClose}>
+        <button className="back-button" type="button" aria-label="뒤로가기" data-tip="뒤로가기" onClick={onClose}>
           <Icon src={icons.expandLeft} />
         </button>
         <div className="chat-room-title">
@@ -415,7 +447,7 @@ export function ChatRoom({
           <IconButton label={fullscreen ? '전체 화면 끄기' : '전체 화면'} active={fullscreen} onClick={onToggleFullscreen}>
             <Icon src={fullscreen ? icons.exitFullscreen : icons.fullscreen} />
           </IconButton>
-          <div className="room-menu-wrap">
+          <div className="room-menu-wrap" ref={roomMenuRef}>
             <IconButton
               label="메뉴"
               active={roomTool === 'menu'}

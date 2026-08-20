@@ -4,7 +4,7 @@ import { icons } from './chat.icons.js'
 import { NewChatDialog } from './NewChatDialog.jsx'
 import { toTeamRows } from './chat.data.js'
 import { formatTime } from './chat.format.js'
-import { AvatarStack, BordoAvatar, Icon, IconButton, RequestIcon, UnreadBadge } from './chat.ui.jsx'
+import { AvatarStack, BordoAvatar, Icon, IconButton, PersonAvatar, RequestIcon, UnreadBadge } from './chat.ui.jsx'
 
 function ChatPreview({ chat, selected, onSelect }) {
   return (
@@ -15,7 +15,7 @@ function ChatPreview({ chat, selected, onSelect }) {
         ) : chat.stacked || !chat.avatar ? (
           <AvatarStack avatars={chat.avatars} />
         ) : (
-          <img className="chat-avatar" src={chat.avatar} alt="" />
+          <PersonAvatar className="chat-avatar" src={chat.avatar} />
         )}
         <div className="chat-preview-copy">
           <div className="chat-preview-title">
@@ -220,8 +220,23 @@ export function ChatListPanel({
               <Icon src={icons.ai} />
             </IconButton>
 
+            {/*
+              똑같은 안내가 검색칸 자리에도 한 벌 더 있었다(`position: absolute`
+              인데 자기 자리를 잡아 줄 조상이 없어, 엉뚱하게 아래 `자리 비움`
+              스위치 위에 겹쳐 떴다). 가리키는 버튼이 하나인데 말풍선이 둘일
+              이유가 없어 이 벌만 남긴다.
+
+              세 번 깜빡이면 스스로 접는다 — 눌러서만 닫히면 처음 켠 사람이
+              그새 다른 데를 보고 있다가 다시 열었을 때도 여전히 떠 있어,
+              눈에 안 띄던 권유가 나중엔 방해로 읽힌다. `setTimeout` 으로
+              직접 시간을 세지 않고 `onAnimationEnd` 를 쓰는 이유는, 그러면
+              깜빡이는 시간(`chat.css` 의 `chat-tip-blink`)과 사라지는 시점이
+              **한 곳**에만 적히기 때문이다 — 따로 세면 애니메이션 길이만
+              바뀌었을 때 깜빡임이 끝나기 전에 사라지거나 끝난 뒤에도 한
+              박자 남는다.
+            */}
             {promptVisible ? (
-              <div className="chat-tip" role="note">
+              <div className="chat-tip is-blinking" role="note" onAnimationEnd={() => setPromptVisible(false)}>
                 <p>당신의 Bordo를 입맛에 맞게 조정해보세요!</p>
                 <button type="button" aria-label="안내 닫기" onClick={() => setPromptVisible(false)}>
                   ×
@@ -256,27 +271,6 @@ export function ChatListPanel({
           {/* 서버에 방 검색 API 가 없다. 이건 검색이 아니라 이미 받아 온 목록을
               좁히는 것이라, 그렇다고 적어 둔다. */}
           <p>불러온 목록 안에서만 찾습니다.</p>
-        </div>
-      ) : null}
-
-      {/*
-        말풍선과 검색칸은 **같은 자리를 쓴다.**
-
-        말풍선은 머리 밑에 떠 있는(`position: absolute`) 안내라, 검색칸이 그
-        자리에 들어오면 글자 위에 글자가 겹친다. 검색을 여는 동안은 안내를
-        내린다 — 지금 하려는 일이 검색인데 그 위에 다른 권유가 떠 있을 이유가
-        없다. 닫으면 다시 뜬다(닫기 `×` 를 누른 것과는 다르다).
-      */}
-      {promptVisible && tool !== 'search' ? (
-        <div className="chat-tip">
-          <p>
-            당신의 Bordo를 입맛에 맞게
-            <br />
-            조정해보세요!
-          </p>
-          <button type="button" aria-label="닫기" onClick={() => setPromptVisible(false)}>
-            ×
-          </button>
         </div>
       ) : null}
 

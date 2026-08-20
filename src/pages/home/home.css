@@ -91,10 +91,23 @@ body,
     width 220ms ease;
 }
 
+/*
+  접으면 폭만 줄인다 — **띄우지 않는다.**
+
+  전에는 `width: 0` 까지 접고, 다시 펴는 단추(`.sidebar-top`)만
+  `position: fixed` 로 화면 왼쪽 위에 남겨 뒀다. 본문(`.home-main` ·
+  `.msched-main` 등)은 사이드바가 비운 자리를 그대로 차지하며 왼쪽 끝까지
+  넓어지는데, 뜬 단추는 흐름 밖이라 그 위에 그대로 얹혀 **본문 제목과
+  글자가 겹쳤다**(예: 「회의 일정」). 플로우 판의 같은 문제를
+  `FlowBoardPage.jsx` 가 이미 이렇게 풀어 뒀다 — 접힌 뒤에도 실제로 자리를
+  차지하는 얇은 기둥만 남기면, 본문이 그 폭만큼만 밀리므로 겹칠 자리 자체가
+  없어진다.
+*/
 .sidebar.is-collapsed {
-  flex-basis: 0;
-  width: 0;
-  overflow: visible;
+  flex-basis: 56px;
+  width: 56px;
+  min-width: 56px;
+  overflow: hidden;
   background: transparent;
 }
 
@@ -107,13 +120,13 @@ body,
   padding: 17px 12px 0;
 }
 
+/* 접히면 로고까지 넣을 폭이 없다. 다시 펴는 단추만 남긴다. */
 .sidebar.is-collapsed .sidebar-top {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 30;
-  width: 240px;
-  background: #ffffff;
+  width: auto;
+}
+
+.sidebar.is-collapsed .logo {
+  display: none;
 }
 
 .icon-button {
@@ -209,77 +222,8 @@ body,
   object-fit: contain;
 }
 
-/* 지금 진행 중인 회의가 있을 때 `회의` 자리에 대신 뜨는 아이콘. */
-.sidebar-icon-live {
-  background: rgba(255, 100, 80, 0.12);
-}
-
-.sidebar-icon-live:hover {
-  background: rgba(255, 100, 80, 0.2);
-}
-
-/*
-  팀장의 `회의 시작하기 · 회의 일정 보기` 드롭다운(시안 `692:7910`).
-
-  자리 잡는 기준은 이 단추가 아니라 `.sidebar-icon-row` 다 — `.sidebar` 에
-  `overflow: hidden` 이 걸려 있어(작은 화면에서 프로젝트 목록이 넘치지
-  않게 하는 규칙), 회의 아이콘 기준으로 오른쪽에 펼치면 사이드바 폭(240px)
-  을 넘는 부분이 그대로 잘렸다. 아이콘 줄 오른쪽 끝에 붙이면 어느 아이콘을
-  눌렀든 사이드바 안에 들어온다.
-*/
 .sidebar-icon-row {
   position: relative;
-}
-
-.sidebar-meeting-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 8px;
-  z-index: 20;
-  display: flex;
-  flex-direction: column;
-  width: 152px;
-  padding: 6px;
-  gap: 6px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-}
-
-.sidebar-meeting-panel hr {
-  margin: 0;
-  border: 0;
-  border-top: 1px solid #e5e7eb;
-}
-
-.sidebar-meeting-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
-  border-radius: 6px;
-  color: #1f1f1f;
-  font-size: 12px;
-  text-decoration: none;
-}
-
-.sidebar-meeting-row:hover {
-  background: #f3f4f6;
-}
-
-.sidebar-meeting-row[aria-disabled='true'] {
-  color: #b8bbc0;
-  cursor: default;
-}
-
-.sidebar-meeting-row[aria-disabled='true']:hover {
-  background: transparent;
-}
-
-.sidebar-meeting-row img {
-  width: 18px;
-  height: 18px;
 }
 
 .sidebar-icon-badge {
@@ -552,6 +496,22 @@ h1 {
   color: #ffffff;
 }
 
+/* 볼 브리핑이 있을 때(비활성 아님)만 반짝인다 — 눈에 띄어야 하는 것은
+   "할 일이 있다" 는 상태지, 할 일이 없을 때가 아니다. 3번만 하고 멈춘다. */
+.ai-brief-button:not(.disabled) {
+  animation: ai-brief-glow 700ms ease-in-out 3;
+}
+
+@keyframes ai-brief-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 38, 98, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(0, 38, 98, 0.18);
+  }
+}
+
 .recent-section {
   width: min(100%, 964px);
   max-width: 100%;
@@ -812,17 +772,36 @@ h1 {
   display: block;
 }
 
-/* 마지막 줄(`1fr`) 안에서 아래에 붙는다. 다섯 장을 나란히 놓았을 때 눈이 한 줄을
-   훑을 수 있어야 해서, 제목이 한 줄이든 두 줄이든 같은 높이에 온다. */
-.project-card time {
-  align-self: end;
-}
+/*
+  옛 그리드 레이아웃(제목 아래 줄이 `.project-card` 의 `1fr` 그리드 행을
+  직접 차지하던 시절) 에 남은 규칙이었다. 지금은 `<time>` 이 `.card-foot`
+  (세로 flex, `align-items: flex-start`) 안에 있어 이 자리의 cross-axis 가
+  가로다 — `align-self: end` 가 시각만 오른쪽 끝으로 밀어, `불참한 회의`
+  뱃지는 왼쪽인데 시각만 오른쪽으로 갈라져 보였다. 지운다.
+*/
 
 .project-card .meeting-company {
-  /* 별(24px)과 그 왼쪽 여백만큼 비워 둔다. 108px 고정이면 카드가 정사각형
-     까지 좁아졌을 때 이름이 별 밑으로 들어간다. */
+  /*
+    `flex: 1` 로 남는 폭을 실제로 갖는다.
+
+    전에는 `max-width` 만 걸려 있었다 — 그 값은 이름이 **넘지 못할 상한**일
+    뿐, 이름이 짧으면 아무 것도 이름을 오른쪽으로 밀지 않아 별이 카드
+    오른쪽 끝이 아니라 이름 글자 바로 옆에 따라붙었다. `min-width: 0` 이
+    없으면 flex 자식은 내용보다 좁아지지 않으므로, 긴 이름이 줄을 밀어
+    말줄임이 걸릴 자리를 잃는다 — 그래서 함께 둔다.
+  */
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: calc(100% - 32px);
-  margin-bottom: 18px;
+  /*
+    `margin-bottom` 을 여기 두면 안 된다.
+
+    이 줄의 세로 간격은 부모(`.project-card-head`)가 이미 갖고 있다
+    (`align-items: center` 로 별과 나란히 세운 줄 전체의 아래 여백).
+    여기 또 `margin-bottom` 을 주면 이 칸의 플렉스 높이만 커져서, `center`
+    정렬이 이름 글자를 줄 위쪽으로 밀어 올린다 — 옆의 별은 그대로 가운데인데
+    이름만 위로 붙어 둘이 어긋나 보였다.
+  */
   overflow: hidden;
   color: #1f1f1f;
   font-size: 13px;
@@ -1884,14 +1863,16 @@ h1 {
     overflow: hidden;
   }
 
-  .sidebar-top,
-  .sidebar.is-collapsed .sidebar-top {
-    width: 176px;
-  }
-
   .sidebar-top {
+    width: 176px;
     gap: 10px;
     padding-inline: 8px;
+  }
+
+  /* 접히면 다른 폭에서도 얇은 기둥만 남긴다 — `width: auto` 는 이 breakpoint
+     에서도 여전히 위 규칙(`176px`)을 이겨야 한다. */
+  .sidebar.is-collapsed .sidebar-top {
+    width: auto;
   }
 
   .logo {

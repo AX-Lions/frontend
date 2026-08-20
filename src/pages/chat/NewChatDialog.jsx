@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { createRoom, fetchCandidates } from './chat.data.js'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
+import { PersonAvatar } from './chat.ui.jsx'
 
 const ROOM_TYPES = [
   { id: 'DIRECT', label: '1:1 대화', hint: '상대와 직접 이야기합니다.' },
@@ -116,11 +117,7 @@ export function NewChatDialog({ onClose, onCreated }) {
                     disabled={Boolean(creatingId)}
                     onClick={() => start(member)}
                   >
-                    {member.avatar_url ? (
-                      <img alt="" src={member.avatar_url} />
-                    ) : (
-                      <span className="new-chat-initial" aria-hidden="true">{member.name.slice(0, 1)}</span>
-                    )}
+                    <PersonAvatar className="new-chat-avatar" src={member.avatar_url} />
                     <span>{member.name}</span>
                     {creatingId === member.user_id ? <em>여는 중…</em> : null}
                   </button>

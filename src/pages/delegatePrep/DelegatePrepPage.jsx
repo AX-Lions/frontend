@@ -975,13 +975,14 @@ export function DelegatePrepPage() {
                                   <span>{evidence.body}</span>
                                 </div>
                                 {/*
-                                  갈 곳이 아직 없다. 링크로 두면 눌러서 아무 일도
-                                  안 일어나거나 홈으로 튄다 — 눌리지 않는 표시로 둔다.
+                                  `/flow-board` 가 `?edge=` 딥링크를 받게 되면서
+                                  갈 곳이 생겼다 — 예전에는 여기서 눌리지 않는
+                                  표시만 그렸다.
                                 */}
                                 {evidence.link ? (
-                                  <span className="prep-evidence-link" aria-disabled="true">
+                                  <AppLink className="prep-evidence-link" href={evidence.link}>
                                     바로가기
-                                  </span>
+                                  </AppLink>
                                 ) : null}
                               </div>
                             </div>

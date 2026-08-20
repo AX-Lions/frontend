@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { useSearchParam } from '../../app/navigation.js'
+import { fetchMe } from '../account/account.data.js'
 
 import './chat.css'
 import { AgentSettingsPanel } from './AgentSettingsPanel.jsx'
@@ -22,27 +23,6 @@ import {
 } from './chat.data.js'
 import { useResource } from '../../lib/useResource.js'
 import { LoadError, Loading } from '../../shared/components/LoadState.jsx'
-
-function BordoSettingsPage({ onBack }) {
-  const handleNavigate = (event, item) => {
-    if (item.id !== 'chat') {
-      return
-    }
-
-    event.preventDefault()
-    onBack()
-  }
-
-  return (
-    <div className="settings-page">
-      <GlobalSidebar active="chat" onNavigate={handleNavigate} />
-      <AgentSettingsPanel onBack={onBack} />
-      <main className="settings-brand" aria-label="설정 미리보기">
-        <p>Bordo</p>
-      </main>
-    </div>
-  )
-}
 
 /**
  * 주소에 실려 온 방.
@@ -93,6 +73,11 @@ export function ChatPage() {
 
   const sidebar = useResource((signal) => fetchSidebar(signal), [], { cacheKey: 'chat-sidebar' })
   const important = useResource((signal) => fetchImportant(signal), [], { cacheKey: 'chat-important' })
+  // `개인 설정` 화면과 같은 캐시 키를 써서 이미 그쪽이 받아 둔 값이 있으면
+  // 다시 요청하지 않는다. 레일 하단 프로필(`GlobalSidebar`)이 홈 사이드바와
+  // 같은 사람을 그리려면 이름·아바타가 필요하다.
+  const me = useResource((signal) => fetchMe(signal), [], { cacheKey: 'me' })
+  const sidebarUser = { name: me.data?.name, avatarUrl: me.data?.avatar_url }
 
   /*
     자리 비움.
@@ -292,16 +277,10 @@ export function ChatPage() {
     }
   }, [selectedChatId, importantRooms, refreshImportant])
 
-  // 대리인 설정만 화면을 통째로 덮는다. 채팅 설정은 오른쪽 칸만 바뀐다 —
-  // 어느 대화의 설정을 보고 있는지는 왼쪽 목록에서 눈으로 확인해야 한다.
-  if (view === 'agent') {
-    return <BordoSettingsPage onBack={() => setView('chat')} />
-  }
-
   if (sidebar.loading && !sidebar.data) {
     return (
       <div className="chat-page">
-        <GlobalSidebar active="chat" />
+        <GlobalSidebar active="chat" user={sidebarUser} />
         <Loading label="채팅 목록을 불러오는 중입니다…" />
       </div>
     )
@@ -310,7 +289,7 @@ export function ChatPage() {
   if (sidebar.error && !sidebar.data) {
     return (
       <div className="chat-page">
-        <GlobalSidebar active="chat" />
+        <GlobalSidebar active="chat" user={sidebarUser} />
         <LoadError error={sidebar.error} onRetry={sidebar.reload} />
       </div>
     )
@@ -318,29 +297,42 @@ export function ChatPage() {
 
   return (
     <div className={fullscreen ? 'chat-page fullscreen' : 'chat-page'}>
-      <GlobalSidebar active="chat" />
-      {fullscreen ? null : <ChatListPanel
-        awayRooms={awayRooms}
-        presence={presenceStatus}
-        presenceBusy={Boolean(pendingPresence)}
-        selectedChatId={selectedChatId}
-        sidebar={sidebar.data}
-        onPresenceChange={changePresence}
-        onCreatedRoom={(room) => {
-          // 만들자마자 연다. 목록에 새 줄이 생기기만 하면 사용자는 어느 것이
-          // 방금 만든 것인지 찾아야 한다.
-          setSelectedChatId(room.id)
-          sidebar.reload()
-        }}
-        onSelectChat={(id) => {
-          setSelectedChatId(id)
-          // 설정을 보다가 다른 대화를 고르면 그 대화를 연다. 설정 화면에
-          // 머물면 방금 고른 대화가 어디로 갔는지 알 수 없다.
-          setView('chat')
-        }}
-        onOpenAgentSettings={() => setView('agent')}
-        onOpenChatSettings={() => setView('room-settings')}
-      />}
+      <GlobalSidebar active="chat" user={sidebarUser} />
+      {/*
+        대리인 설정은 **왼쪽 칸만** 바꾼다. 예전에는 이 자리 전체를 별도
+        화면(`BordoSettingsPage`)으로 통째로 덮어서, 열려 있던 대화창이
+        사라지고 자리에 "Bordo" 글자만 남았다 — 채팅 설정(`room-settings`)이
+        오른쪽만 바꾸는 것과 결이 달랐다. 대화를 보면서 대리인 성격을
+        조정하고 싶을 때 대화가 사라지면 무엇을 기준으로 조정하는지
+        놓친다. 전체 화면일 때도 대리인 설정은 봐야 하므로 `fullscreen`
+        보다 우선한다.
+      */}
+      {view === 'agent' ? (
+        <AgentSettingsPanel onBack={() => setView('chat')} />
+      ) : fullscreen ? null : (
+        <ChatListPanel
+          awayRooms={awayRooms}
+          presence={presenceStatus}
+          presenceBusy={Boolean(pendingPresence)}
+          selectedChatId={selectedChatId}
+          sidebar={sidebar.data}
+          onPresenceChange={changePresence}
+          onCreatedRoom={(room) => {
+            // 만들자마자 연다. 목록에 새 줄이 생기기만 하면 사용자는 어느 것이
+            // 방금 만든 것인지 찾아야 한다.
+            setSelectedChatId(room.id)
+            sidebar.reload()
+          }}
+          onSelectChat={(id) => {
+            setSelectedChatId(id)
+            // 설정을 보다가 다른 대화를 고르면 그 대화를 연다. 설정 화면에
+            // 머물면 방금 고른 대화가 어디로 갔는지 알 수 없다.
+            setView('chat')
+          }}
+          onOpenAgentSettings={() => setView('agent')}
+          onOpenChatSettings={() => setView('room-settings')}
+        />
+      )}
       {view === 'room-settings' ? (
         <ChatSettingsPanel
           room={openRoom}

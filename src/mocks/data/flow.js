@@ -442,6 +442,20 @@ const MEETING_GLOBAL_EDGES = [
       ['임수연', '반영하고 알려 드릴게요.'],
     ],
   },
+  /*
+    유수인의 대리인이 저장된 답변으로 직접 답한 예다. `briefings.direction`
+    의 `used_answers[0]` 이 이 엣지를 가리킨다 — 브리핑 카드와 판이 같은 발언을
+    가리켜야 카드를 눌렀을 때 진짜 그 자리로 간다.
+  */
+  {
+    id: 'meeting-edge-29',
+    from: '유수인의 Bordo', to: ['최비성', '임수연'], type: 'OPINION', surface: 'DISCORD',
+    at: daysAgo(1, 20, 29), agenda: 'slot',
+    says: [
+      ['최비성', '수인님 슬롯 선호가 있으신가요?'],
+      ['유수인의 Bordo', '오전 슬롯은 피해 주세요. 오후 2시 이후로 저장돼 있습니다.'],
+    ],
+  },
 
   {
     id: 'meeting-edge-7',
@@ -561,6 +575,54 @@ const MEETING_GLOBAL_EDGES = [
     says: [
       ['서재민', '사람별 작업 요약은 이번 배포에서 뺍니다. 범위가 두 번 줄어든 프로젝트라 다시 늘리지 않겠습니다.'],
       ['최비성', '동의합니다.'],
+    ],
+  },
+
+  /*
+    시안 마감을 앞당기는 결정. **`needs_confirmation` 의 `bc-1` 과
+    `used_answers[1]` 이 둘 다 이 엣지를 가리킨다** — "확인이 필요해요" 카드와
+    "무엇에 근거해 답했는지" 가 같은 발언 하나를 서로 다른 각도로 읽는 것이지,
+    별개의 사실이 아니다.
+  */
+  {
+    id: 'meeting-edge-30',
+    from: '유수인의 Bordo', to: ['임수연', '서재민'], type: 'CHANGE', surface: 'DISCORD',
+    at: daysAgo(1, 21, 14), doc: 'release', agenda: 'release',
+    says: [
+      ['임수연', '시안 마감을 8/18 로 당기겠습니다. 괜찮을까요?'],
+      ['유수인의 Bordo', '수인님 답변 기준으로는 8월 18일을 넘기지 않는 선입니다. 그대로 반영해서 알려 드리겠습니다.'],
+    ],
+  },
+  {
+    id: 'meeting-edge-31',
+    from: '유수인의 Bordo', to: ['임수연'], type: 'CONCLUSION', surface: 'SERVICE',
+    at: daysAgo(1, 21, 17), agenda: 'release',
+    says: [
+      ['임수연', '색상 토큰도 이번에 같이 정리할까요?'],
+      ['유수인의 Bordo', '색상 토큰은 확정본이 있어 이번 수정 범위에 들어가지 않습니다.'],
+    ],
+  },
+  /*
+    일정 연장은 대리인 권한 밖이라 유보한다. `needs_confirmation` 의 `bc-2` 와
+    `deferred_answers[0]` 이 이 엣지를 가리킨다 — 유보는 "몰라서" 가 아니라
+    "정할 수 있는 사람이 아니라서" 라는 것이 이 엣지의 대사에 그대로 남는다.
+  */
+  {
+    id: 'meeting-edge-32',
+    from: '유수인의 Bordo', to: ['서재민', '임수연'], type: 'SCHEDULE', surface: 'SERVICE',
+    at: daysAgo(1, 21, 20), doc: 'release', agenda: 'release',
+    says: [
+      ['서재민', 'API 연동 완료일을 8/23 에서 8/30 으로 미루겠습니다. 괜찮을까요?'],
+      ['유수인의 Bordo', '일정 연장 여부는 제가 정할 수 없습니다. 본인 확인이 필요합니다.'],
+    ],
+  },
+  {
+    id: 'meeting-edge-33',
+    from: '유수인의 Bordo', to: ['서재민'], type: 'REQUEST', surface: 'DISCORD',
+    at: daysAgo(1, 21, 23), agenda: 'release',
+    says: [
+      ['서재민', '8/18 마감이면 QA 기간이 3일뿐인데 괜찮을까요?'],
+      ['유수인의 Bordo', 'QA 기간을 줄여도 되는지는 제가 답할 근거가 없어 답을 미루겠습니다.'],
     ],
   },
 ]
@@ -1035,38 +1097,72 @@ const MEETING_REHEARSAL_EDGES = [
   },
 ]
 
+/*
+  연합학술제 부스 운영 킥오프. **유수인만 대리 참석이고 서재민은 실제로 있었다.**
+
+  예전에는 대리 참석인 유수인이 자기 이름으로 직접 말하고, 정작 자리에 있던
+  서재민 몫을 "서재민의 Bordo" 가 대신 말하는 것으로 적혀 있었다 — 대리 참석
+  표시(`meetings.js` 의 `DELEGATED`)와 반대로 뒤집힌 판이었다. 자리에 없는
+  사람만 대리인이 말하고, 있는 사람은 본인이 말한다.
+*/
 const MEETING_BOOTH_EDGES = [
   {
     id: 'meeting-booth-1',
-    from: '유수인', to: ['강다은', '서재민'], type: 'SCHEDULE', surface: 'SERVICE',
+    from: '유수인의 Bordo', to: ['강다은', '서재민'], type: 'SCHEDULE', surface: 'DISCORD',
     at: daysAgo(6, 11, 0), agenda: 'slot',
     says: [
-      ['유수인', '부스 운영은 이틀입니다. 오전·오후로 나눠서 인원을 잡겠습니다.'],
+      ['유수인의 Bordo', '부스 운영은 이틀입니다. 오전·오후로 나눠서 인원을 잡겠습니다.'],
     ],
   },
   {
     id: 'meeting-booth-2',
-    from: '강다은', to: ['유수인'], type: 'OPINION', surface: 'SERVICE',
+    from: '강다은', to: ['유수인의 Bordo'], type: 'OPINION', surface: 'DISCORD',
     at: daysAgo(6, 11, 18),
     says: [
       ['강다은', '첫날 오전은 사람이 적을 듯해 둘이면 충분해 보입니다.'],
-      ['유수인', '그럼 오후에 더 붙이겠습니다.'],
+      ['유수인의 Bordo', '그럼 오후에 더 붙이겠습니다.'],
     ],
   },
   {
     id: 'meeting-booth-3',
-    from: '서재민의 Bordo', to: ['유수인', '강다은'], type: 'ETC', surface: 'SERVICE',
+    from: '서재민', to: ['유수인의 Bordo', '강다은'], type: 'ETC', surface: 'SERVICE',
     at: daysAgo(6, 11, 30),
     says: [
-      ['서재민의 Bordo', '서재민님 일정에 그 이틀 중 첫날 오후가 이미 잡혀 있습니다. 겹치는지 본인 확인이 필요합니다.'],
+      ['서재민', '그 이틀 중 첫날 오후에 제 일정이 이미 잡혀 있습니다. 겹치는지 확인해 보겠습니다.'],
+    ],
+  },
+  /*
+    `briefings.academyKickoff` 의 `used_answers[0]` 이 이 엣지를 가리킨다.
+    유수인의 Bordo 가 지난 회의 기록을 근거로 곧장 답한 사례다.
+  */
+  {
+    id: 'meeting-booth-5',
+    from: '유수인의 Bordo', to: ['서재민'], type: 'OPINION', surface: 'DISCORD',
+    at: daysAgo(6, 11, 40),
+    says: [
+      ['서재민', '발표자는 당번 명단에서 빼야 하지 않을까요?'],
+      ['유수인의 Bordo', '발표자는 부스 당번에서 빼는 것으로 알고 있습니다. 지난 회의 기록을 따랐습니다.'],
     ],
   },
   {
     id: 'meeting-booth-4',
-    from: '유수인', to: ['강다은'], type: 'CONCLUSION', surface: 'SERVICE',
+    from: '유수인의 Bordo', to: ['강다은'], type: 'CONCLUSION', surface: 'SERVICE',
     at: daysAgo(6, 11, 52), agenda: 'slot',
     says: [
-      ['유수인', '초안은 이걸로 두고, 서재민님 확인 받고 확정하겠습니다.'],
+      ['유수인의 Bordo', '초안은 이걸로 두고, 서재민님 확인 받고 확정하겠습니다.'],
+    ],
+  },
+  /*
+    `deferred_answers[0]` 이 이 엣지를 가리킨다. 저장된 근거가 없어 유보한
+    사례라, 대사가 "모른다" 가 아니라 "확인 후 안내" 로 끝난다.
+  */
+  {
+    id: 'meeting-booth-6',
+    from: '유수인의 Bordo', to: ['서재민'], type: 'REQUEST', surface: 'SERVICE',
+    at: daysAgo(6, 12, 5),
+    says: [
+      ['서재민', '초록 마감일이 언제인지 알려주실 수 있나요?'],
+      ['유수인의 Bordo', '초록 마감일은 제가 답할 근거가 없어 확인 후 다시 안내드리겠습니다.'],
     ],
   },
 ]
@@ -1776,7 +1872,7 @@ const boothMeeting = flowFor({
     meeting_label: `${dayLabel(daysAgo(6))} 연합학술제 부스 운영 킥오프`,
     category: 'MEETING',
   },
-  nodeNames: ['유수인', '강다은', '서재민', '서재민의 Bordo'],
+  nodeNames: ['유수인의 Bordo', '강다은', '서재민'],
   edges: MEETING_BOOTH_EDGES,
 })
 

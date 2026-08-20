@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 
+import { AppLink } from '../../app/AppLink.jsx'
 import { AgentDock } from '../home/AgentDock.jsx'
 import { Empty } from '../../shared/components/LoadState.jsx'
 
@@ -28,7 +29,7 @@ function matchesSearch(card, keyword) {
   if (!keyword) {
     return true
   }
-  const haystack = `${card.title ?? ''} ${card.body ?? ''} ${card.note ?? ''}`.toLowerCase()
+  const haystack = `${card.title ?? ''} ${card.body ?? ''} ${card.note ?? ''} ${card.excerpt ?? ''}`.toLowerCase()
   return haystack.includes(keyword)
 }
 
@@ -45,6 +46,17 @@ function BriefSection({ cards, emptyText, renderCard, title }) {
   )
 }
 
+/** 서버가 남기는 유보 사유 코드를 사람이 읽을 한 줄로 바꾼다. */
+const DEFER_REASON_LABEL = {
+  'allow_schedule_change=false': '일정 변경은 대리인 권한 밖이라 유보',
+  no_saved_answer: '저장된 답이 없어 유보',
+  no_evidence: '근거가 없어 유보',
+}
+
+function deferReasonLabel(reason) {
+  return DEFER_REASON_LABEL[reason] ?? '근거가 부족해 유보'
+}
+
 export function FlowBriefingSidebar({
   activeChip,
   briefing,
@@ -52,6 +64,7 @@ export function FlowBriefingSidebar({
   isScrolled,
   onChipToggle,
   onClose,
+  onOpenEdge,
   onScroll,
 }) {
   const [keyword, setKeyword] = useState('')
@@ -77,6 +90,8 @@ export function FlowBriefingSidebar({
   const confirmations = (briefing?.needs_confirmation ?? []).filter(keep)
   const requests = (briefing?.requests_to_me ?? []).filter(keep)
   const answers = (briefing?.needs_answer ?? []).filter(keep)
+  const used = (briefing?.used_answers ?? []).filter(keep)
+  const deferred = (briefing?.deferred_answers ?? []).filter(keep)
 
   return (
     <aside
@@ -131,22 +146,39 @@ export function FlowBriefingSidebar({
         </section>
 
         <BriefSection
-          data-tip="확인이 필요해요"
+          title="확인이 필요해요"
           cards={confirmations}
           emptyText="확인할 변경이 없습니다."
           renderCard={(card) => (
-            <article className="bordo-action-card" key={card.id}>
-              <span>
-                <strong>{card.title}</strong>
-                <small>{card.body}</small>
-              </span>
-              <img src={icons.expandRight} alt="" />
-            </article>
+            <div className="bordo-action-card-wrap" key={card.id}>
+              <button
+                type="button"
+                className="bordo-action-card"
+                disabled={!card.edge_id}
+                onClick={() => onOpenEdge?.(card.edge_id)}
+              >
+                <span>
+                  <strong>{card.title}</strong>
+                  <small>{card.body}</small>
+                </span>
+                <img src={icons.expandRight} alt="" />
+              </button>
+              {/* 이 변경이 실제로 바꾼 일정. 없는 카드도 있다 — 모든 확인
+                  사항이 달력 일정으로 이어지는 것은 아니다(예: 톤 규칙 정리). */}
+              {card.calendar_event_id ? (
+                <AppLink
+                  className="bordo-action-card-schedule"
+                  href={`/meeting-schedule?event=${card.calendar_event_id}`}
+                >
+                  실제 일정에서 보기
+                </AppLink>
+              ) : null}
+            </div>
           )}
         />
 
         <BriefSection
-          data-tip="나에게 요청한 내용"
+          title="나에게 요청한 내용"
           cards={requests}
           emptyText="나에게 온 요청이 없습니다."
           renderCard={(card) => (
@@ -159,7 +191,7 @@ export function FlowBriefingSidebar({
         />
 
         <BriefSection
-          data-tip="답변이 필요해요"
+          title="답변이 필요해요"
           cards={answers}
           emptyText="대리인이 유보한 질문이 없습니다."
           renderCard={(card) => (
@@ -173,18 +205,48 @@ export function FlowBriefingSidebar({
           )}
         />
 
+        {/*
+          대리인이 실제로 무엇에 근거해 답했는지, 무엇을 유보했는지.
+
+          데이터는 처음부터 있었지만 이 화면이 한 번도 그리지 않았다 — 근거
+          없이 답했다는 오해를 남기지 않으려면, 이 서비스의 차별점인 "유보"가
+          결론 목록만큼 눈에 띄어야 한다.
+        */}
         <BriefSection
-          title="확인이 필요해요"
-          cards={confirmations}
-          emptyText="확인할 변경이 없습니다."
-          renderCard={(card) => (
-            <article className="bordo-action-card" key={card.id}>
-              <span>
-                <strong>{card.title}</strong>
-                <small>{card.body}</small>
-              </span>
-              <img src={icons.expandRight} alt="" />
-            </article>
+          title="무엇에 근거해 답했는지"
+          cards={used}
+          emptyText="이번 회의에서 대신 답한 것이 없습니다."
+          renderCard={(card, index) => (
+            <button
+              type="button"
+              className="bordo-evidence-card is-used"
+              key={`${card.edge_id ?? 'used'}-${index}`}
+              disabled={!card.edge_id}
+              onClick={() => onOpenEdge?.(card.edge_id)}
+            >
+              <small>“{card.excerpt}”</small>
+              {card.edge_id ? <em>플로우에서 보기 →</em> : null}
+            </button>
+          )}
+        />
+
+        <BriefSection
+          title="무엇을 유보했는지"
+          cards={deferred}
+          emptyText="유보한 답이 없습니다."
+          renderCard={(card, index) => (
+            <button
+              type="button"
+              className="bordo-evidence-card is-deferred"
+              key={`${card.edge_id ?? 'deferred'}-${index}`}
+              disabled={!card.edge_id}
+              onClick={() => onOpenEdge?.(card.edge_id)}
+            >
+              <small>“{card.excerpt}”</small>
+              {/* `reason` 은 서버 코드다(예: `allow_schedule_change=false`).
+                  화면에 그대로 찍지 않고 사람이 읽을 문장으로 바꾼다. */}
+              <em>{deferReasonLabel(card.reason)}</em>
+            </button>
           )}
         />
       </div>

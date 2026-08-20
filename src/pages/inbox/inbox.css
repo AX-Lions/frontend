@@ -229,11 +229,19 @@
   font-size: 14px;
   font-weight: 600;
   color: #1f1f1f;
-  transition: background 120ms ease;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
 
+/*
+  플로우 판 요약표(`summary-column button.is-active`)와 같은 남색 +
+  흰 글씨다 — 이 줄도 눌러야 뜻이 있는 자리(회의로 넘어간다)라, 옅은 회색
+  보다 이 판 다른 곳의 "누를 수 있다" 신호와 맞춰 뒀다.
+*/
 .inbox-card-row:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: #002662;
+  color: #ffffff;
 }
 
 .inbox-card-row:disabled {
