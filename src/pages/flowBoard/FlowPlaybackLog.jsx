@@ -83,16 +83,35 @@ export function FlowPlaybackLog({ onClose, step, timeline }) {
   const [detailByEdgeId, setDetailByEdgeId] = useState(() => new Map())
 
   useEffect(() => {
-    const missing = edgeIds.filter((id) => !requestedRef.current.has(id))
+    // 정리 함수가 돌 때 `requestedRef.current` 가 다른 것을 가리키고 있을 수
+    // 있어 여기서 한 번 붙잡아 둔다(eslint `exhaustive-deps` 가 잡아 준다).
+    const requested = requestedRef.current
+    const missing = edgeIds.filter((id) => !requested.has(id))
     if (missing.length === 0) {
       return undefined
     }
-    missing.forEach((id) => requestedRef.current.add(id))
+    missing.forEach((id) => requested.add(id))
 
     const controller = new AbortController()
     let alive = true
+    /*
+      **받아 온 것만 「요청함」 으로 남긴다.**
 
-    Promise.all(missing.map((id) => fetchEdge(id, controller.signal).catch(() => null)))
+      `idsKey` 는 걸음마다 바뀌므로 다음 걸음이 오면 이 효과가 정리되며
+      아직 오지 않은 요청을 끊는다. 그런데 id 는 요청을 보내기 전에 이미
+      `requestedRef` 에 넣어 두므로, 끊긴 것들은 **다시는 안 불린다** —
+      화면은 인용문 대신 `item.title` 로 조용히 대신 그린다. 오류도 빈
+      칸도 없어서, 보는 사람은 그 화살표에 원래 인용문이 없는 줄 안다.
+
+      한 걸음이 1.1초라 로컬에서는 거의 안 나지만, 느린 연결에서는 걸음마다
+      한 줄씩 진짜 내용을 잃는다. 그래서 못 받은 것은 표시를 도로 지워
+      다음 걸음이 다시 부르게 한다.
+    */
+    const settled = new Set()
+
+    Promise.all(missing.map((id) => fetchEdge(id, controller.signal)
+      .then((row) => { settled.add(id); return row })
+      .catch(() => null)))
       .then((rows) => {
         if (!alive) {
           return
@@ -111,6 +130,11 @@ export function FlowPlaybackLog({ onClose, step, timeline }) {
     return () => {
       alive = false
       controller.abort()
+      missing.forEach((id) => {
+        if (!settled.has(id)) {
+          requested.delete(id)
+        }
+      })
     }
     // `idsKey` 하나로 충분하다 — `missing` 은 그 안에서 다시 계산한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
