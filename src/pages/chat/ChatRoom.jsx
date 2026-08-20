@@ -11,6 +11,7 @@ import {
 } from './chat.format.js'
 import { Icon, IconButton } from './chat.ui.jsx'
 import { useMinuteTick } from '../../lib/minuteClock.js'
+import { RECONNECTED, useProjectEvents } from '../../lib/projectEvents.js'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
 
@@ -220,6 +221,52 @@ export function ChatRoom({
 
   const messages = useMemo(() => data?.results ?? [], [data])
   const rows = useMemo(() => withDayDividers(messages), [messages])
+
+  /*
+    상대가 보낸 말이 새로고침 없이 온다.
+
+    ## 온 것을 그리지 않고, 온 김에 다시 읽는다
+
+    이벤트에는 `message_id` 만 있고 본문이 없다. 그대로 그리면 **권한 검사를
+    안 거친 것이 화면에 뜬다** — 소켓은 방 단위가 아니라 프로젝트 단위라, 내가
+    안 들어간 방의 말도 같은 채널로 흘러온다. 그래서 신호만 받고 목록은
+    `fetchMessages` 로 다시 읽는다. 서버가 보여 줄 것만 보여 준다.
+
+    ## 내가 보낸 것은 흘려보낸다
+
+    보낸 직후 서버가 돌려준 것을 이미 목록에 얹었다(`appendSent`). 여기서 또
+    다시 읽으면 같은 말을 두 번 그리거나 화면이 한 번 깜빡인다. 내가 누구인지는
+    서버가 방 참여자에 표시해 준다(`members[].is_me`) — 그 값이 없으면 거를 수
+    없을 뿐, 다시 읽는 것 자체는 안전하므로 그냥 읽는다.
+
+    ## 다시 붙었으면 통째로 다시 읽는다
+
+    끊겨 있던 동안 지나간 이벤트는 다시 오지 않는다. 이걸 빼면 잠깐 끊긴 뒤로
+    **조용히 낡은 화면**을 보게 된다 — 화면은 멀쩡해 보이는데 대화만 멈춰 있는,
+    사용자가 알아차릴 수 없는 종류의 고장이다.
+  */
+  const myMemberId = (header?.members ?? []).find((member) => member.is_me)?.id ?? null
+  useProjectEvents(header?.projectId, (event) => {
+    if (event.event_type === RECONNECTED) {
+      reload()
+      return
+    }
+    if (event.event_type !== 'chat.message.created') {
+      // `agent.question.answered` 도 같은 채널로 온다. 이번 범위가 아니다.
+      return
+    }
+
+    const payload = event.payload ?? {}
+    // 프로젝트 채널에는 그 프로젝트의 **모든 방**이 흐른다. 지금 보고 있는
+    // 방이 아니면 이 화면이 할 일은 없다(사이드바 뱃지는 별개 범위).
+    if (String(payload.room_id) !== String(roomId)) {
+      return
+    }
+    if (myMemberId && String(payload.sender_id) === String(myMemberId)) {
+      return
+    }
+    reload()
+  })
 
   const scrollRef = useRef(null)
 
