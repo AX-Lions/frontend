@@ -7,7 +7,24 @@ import { useCallback, useEffect, useState } from 'react'
  * 다음 칸으로 넘어갔다. 1.1초로 늘린다 — 스무 건짜리 회의를 끝까지 보는
  * 데 22초쯤 걸리지만, 뒤로·앞으로 버튼이 있어 급한 사람은 직접 넘기면 된다.
  */
-const STEP_INTERVAL_MS = 1100
+const STEP_BASE_MS = 1100
+
+/*
+ * 한 칸이 인용문을 여럿 묶어 온다면(`weights`, `FlowBoardPage.jsx` 의
+ * `groupedTimeline` 참고) 그만큼 더 오래 보여준다. 안 그러면 인용문 한 줄짜리
+ * 칸과 여덟 줄짜리 칸이 똑같이 1.1초만 머물러, 여덟 줄짜리는 다 읽기도 전에
+ * 다음 칸이 밀고 들어온다 — "전체 회의록이 지저분하고 내용이 안 들어온다"
+ * 는 불만이 여기서 났다. 첫 줄은 `STEP_BASE_MS` 안에 포함되고, 그 다음
+ * 줄부터 한 줄당 이만큼 더한다.
+ */
+const STEP_PER_EXTRA_LINE_MS = 320
+// 묶인 인용문이 아주 많은 칸이 재생을 무한정 붙잡지 않도록 상한을 둔다.
+const STEP_MAX_MS = 3800
+
+function stepDurationMs(weights, index) {
+  const weight = index >= 0 ? (weights?.[index] ?? 1) : 1
+  return Math.min(STEP_MAX_MS, STEP_BASE_MS + STEP_PER_EXTRA_LINE_MS * Math.max(0, weight - 1))
+}
 
 /**
  * 맥락 재생.
@@ -24,8 +41,11 @@ const STEP_INTERVAL_MS = 1100
  *
  * `total` 은 지금 판에 드러날 수 있는 전달 내용의 개수다. 다른 회의를 열면 이
  * 값이 바뀌고, 그때 재생은 멈춘다.
+ *
+ * `weights` 는 선택이다. `i` 번째 칸이 묶어 오는 인용문 개수를 담은 배열이고,
+ * 없으면 전부 한 줄짜리로 본다(`stepDurationMs`).
  */
-export function useFlowPlayback(total) {
+export function useFlowPlayback(total, weights) {
   /*
     "재생 중" 을 상태로 들고 있지 않는다. **몇 개짜리 판에서 시작했는지**만
     적어 두고 재생 여부는 매 렌더에서 계산한다.
@@ -130,10 +150,11 @@ export function useFlowPlayback(total) {
       return undefined
     }
 
-    const timer = setTimeout(() => setStep(step + 1), STEP_INTERVAL_MS)
+    // 방금 드러난 칸(0 부터면 `step - 1` 번째)의 인용문 개수만큼 더 머문다.
+    const timer = setTimeout(() => setStep(step + 1), stepDurationMs(weights, step - 1))
 
     return () => clearTimeout(timer)
-  }, [isPaused, isPlaying, step])
+  }, [isPaused, isPlaying, step, weights])
 
   return {
     isFinished,
