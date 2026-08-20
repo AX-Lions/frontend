@@ -361,12 +361,35 @@ export function FlowBoardPage() {
     if (!playback.isPlaying && excludedContents.length === 0) {
       return null
     }
+    /*
+      **묶음이 걸러진 것을 다시 끌고 들어오지 못하게 막는다.**
+
+      한 줄이 여러 화살표를 대표할 수 있다(`related_edge_ids` — 같은 안건에
+      묶인 것들). 그 목록을 그대로 펼치면 **종류가 다른 형제 화살표까지 같이
+      켜진다.** 그래서 `요청사항` 하나만 켰는데 판에는 결론도 의견도 그대로
+      남고, 둘 다 켜야 비로소 화면과 체크가 맞는 것처럼 보였다.
+
+      줄이 아니라 **화살표 하나하나의 종류**로 다시 거른다. 인덱스에 없는
+      id 는 종류를 알 수 없으므로 남긴다 — 모른다고 지우면 필터를 하나만 켜도
+      판이 뭉텅이로 비어 버린다.
+    */
+    const typeOf = new Map(timelineItems.map((item) => [item.edge_id, item.content_type]))
+    const dropped = (id) => {
+      const type = typeOf.get(id)
+      return type !== undefined && excludedContents.includes(type)
+    }
+
     const shown = new Set()
     script.forEach((item) => {
-      (item.related_edge_ids ?? [item.edge_id]).forEach((id) => shown.add(id))
+      (item.related_edge_ids ?? [item.edge_id]).forEach((id) => {
+        if (!dropped(id)) {
+          shown.add(id)
+        }
+      })
     })
     return shown
-  }, [playback.isPlaying, playback.step, groupedTimeline, pickedTimeline, excludedContents])
+  }, [playback.isPlaying, playback.step, groupedTimeline, pickedTimeline,
+      excludedContents, timelineItems])
 
   /*
     엣지 하나가 회의 전반에서 몇 번째인지.
