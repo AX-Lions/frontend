@@ -48,6 +48,18 @@ export function useFlowPlayback(total) {
   const [step, setStep] = useState(0)
 
   const isPlaying = startedFor === total && step < total
+  /*
+    끝까지 다 봤다 — `isPlaying` 이 스스로 내려가는 바로 그 조건의 반대쪽이다.
+    `stop()` 을 부른 적이 없어야 하므로 `startedFor === total` 도 같이 본다 —
+    안 그러면 재생을 한 번도 안 한 판(`startedFor === null`)도 우연히
+    `step >= total`(둘 다 0) 이 되어 "끝까지 봤다" 로 잘못 읽힌다.
+
+    이 값이 필요한 이유 — 재생이 끝나면 `isPlaying` 이 꺼지면서 오른쪽
+    「전체 회의록」 패널도 같이 닫혔다. 방금 다 본 것을 다시 훑어볼 새도 없이
+    치워지는 것이라, 끝났다는 사실을 따로 들고 있다가 패널을 그대로 열어
+    둔다(`FlowBoardPage.jsx`).
+  */
+  const isFinished = startedFor === total && total > 0 && step >= total
 
   /*
     돌려주는 함수는 전부 `useCallback` 으로 감싼다. 부모가 "패널을 닫으면 재생을
@@ -124,16 +136,22 @@ export function useFlowPlayback(total) {
   }, [isPaused, isPlaying, step])
 
   return {
+    isFinished,
     isPaused,
     isPlaying,
     start,
     /*
-      재생 중이 아닐 때는 0 을 준다. 끝까지 본 뒤에도 `step` 이 마지막 숫자로
-      남아 있으면, 부르는 쪽이 `isPlaying` 을 빠뜨렸을 때 **판이 조용히 그
-      숫자까지만 그린다.** 0 이면 "판이 비어 있다" 로 곧장 드러나 못 보고
-      넘어가지 않는다.
+      재생 중도 아니고 끝난 것도 아닐 때만 0 을 준다 — 시작한 적이 없거나
+      `stop()` 으로 껐을 때다. 그때 `step` 이 마지막 숫자로 남아 있으면,
+      부르는 쪽이 `isPlaying`(과 `isFinished`)을 빠뜨렸을 때 **판이 조용히
+      그 숫자까지만 그린다.** 0 이면 "판이 비어 있다" 로 곧장 드러나 못
+      보고 넘어가지 않는다.
+
+      끝까지 봤을 때(`isFinished`)는 진짜 `step`(= `total`)을 그대로 준다 —
+      「전체 회의록」이 끝난 뒤에도 열려 있으려면 드러난 전부를 계속 그릴
+      수 있어야 한다.
     */
-    step: isPlaying ? step : 0,
+    step: isPlaying || isFinished ? step : 0,
     stepBack,
     stepForward,
     stop,
