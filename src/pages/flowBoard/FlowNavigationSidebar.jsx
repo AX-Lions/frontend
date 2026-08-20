@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 import { AppLink } from '../../app/AppLink.jsx'
 import { FlowMetricBadge } from './FlowMetricBadge'
 
@@ -155,6 +157,37 @@ export function FlowNavigationSidebar({
   timeline,
   timelineEmptyText,
 }) {
+  /*
+    스페이스바로 일시정지·재생을 오간다. 재생 중일 때만 듣는다 — 재생을
+    시작한 적도 없는데 스페이스바가 이 화면 어디서나 재생기처럼 구는 것은
+    뜻밖의 동작이다. 글자를 입력하는 자리(검색창 등)에서는 원래 하는 일
+    (띄어쓰기)을 살려 둔다.
+  */
+  useEffect(() => {
+    if (!playback.isPlaying) {
+      return undefined
+    }
+
+    const onKeyDown = (event) => {
+      if (event.code !== 'Space' && event.key !== ' ') {
+        return
+      }
+      const target = event.target
+      const typing = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
+      if (typing) {
+        return
+      }
+      event.preventDefault()
+      playback.togglePause()
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // `playback` 전체를 넣으면 안 된다 — 매 렌더 새 객체라 `useFlowPlayback.js`
+    // 주석과 같은 사정으로 리스너가 계속 떼었다 붙는다. 쓰는 두 값만 넣는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playback.isPlaying, playback.togglePause])
+
   return (
     <aside className={isCollapsed ? 'flow-sidebar is-collapsed' : 'flow-sidebar'} aria-label="회의 탐색">
       <header className={isScrolled ? 'team-header is-scrolled' : 'team-header'}>

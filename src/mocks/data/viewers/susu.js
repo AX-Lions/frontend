@@ -167,13 +167,18 @@ export const viewer = {
     '2f5c1d47-9b0a-4e3c-8f61-7a4d2c9e0b13': {
       narrative:
         '연합학술제 부스 운영 킥오프에 유수인의 Bordo가 대신 들어갔습니다. 부스 운영 이틀을 오전·오후로 나누는 안이 나왔고, 첫날 오전 인원을 둘로 줄이자는 강다은 님 의견에 이견이 없었습니다. 다만 서재민 님 일정과 겹치는지는 확인할 수 없어 유보했습니다 — 그 자리에서 확정했다면 없는 근거로 남의 일정을 정하는 셈이 됐을 것입니다. 인원 배치는 아직 초안입니다.',
+      // 필드 이름을 `briefings.js` 의 `needs_answer` 와 한 글자까지 맞춘다.
+      // 여기서만 다른 이름을 쓰면 `FlowBriefingSidebar` 가 읽지 못해 카드에
+      // 빈 제목 · 빈 본문만 남는다 — 실제로 그렇게 어긋나 있었다.
       needs_answer: [
         {
-          id: 'na-booth-1',
-          question: '첫날 오후 인원을 몇 명으로 잡을까요?',
-          asked_by: '강다은',
-          reason: '기록에 인원 기준이 없어 대리인이 답하지 못했습니다.',
+          question_id: 'e8f3c1a6-4b90-4d72-9e1c-5a6b0d3f8c72',
+          asker_name: '강다은',
+          title: '부스 인원 기준',
+          body: '첫날 오후 인원을 몇 명으로 잡을까요? 기록에 인원 기준이 없어 대리인이 답하지 못했습니다.',
           asked_at: daysAgo(6, 20, 30),
+          meta: '강다은 · 20:30',
+          chat_room_id: '6e1b85a4-d3b7-4abd-92f8-1e4eb692caec',
           answered_at: null,
         },
       ],

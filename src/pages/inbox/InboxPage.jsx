@@ -95,7 +95,6 @@ export function InboxPage() {
       onToggleCollapse={() => setIsSidebarCollapsed((was) => !was)}
       favoriteProjects={(homeData?.favorite_projects ?? []).filter(inCurrentTeam)}
       recentProjects={(homeData?.recent_projects ?? []).filter(inCurrentTeam)}
-      shortcuts={homeData?.shortcuts}
       userName={homeData?.user_name}
       avatarUrl={homeData?.user_avatar_url}
       onAddProject={() => setAddingProject(true)}

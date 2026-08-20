@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 
 import { FlowMetricBadge } from './FlowMetricBadge'
 import { toneOf } from './flowBoard.data'
@@ -134,6 +134,18 @@ export function FlowCanvas({
   children,
 }) {
   const { stage, links, badges, nodes } = layout
+
+  /*
+    노드와 겹치는 뱃지 묶음을 눌러야 펼치는 요약 단추로 접는다.
+
+    `flowLayout.js` 가 자리를 찾을 때 "화살표에 붙어 있는 것" 을 "아무것과도
+    안 겹치는 것" 보다 우선한다(그쪽 주석 참고) — 아주 촘촘한 판에서는 그
+    타협의 대가로 알약 묶음이 옆 노드 원과 겹친다. 알약을 펼쳐 둔 채로
+    두면 얼굴이 가려지므로, `badge.crampedNode` 가 선 자리에서만 이렇게
+    접는다 — 나머지 뱃지는 지금처럼 그대로 펼쳐 보인다.
+  */
+  const [expandedBadgeIds, setExpandedBadgeIds] = useState(() => new Set())
+  const expandBadge = (badgeId) => setExpandedBadgeIds((current) => new Set(current).add(badgeId))
 
   // 인덱스(안건)를 고르면 그 안건에 걸린 화살표만 남기지 않고 **나머지를
   // 흐린다.** 지우면 판의 모양이 바뀌어 "무엇이 강조됐는지" 를 비교할 수 없다.
@@ -305,9 +317,18 @@ export function FlowCanvas({
 
       {badges.map((badge) => {
         const lit = isHighlighted(badge.arrow)
+        const counts = badge.arrow.counts ?? []
+        const collapsed = badge.crampedNode && !expandedBadgeIds.has(badge.id)
+
         return (
           <div
-            className={`flow-badge-group is-${badge.axis}${badge.isSelf ? ' is-self' : ''}${lit ? '' : ' is-dimmed'}`}
+            className={[
+              'flow-badge-group',
+              `is-${badge.axis}`,
+              badge.isSelf ? 'is-self' : '',
+              lit ? '' : 'is-dimmed',
+              collapsed ? 'is-collapsed' : '',
+            ].filter(Boolean).join(' ')}
             key={badge.id}
             /*
               선과 나란히 눕힌다. `translate` 가 `rotate` 보다 **앞에** 와야
@@ -321,7 +342,22 @@ export function FlowCanvas({
             }}
             onPointerDown={(event) => event.stopPropagation()}
           >
-            {(badge.arrow.counts ?? []).map((count) => {
+            {collapsed ? (
+              /*
+                노드와 겹칠 때만 오는 마지막 수단이다 — 알약을 펼친 채로 두면
+                얼굴을 가리므로, 종류 수만 우선 보여 주고 눌러야 펼친다.
+                펼친 뒤에는 이 판이 다시 그려질 때까지 그대로 남는다(같은
+                자리로 도로 접히면 방금 누른 것이 사라진 것처럼 보인다).
+              */
+              <button
+                type="button"
+                className="flow-badge flow-badge-collapsed"
+                aria-label={`${badge.arrow.direction_label} ${counts.length}종 ${badge.arrow.total_count ?? counts.reduce((sum, c) => sum + c.count, 0)}건 — 눌러서 펼치기`}
+                onClick={() => expandBadge(badge.id)}
+              >
+                <span aria-hidden="true">···</span>
+              </button>
+            ) : counts.map((count) => {
               const badgeId = `${badge.id}::${count.content_type}`
               /*
                 안 걸린 알약은 **지우지 않고 흐리게 둔다.**

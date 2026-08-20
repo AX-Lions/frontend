@@ -138,13 +138,17 @@ export const viewer = {
     'cdcd5cda-d887-47dc-91aa-4bb7393d461b': {
       narrative:
         '베를린 시각으로 새벽에 열린 회의라 강다은의 Bordo가 대신 들어갔습니다. 봇 배포 상태를 묻는 질문에 작업 기록을 근거로 "자동 배포는 붙어 있고 main 으로 올라가면 반영된다" 고 답했습니다. 이번 주에는 화면 연결까지만 하고 새 기능을 넣지 않기로 정해졌으니, 준비하시던 것이 있으면 다음 주로 밀립니다. 채널 권한 범위 이야기가 한 번 나왔지만 지시하신 대로 확정하지 않고 넘겨 두었습니다.',
+      // 필드 이름을 `briefings.js` 의 `needs_answer` 와 맞춘다 — 다르면
+      // `FlowBriefingSidebar` 가 못 읽어 빈 카드만 남는다.
       needs_answer: [
         {
-          id: 'na-sync-1',
-          question: '봇이 읽고 저장할 채널을 어디까지 허용합니까?',
-          asked_by: '최비성',
-          reason: '되돌리기 어려운 설정이라 본인 확인 전에는 답하지 않았습니다.',
+          question_id: 'c2d5a9f1-7b34-4e06-8a5c-9f1e3b6d0c47',
+          asker_name: '최비성',
+          title: 'Discord 봇 권한 범위',
+          body: '봇이 읽고 저장할 채널을 어디까지 허용합니까? 되돌리기 어려운 설정이라 본인 확인 전에는 답하지 않았습니다.',
           asked_at: daysAgo(4, 15, 50),
+          meta: '최비성 · 15:50',
+          chat_room_id: '4a91c6d8-2e57-4b03-9f68-7d0e5a2c39b1',
           answered_at: null,
         },
       ],

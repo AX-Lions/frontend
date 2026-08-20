@@ -15,15 +15,18 @@ import { AgentDock } from '../home/AgentDock.jsx'
  * 사용자는 패널을 닫았다가 다시 열어야 하는데, 닫으면 판까지 넓어졌다
  * 좁아져서 화면이 한 번 출렁인다.
  *
- * ## 상세가 없는 칸은 여기 안 온다
+ * ## 상세가 없는 칸도 여기로 온다
  *
- * 서버는 당분간 요약표를 문자열로만 내려 준다. 그런 칸까지 이 패널을 열면
- * 맥락도 갈린 지점도 빈 화면이 떠서 **그 안건에 논의가 없었던 것으로 읽힌다.**
- * 그래서 고르는 쪽(`FlowBoardPage`)이 상세 있는 칸만 이리로 보낸다.
+ * 서버는 당분간 요약표를 문자열로만 내려 준다. 그런 칸은 `context`·
+ * `debates`·`resolution`·`open_question` 이 전부 없는 `{ text }` 하나로
+ * 온다 — 아래에서 그 넷을 각자 조건부로 그리므로 자연히 아무 것도 안
+ * 뜨는데, 그러면 "이 화면이 고장났나" 로 읽힐 수 있어 마지막에 안내
+ * 문장 하나를 남긴다(`hasAnyDetail` 아래).
  */
 export function FlowAgendaPanel({ column, icons, item, onBack, onClose }) {
   const debates = item.debates ?? []
   const edgeCount = (item.related_edge_ids ?? []).length
+  const hasAnyDetail = Boolean(item.context || debates.length > 0 || item.resolution || item.open_question)
 
   return (
     <aside className="briefing-panel agenda-panel" aria-label="안건 상세">
@@ -91,6 +94,12 @@ export function FlowAgendaPanel({ column, icons, item, onBack, onClose }) {
           <section className="agenda-section agenda-open">
             <h3>아직 안 정해진 것</h3>
             <p>{item.open_question}</p>
+          </section>
+        ) : null}
+
+        {!hasAnyDetail ? (
+          <section className="agenda-section">
+            <p className="agenda-no-detail">아직 정리된 뒷이야기가 없습니다.</p>
           </section>
         ) : null}
 

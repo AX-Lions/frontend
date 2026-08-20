@@ -289,7 +289,6 @@ export function HomePage() {
         onToggleCollapse={toggleSidebar}
         favoriteProjects={favoriteProjects}
         recentProjects={recentProjects}
-        shortcuts={homeData.shortcuts}
         userName={homeData.user_name}
         avatarUrl={homeData.user_avatar_url}
         meetingIdByProject={meetingIdByProject}

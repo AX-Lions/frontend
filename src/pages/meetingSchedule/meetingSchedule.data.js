@@ -10,6 +10,14 @@ import { api } from '../../lib/api.js'
 export const NEW_EVENT_PARAM = 'new'
 
 /**
+ * 다른 화면(예: 브리핑의 「실제 일정에서 보기」)에서 특정 일정 한 칸을 바로
+ * 열 때 다는 쿼리 이름. 지금 보이는 달에 그 일정이 있을 때만 열린다 — 데모
+ * 데이터는 전부 이번 달 안에 있어서 충분하다. 몇 달을 넘나드는 일정까지
+ * 열어야 한다면 그때 달을 함께 넘기는 쿼리를 추가한다.
+ */
+export const EVENT_PARAM = 'event'
+
+/**
  * 회의 일정(시안 `692:7910`)이 부르는 것.
  *
  * `GET /projects/{project_id}/calendar/events` 는 **프로젝트 하나**의 일정만

@@ -6,6 +6,7 @@ import { FlowBriefingSidebar } from './FlowBriefingSidebar'
 import { FlowCanvas } from './FlowCanvas'
 import { FlowEdgePanel, FlowNodePanel } from './FlowInspectorPanel'
 import { FlowNavigationSidebar } from './FlowNavigationSidebar'
+import { FlowPlaybackLog } from './FlowPlaybackLog.jsx'
 import { FlowRail } from './FlowRail'
 // 팀 전환하기는 홈에서 먼저 생겼다. 회의 화면에도 같은 팝업이 필요해져
 // 여기서 그대로 가져다 쓴다 — 팝업 하나 때문에 `pages/home` 전체를
@@ -183,10 +184,21 @@ export function FlowBoardPage() {
         setIsMeetingMenuOpen(false)
       }
     }
-    document.addEventListener('pointerdown', close)
+    /*
+      버블 단계가 아니라 **캡처 단계**에서 듣는다.
+
+      판 위 화살표에는 `FlowCanvas` 가 누를 자리를 넓힌 보이지 않는 선
+      (`.flow-link-hit`)이 깔려 있고, 그 선은 판 드래그가 시작되지 않도록
+      `pointerdown` 에서 `stopPropagation()` 을 부른다. 그 넓은 선이 판의 빈
+      자리처럼 보이는 곳도 꽤 덮고 있어서, 버블 단계에서 들으면 그 위를
+      누를 때마다 이 이벤트가 `document` 까지 못 올라와 메뉴가 안 닫혔다.
+      캡처 단계는 버블보다 먼저(위에서 아래로) 도니 그 `stopPropagation()`
+      보다 앞서 실행된다.
+    */
+    document.addEventListener('pointerdown', close, true)
     window.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('pointerdown', close)
+      document.removeEventListener('pointerdown', close, true)
       window.removeEventListener('keydown', onKey)
     }
   }, [isMeetingMenuOpen, setIsMeetingMenuOpen])
@@ -509,6 +521,31 @@ export function FlowBoardPage() {
     생긴 화살표가 판에 없다. `id` 에 `timeline::` 을 붙여 판의 화살표 id 와
     절대 겹치지 않게 한다 — 겹치면 엉뚱한 선이 골라진 것으로 그려진다.
   */
+  /*
+    시간순 인덱스 한 줄을 화살표 패널 모양으로 바꾼다.
+
+    `selectTimelineItem`(사람이 눌렀을 때)과 재생 중 자동으로 여는 자리가
+    같은 모양을 만들어야 한다. 따로 두면 둘 중 하나만 고쳐질 때 "손으로
+    누르면 이렇게 뜨는데 재생 중엔 다르게 뜬다" 는 어긋남이 생긴다.
+  */
+  const edgePanelFor = (item) => ({
+    kind: 'edge',
+    badgeId: null,
+    count: null,
+    arrow: {
+      id: `timeline::${item.edge_id}`,
+      direction_label: item.direction_label,
+      counts: [{
+        content_type: item.content_type,
+        label: item.label,
+        count: 1,
+        edge_ids: [item.edge_id],
+      }],
+    },
+    direction: item.direction_label,
+    edgeIds: [item.edge_id],
+  })
+
   const selectTimelineItem = (item) => {
     const same = ui.activeTimelineItem?.edge_id === item.edge_id
     ui.toggleTimelineItem(item)
@@ -517,24 +554,54 @@ export function FlowBoardPage() {
       setPanel(null)
       return
     }
-    setPanel({
-      kind: 'edge',
-      badgeId: null,
-      count: null,
-      arrow: {
-        id: `timeline::${item.edge_id}`,
-        direction_label: item.direction_label,
-        counts: [{
-          content_type: item.content_type,
-          label: item.label,
-          count: 1,
-          edge_ids: [item.edge_id],
-        }],
-      },
-      direction: item.direction_label,
-      edgeIds: [item.edge_id],
-    })
+    setPanel(edgePanelFor(item))
   }
+
+
+  /*
+    브리핑 카드(확인·근거)에서 가리키는 엣지 하나를 연다.
+
+    카드가 들고 있는 것은 `edge_id` 뿐이라, 패널을 그리는 데 필요한
+    `content_type`·`label`·`direction_label` 은 시간순 인덱스에서 찾아야
+    한다. `selectTimelineItem` 과 같은 모양의 패널을 만드는 이유도 그래서다 —
+    다른 모양이면 화살표 패널이 그 엣지를 못 읽는다.
+  */
+  const openEdgeById = (edgeId) => {
+    const item = timelineItems.find((row) => row.edge_id === edgeId)
+    if (item) {
+      selectTimelineItem(item)
+    }
+  }
+
+  /*
+    다른 화면(예: 요청함의 승인 팝업)에서 `?edge=` 를 달고 들어왔다.
+
+    `?source=bordo-briefing` 처럼 마운트 시점에 한 번만 읽으면 되는 값이
+    아니다 — 그건 즉시 열 수 있는 고정 패널이지만, 화살표 패널은 시간순
+    인덱스가 도착해야 어떤 종류인지 알 수 있다. 그래서 목록이 채워지길
+    기다렸다가 한 번만 연다 — 매번 열면 사용자가 스스로 닫은 패널이 다시 튀어
+    나온다.
+  */
+  const openedFromUrlRef = useRef(false)
+  useEffect(() => {
+    const targetEdgeId = entryParams.get('edge')
+    if (!targetEdgeId || openedFromUrlRef.current || timelineItems.length === 0) {
+      return undefined
+    }
+    const item = timelineItems.find((row) => row.edge_id === targetEdgeId)
+    if (!item) {
+      return undefined
+    }
+    // `setTimeout` 로 한 틱 미룬다. effect 본문에서 곧장 `setState` 를 부르면
+    // 같은 커밋 안에서 렌더가 한 번 더 걸린다(`react-hooks/set-state-in-effect`,
+    // `useFlowPlayback.js` 에 같은 사정이 적혀 있다).
+    const timer = setTimeout(() => {
+      openedFromUrlRef.current = true
+      selectTimelineItem(item)
+    }, 0)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timelineItems])
 
   /*
     재생을 시작할 때 켜져 있던 것을 끈다.
@@ -682,7 +749,7 @@ export function FlowBoardPage() {
           : (mode === WORK_MODE ? '이 기간에 오간 작업이 없습니다.' : '이 회의에서 오간 내용이 없습니다.')}
       />
 
-      <main className={panel ? 'flow-workspace has-record-panel' : 'flow-workspace'}>
+      <main className={(panel || playback.isPlaying) ? 'flow-workspace has-record-panel' : 'flow-workspace'}>
         <section
           className={isPanning ? 'flow-board is-panning' : 'flow-board'}
           aria-label="회의 플로우보드"
@@ -743,7 +810,15 @@ export function FlowBoardPage() {
                       setPickedMeetingId(item.id)
                       rememberMeetingInUrl(item.id)
                       setPanel(null)
-                      ui.setActiveIndex(null)
+                      /*
+                        `useFlowBoardUi` 리팩터로 `activeIndex` 가
+                        `activeTimelineItem` 이 됐는데(그쪽 주석 참고) 여기만
+                        옛 이름(`setActiveIndex`, 존재하지 않는 함수)을 그대로
+                        불러 **클릭마다 여기서 예외가 났다.** 그 아래
+                        `setIsMeetingMenuOpen(false)` 까지 못 가서, 회의를
+                        골라도 목록이 안 닫혔다.
+                      */
+                      ui.setActiveTimelineItem(null)
                       ui.setIsMeetingMenuOpen(false)
                     }}
                   >
@@ -806,9 +881,14 @@ export function FlowBoardPage() {
                             단추의 뜻을 알려 주는 자리인데, 여기는 글이 이미
                             적혀 있어서 같은 글이 아래에 한 번 더 뜬다.
 
-                            상세가 있는 칸만 안건 패널을 연다. 없는 칸까지
-                            열면 맥락도 갈린 지점도 비어 있는 패널이 떠서,
-                            **그 안건에 논의가 없었던 것으로 읽힌다.**
+                            상세가 없는 칸도 **같은 안건 패널**을 연다 — 전에는
+                            그런 칸을 누르면 안건 패널 대신 브리핑 전체가
+                            불쑥 떴다. 방금 누른 그 줄과는 상관없는 다른
+                            패널로 화면이 통째로 바뀌는 쪽이, 맥락 없는 패널이
+                            뜨는 것보다 더 헷갈렸다. `FlowAgendaPanel` 은
+                            맥락·갈린 지점·결론이 없으면 그 줄만 조용히
+                            건너뛰므로(그쪽 파일 참고), 상세가 없어도 빈
+                            패널로 보이지 않는다.
                           */
                           return (
                             <button
@@ -823,9 +903,11 @@ export function FlowBoardPage() {
                                   setPanel({ kind: 'briefing' })
                                   return
                                 }
-                                setPanel(item.detail
-                                  ? { kind: 'agenda', column: column.title, item: item.detail }
-                                  : { kind: 'briefing' })
+                                setPanel({
+                                  kind: 'agenda',
+                                  column: column.title,
+                                  item: item.detail ?? { text: item.text },
+                                })
                               }}
                             >
                               {item.text}
@@ -888,7 +970,15 @@ export function FlowBoardPage() {
           ) : null}
         </section>
 
-        {panel?.kind === 'briefing' ? (
+        {playback.isPlaying ? (
+          <FlowPlaybackLog
+            onClose={stopPlayback}
+            step={playback.step}
+            timeline={pickedTimeline}
+          />
+        ) : null}
+
+        {!playback.isPlaying && panel?.kind === 'briefing' ? (
           briefing ? (
             <FlowBriefingSidebar
               activeChip={activeChip}
@@ -897,6 +987,7 @@ export function FlowBoardPage() {
               isScrolled={ui.isBriefScrolled}
               onChipToggle={(contentType) => setActiveChip((c) => (c === contentType ? null : contentType))}
               onClose={() => setPanel(null)}
+              onOpenEdge={openEdgeById}
               onScroll={(event) => ui.setIsBriefScrolled(event.currentTarget.scrollTop > 0)}
             />
           ) : (
@@ -914,7 +1005,7 @@ export function FlowBoardPage() {
           )
         ) : null}
 
-        {panel?.kind === 'agenda' ? (
+        {!playback.isPlaying && panel?.kind === 'agenda' ? (
           <FlowAgendaPanel
             column={panel.column}
             icons={icons}
@@ -934,7 +1025,7 @@ export function FlowBoardPage() {
           />
         ) : null}
 
-        {panel?.kind === 'node' && selectedNode ? (
+        {!playback.isPlaying && panel?.kind === 'node' && selectedNode ? (
           <FlowNodePanel
             meetingId={meetingId}
             node={selectedNode}
@@ -944,7 +1035,7 @@ export function FlowBoardPage() {
           />
         ) : null}
 
-        {panel?.kind === 'edge' ? (
+        {!playback.isPlaying && panel?.kind === 'edge' ? (
           <FlowEdgePanel
             /*
               화살표가 바뀌면 **패널을 새로 만든다.**

@@ -1070,6 +1070,50 @@
   padding: 0;
   color: var(--muted);
   font-size: 12px;
+  /* 접혀 있다 펼쳐질 때 알약이 하나씩 튀어나오는 느낌. 처음 그릴 때도
+     같은 값으로 살짝 나타나는데, 그때는 다 같이 나타나 눈에 덜 띈다. */
+  animation: flow-badge-pop 180ms ease;
+}
+
+@keyframes flow-badge-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/*
+  노드와 겹쳐서 접힌 뱃지 묶음(`FlowCanvas` 의 `badge.crampedNode`).
+
+  펼쳐진 알약 하나(`.metric-icon`, 28px 원)와 같은 발판을 써서, 접혔다
+  펼쳐져도 자리가 크게 튀지 않는다. 톤이 없는 요약이라 색은 중립으로 둔다.
+*/
+.flow-badge-collapsed {
+  width: 28px;
+  height: 28px;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.flow-badge-collapsed:hover {
+  background: var(--tone-hover, #f3f4f6);
+}
+
+.flow-badge-collapsed:active {
+  transform: scale(0.95);
 }
 
 .flow-badge b {
@@ -1578,6 +1622,75 @@
   padding: 0;
 }
 
+/*
+  「전체 회의록」(맥락 재생 중 오른쪽 패널, `FlowPlaybackLog.jsx`).
+
+  기존 카드(`.bordo-request-card` 등)를 그대로 안 쓰는 이유는, 저건 한
+  번에 한 종류 목록을 그리는 자리라 방향(`누가 → 누구`)이 없다. 여기는
+  재생 한 걸음이 곧 카드 한 장이라 방향이 먼저 와야 "누가 누구에게" 가
+  한눈에 잡힌다.
+*/
+.playback-log-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.playback-log-item {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #ffffff;
+  /*
+    새 카드가 아래에 쌓일 때 튀지 않고 자연스럽게 나타나야 "시간 순으로
+    이어지고 있다" 는 느낌이 산다. 갑자기 나타나면 재생 속도(0.5초)와
+    안 맞아 뚝뚝 끊겨 보인다.
+  */
+  animation: playback-log-enter 200ms ease;
+}
+
+@keyframes playback-log-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.playback-log-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.playback-log-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playback-log-head span {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.playback-log-item p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .bordo-section {
   padding: 32px 24px;
   border-bottom: 1px solid var(--border);
@@ -1710,6 +1823,90 @@
   height: 16px;
   flex: 0 0 16px;
   opacity: 0.8;
+}
+
+/*
+  확인 카드가 이제 두 조각이다 — 화살표 판으로 가는 버튼과, 있으면 실제
+  일정으로 가는 링크. 하나로 합쳐 두면 "이 변경을 봤다" 와 "일정에서 봤다" 를
+  구별할 방법이 없어, 뭘 눌러도 같은 곳으로 간다.
+*/
+.bordo-action-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+button.bordo-action-card {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+button.bordo-action-card:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.bordo-action-card-schedule {
+  align-self: flex-start;
+  padding-left: 16px;
+  color: var(--accent, #d3572e);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bordo-action-card-schedule:hover {
+  text-decoration: underline;
+}
+
+/*
+  "무엇에 근거해 답했는지" · "무엇을 유보했는지" 카드.
+
+  둘을 같은 모양으로 두면 "답했다" 와 "미뤘다" 가 눈으로 구별되지 않는다.
+  유보는 이 서비스의 차별점이라(`../../../CLAUDE.md`), 결론과 나란히 두되
+  왼쪽 띠 색으로만 갈라 산만해지지 않게 한다.
+*/
+.bordo-evidence-card {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  border: 0;
+  border-left: 3px solid var(--border);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bordo-evidence-card:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.bordo-evidence-card.is-used {
+  border-left-color: #2e9e5b;
+}
+
+.bordo-evidence-card.is-deferred {
+  border-left-color: #d3572e;
+}
+
+.bordo-evidence-card small {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.bordo-evidence-card em {
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
 }
 
 /* ─────────────────────────────────────────── 노드 · 화살표 상세 패널 */
@@ -2147,6 +2344,13 @@
   color: var(--ink);
   font-size: 13px;
   line-height: 1.55;
+}
+
+/* 맥락·갈린 지점·결론이 전부 없는 칸의 안내문. 본문과 같은 색이면 "정리된
+   내용" 처럼 읽히므로 흐리게 둔다 — 정말 없다는 뜻이 눈에 먼저 들어와야 한다. */
+.agenda-no-detail {
+  color: var(--muted);
+  font-style: italic;
 }
 
 .agenda-debates {

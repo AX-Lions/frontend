@@ -253,6 +253,28 @@
   color: var(--chat-muted);
 }
 
+/*
+  세 번 깜빡이고 스스로 접는다(`ChatListPanel.jsx` 의 `onAnimationEnd`).
+
+  `animation-iteration-count: 3` 인데 한 번 깜빡임 자체는 절반(어두워졌다
+  밝아지는 것 한 번)이 아니라 **한 번 어두워지고 한 번 밝아지는 전체**를
+  한 회로 센다 — `@keyframes` 를 0%(밝음) → 50%(어두움) → 100%(밝음) 로
+  둔 이유다. 절반만 한 회로 세면 마지막에 어두운 채로 끝나 사라지는 순간이
+  깜빡이다 만 것처럼 보인다.
+*/
+.chat-tip.is-blinking {
+  animation: chat-tip-blink 700ms ease-in-out 3;
+}
+
+@keyframes chat-tip-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
 .chat-list-scroll {
   flex: 1 1 auto;
   min-height: 0;
@@ -1274,6 +1296,45 @@
 .settings-page,
 .settings-page * {
   box-sizing: border-box;
+}
+
+/*
+  대리인 설정(`AgentSettingsPanel`, 루트 클래스 `.settings-panel`)이 이제
+  독립된 `.settings-page` 대신 채팅 화면(`.chat-page`) 왼쪽 칸에 그대로
+  얹혀서 뜬다(`ChatPage.jsx` 참고). 그 안의 모든 조각(스위치·프롬프트
+  카드…)이 기대는 `--settings-*` 변수와 버튼 초기화만 `.chat-page` 에도
+  얹는다 — 레이아웃(그리드·높이·배경)까지 다시 적으면 `.chat-page` 자체
+  규칙과 값이 겹쳐 어느 쪽이 진짜인지 알 수 없어진다. 값은 채팅과 이미
+  같아서(주석 "채팅과 같은 위계를 쓴다") 두 벌을 나란히 둬도 어긋나지 않는다.
+*/
+.chat-page {
+  --settings-fs-page: 24px;
+  --settings-fs-title: 16px;
+  --settings-fs-body: 14px;
+  --settings-fs-meta: 12px;
+  --settings-ink: #1f1f1f;
+  --settings-muted: #60646c;
+  --settings-disabled: #b8bbc0;
+  --settings-line: #e5e7eb;
+  --settings-panel: #f7f7f8;
+  --settings-soft: #fafafb;
+  --settings-point: #ff9d42;
+  --settings-active: #002662;
+  --settings-switch-on: var(--settings-point);
+  --settings-switch-on-hover: #eb903d;
+}
+
+.chat-page .settings-panel button,
+.chat-page .settings-panel input,
+.chat-page .settings-panel textarea {
+  font: inherit;
+}
+
+.chat-page .settings-panel button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }
 
 /* 채팅과 같은 위계를 쓴다. 두 화면이 톱니 하나로 이어져 있어서, 크기 규칙이
@@ -2783,8 +2844,7 @@
   background: var(--chat-white-hover);
 }
 
-.new-chat-member img,
-.new-chat-initial {
+.new-chat-member img {
   display: inline-flex;
   width: 28px;
   height: 28px;
