@@ -590,6 +590,24 @@ export function AccountPage() {
               </p>
             </>
           )}
+
+          {/*
+            발급 방법 아래에 **무엇이 자동으로 일어나는지**를 적는 이유 — 이걸 안
+            적으면 사용자가 매번 "기록해 줘"라고 시켜야 하는 줄 압니다. 실제로는
+            무엇을 언제 기록할지를 연결할 때 서버가 개인 AI 에게 알려 줍니다.
+          */}
+          <p className="account-label">연결하면 이렇게 동작합니다</p>
+          <ul className="account-steps">
+            <li>새 작업에 착수하면 → <strong>작업</strong>으로 기록됩니다</li>
+            <li>진척이 생기면 → 진행률이 갱신됩니다</li>
+            <li>막히면 → <strong>막힘</strong>으로 바뀌고 이유가 남습니다</li>
+            <li>일을 끝내면 → <strong>완료</strong>로 표시됩니다</li>
+            <li>설계 결정·조사 결과를 정리하면 → <strong>문서</strong>로 올라갑니다</li>
+          </ul>
+          <p className="account-hint account-hint-after">
+            매번 “기록해 줘”라고 말할 필요는 없습니다. 평소처럼 개인 AI 와 일하면
+            됩니다. 비밀키로 보이는 값은 저장 <strong>전에</strong> 지워집니다.
+          </p>
         </section>
 
         <section className="account-section account-danger">

@@ -672,11 +672,22 @@ export function HomePage() {
           // `project_progress` 에도 넣는다. 온보딩 화면이 뜰지 말지를 이걸로
           // 판정하므로, 여기 안 넣으면 프로젝트를 만들고도 화면이 `아직 참여
           // 중인 프로젝트가 없습니다` 로 남아 사용자가 또 만들게 된다.
-          onCreated={(project) => setData((current) => (current ? {
-            ...current,
-            recent_projects: [project, ...(current.recent_projects ?? [])],
-            project_progress: [project, ...(current.project_progress ?? [])],
-          } : current))}
+          onCreated={(project) => {
+            /*
+              담아 둔 홈 응답을 버린다.
+
+              화면 안의 값만 얹으면 **이 화면을 떠나는 순간 방금 만든
+              프로젝트가 사라진다** — 다른 데 갔다 돌아오면 캐시에 있던
+              옛 응답이 그대로 다시 그려지기 때문이다. 사용자는 프로젝트가
+              안 만들어진 줄 알고 또 만든다.
+            */
+            evict(cacheKeyFor('home', []))
+            setData((current) => (current ? {
+              ...current,
+              recent_projects: [project, ...(current.recent_projects ?? [])],
+              project_progress: [project, ...(current.project_progress ?? [])],
+            } : current))
+          }}
         />
       ) : null}
 

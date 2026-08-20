@@ -6,8 +6,8 @@ import { cacheKeyFor, evict } from '../../lib/resourceCache.js'
 import { useResource } from '../../lib/useResource.js'
 import { LoadError, Loading } from '../../shared/components/LoadState.jsx'
 import {
-  cancelAbsence, fetchPrep, registerAbsence, removeStance, saveAgentSetup,
-  saveStance as putStance,
+  cancelAbsence, fetchPrep, predictDebatePoints, registerAbsence, removeStance,
+  saveAgentSetup, saveStance as putStance,
 } from './delegatePrep.data.js'
 import './delegatePrep.css'
 
@@ -51,6 +51,31 @@ import './delegatePrep.css'
  * 그대로 담겨 온다. 읽는 사람 시간대로 보이는 것이 맞다 — 「내가 자리를
  * 비운 사이」 를 재는 기준이 그 사람의 하루이기 때문이다.
  */
+/**
+ * 근거 카드 「바로가기」의 목적지.
+ *
+ * 서버는 주소가 아니라 **무엇을 가리키는지**를 준다 — `{label, meeting_id}`
+ * 또는 `{label, work_item_id}` (`contention.py`). 화면 주소는 클라이언트의
+ * 것이라, 서버가 그것까지 만들면 라우트를 바꿀 때마다 서버를 같이 고쳐야 한다.
+ *
+ * 전에는 이 **객체를 `href` 에 그대로** 넣었다. `href="[object Object]"` 가
+ * 되어 누르면 라우터가 못 알아보고 홈으로 떨어뜨렸다 — 시드 데이터 문제가
+ * 아니라 여기가 원인이었다.
+ *
+ * 갈 곳이 없는 종류는 `null` 을 돌려 **버튼을 아예 안 그린다.** 작업 기록
+ * 하나를 여는 화면이 아직 없다. 눌렸는데 아무 일도 안 일어나는 것보다
+ * 없는 편이 정직하다.
+ */
+function evidenceHref(link) {
+  if (!link || typeof link !== 'object') {
+    return null
+  }
+  if (link.meeting_id) {
+    return `/flow-board?meeting=${encodeURIComponent(link.meeting_id)}`
+  }
+  return null
+}
+
 function whenLabel(iso) {
   const at = new Date(iso)
   if (Number.isNaN(at.getTime())) {
@@ -240,8 +265,42 @@ function PrepShell({ children }) {
  * 남은 것이 있을 때 홈으로 데려가지 않는 이유도 같다 — 돌아갈 곳은
  * 남은 논쟁점이지 홈이 아니다.
  */
-function CompleteModal({ remaining = 0, onClose }) {
-  const done = remaining === 0
+/**
+ * 모달 본문. 네 상태를 가른다 — 뭉치면 거짓말이 된다.
+ *
+ * 특히 `아직 안 맡김` 을 안 가르면, 설정만 저장한 사람에게 「회의 시간이 되면
+ * Bordo가 대신 참석합니다」 라고 말하게 된다. 실제로는 본인이 나가야 한다.
+ */
+function modalBody({ done, delegated, generating, remaining }) {
+  if (done) {
+    return '모든 논쟁점에 입장을 남기고 Bordo 활동 설정까지 마쳤습니다. '
+      + '회의 시간이 되면 Bordo가 대신 참석해 처리합니다.'
+  }
+  if (!delegated) {
+    return '활동 설정을 저장했습니다. 이 회의는 아직 맡기지 않았습니다 — '
+      + '위쪽 「Bordo에게 맡기기」를 눌러야 대리 참석으로 등록됩니다.'
+  }
+  if (generating) {
+    return 'Bordo가 예상 논쟁점을 만들고 있습니다. 곧 아래에 채워지니 '
+      + '이 화면에서 기다렸다가 입장을 적어 두십시오.'
+  }
+  if (remaining > 0) {
+    return `활동 설정을 적용했습니다. 논쟁점 ${remaining}개에 아직 입장이 없습니다.`
+  }
+  return '활동 설정을 적용했습니다. 예상된 논쟁점은 아직 없습니다 — '
+    + '「논쟁점 예상하기」로 지금 만들어 볼 수 있습니다.'
+}
+
+function CompleteModal({ remaining = 0, delegated = false, generating = false, onClose }) {
+  /*
+    「완료」라고 말할 수 있는 조건이 셋이다. 하나라도 빠지면 저장만 됐다고 한다.
+
+    전에는 `remaining === 0` 하나였다. 그래서 **논쟁점이 아직 한 개도 안
+    만들어진 회의**에서 남은 것이 0으로 계산돼, 뒤에서 예측이 도는 중인데도
+    화면은 `설정을 완료했습니다` 라고 말하고 「홈으로 가기」에 포커스를 줬다.
+    사람은 그대로 홈으로 갔고, 논쟁점은 아무도 안 본 채로 생겼다.
+  */
+  const done = delegated && !generating && remaining === 0
   const homeButtonRef = useRef(null)
 
   useEffect(() => {
@@ -276,11 +335,7 @@ function CompleteModal({ remaining = 0, onClose }) {
         <h2 id="prep-complete-title">
           {done ? '설정을 완료했습니다' : '설정을 저장했습니다'}
         </h2>
-        <p>
-          {done
-            ? '모든 논쟁점에 입장을 남기고 Bordo 활동 설정까지 마쳤습니다. 회의 시간이 되면 Bordo가 대신 참석해 처리합니다.'
-            : `Bordo 활동 설정을 적용했습니다. 논쟁점 ${remaining}개에 아직 입장이 없습니다.`}
-        </p>
+        <p>{modalBody({ done, delegated, generating, remaining })}</p>
         {/* 닫기(×)는 이 화면에 남아 더 손보게 하고, 이 버튼은 준비가 끝났다는
             사람의 판단을 그대로 따라 홈으로 데려간다.
 
@@ -292,7 +347,7 @@ function CompleteModal({ remaining = 0, onClose }) {
           type="button"
           onClick={done ? () => navigate('/') : onClose}
         >
-          {done ? '홈으로 가기' : '남은 논쟁점 보기'}
+          {done ? '홈으로 가기' : '이 화면에서 계속하기'}
         </button>
       </div>
     </div>
@@ -666,15 +721,13 @@ export function DelegatePrepPage() {
 
     try {
       /*
-        아직 불참 등록이 안 됐으면 **먼저 등록한다.**
+        **여기서 불참을 등록하지 않는다.**
 
-        버튼에 `적용하기` 라고 적혀 있지만 사람이 기대하는 것은 「맡기기」다.
-        홈을 거치지 않고 주소로 바로 들어온 경우 설정만 저장되고 대리 참석은
-        꺼진 채로 남는데, 화면에는 「맡겼습니다」 가 떠서 알 방법이 없었다.
+        전에는 `if (!delegated) await registerAbsence(meetingId)` 가 있었다.
+        「적용하기」를 눌렀을 뿐인데 회의 불참으로 바뀌었고, 사용자는 그걸
+        알 방법이 없었다. 설정을 저장하는 것과 회의에 안 나가는 것은 다른
+        결정이다 — 맡기기는 화면 위쪽의 전용 버튼 하나로만 움직인다.
       */
-      if (!delegated) {
-        await registerAbsence(meetingId)
-      }
       await saveAgentSetup(meetingId, payload)
       // 서버 값으로 돌려 놓는다. 안 놓으면 `현재 설정 사용` 으로 되돌린 뒤에도
       // 칸에는 아까 치던 글이 남아, 되돌아간 것이 화면에 안 보인다.
@@ -684,11 +737,14 @@ export function DelegatePrepPage() {
       // 홈이 담아 둔 것을 버린다. 안 버리면 돌아갔을 때 버튼이 아직
       // `회의에 참여하지 않아요` 로 남아 등록이 안 된 것처럼 보인다.
       evict(cacheKeyFor('home', []))
+      // 「맡겼습니다」라고 하지 않는다. 이 버튼은 설정만 저장한다 —
+      // 맡기는 것은 위쪽 전용 버튼이고, 둘을 같은 말로 부르면 안 맡긴
+      // 사람이 맡긴 줄 안다.
       setNotice(mode === 'current'
-        ? '평소 설정으로 Bordo에게 맡겼습니다.'
-        : '이번 회의에만 적용해 Bordo에게 맡겼습니다.')
+        ? '평소 설정으로 되돌렸습니다.'
+        : '이번 회의에만 적용했습니다.')
       /*
-        맡겨졌다는 것을 눈에 보이게 말한다.
+        저장됐다는 것을 눈에 보이게 말한다.
 
         예전에는 논쟁점을 전부 답했을 때만 띄웠다. 그러지 않은 사람에게는
         화면 아래 알림 한 줄이 전부라, 눌리긴 한 것인지 알기 어려웠다.
@@ -749,6 +805,61 @@ export function DelegatePrepPage() {
       setNotice('대리 참석을 취소했습니다.')
     } catch (caught) {
       setError(caught?.message || '취소하지 못했습니다.')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  /**
+   * 이 회의를 Bordo 에게 맡긴다 = 불참 등록.
+   *
+   * **전에는 이 버튼이 없었다.** 아래 「적용하기」가 아직 안 맡겼으면 몰래
+   * 등록해 줬는데, 설정만 저장하려던 사람이 회의 불참으로 바뀌는 것을
+   * 알 방법이 없었다. 맡기는 것은 사람이 따로 누르는 결정이다.
+   *
+   * 등록하면 서버가 뒤에서 논쟁점을 예상하기 시작한다(`register_absence`).
+   */
+  const delegateToBordo = async () => {
+    if (busy || !meetingId) {
+      return
+    }
+    setBusy('delegate')
+    setError('')
+    setNotice('')
+    try {
+      await registerAbsence(meetingId)
+      await prep.reload()
+      // 홈이 담아 둔 것을 버린다. 안 버리면 돌아갔을 때 버튼이 아직
+      // `회의에 참여하지 않아요` 로 남아 등록이 안 된 것처럼 보인다.
+      evict(cacheKeyFor('home', []))
+      setNotice('이 회의를 Bordo에게 맡겼습니다. 예상 논쟁점을 만들고 있어요.')
+    } catch (caught) {
+      setError(caught?.message || '맡기지 못했습니다.')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  /**
+   * 논쟁점을 지금 예상한다.
+   *
+   * 이미 목록이 있으면 `force` 로 **다시** 예상한다. 답을 달아 둔 논쟁점과
+   * 그 입장은 서버가 지우지 않으므로, 눌렀다가 적어 둔 것을 잃지 않는다.
+   */
+  const predictPoints = async () => {
+    if (busy || !meetingId) {
+      return
+    }
+    setBusy('predict')
+    setError('')
+    setNotice('')
+    try {
+      await predictDebatePoints(meetingId, { force: rows.length > 0 })
+      // 곧바로 다시 읽어 `GENERATING` 을 받는다. 그래야 폴링이 시작되고
+      // 스피너가 뜬다 — 안 읽으면 4초 동안 아무 일도 안 일어난 것처럼 보인다.
+      await prep.reload()
+    } catch (caught) {
+      setError(caught?.message || '논쟁점을 예상하지 못했습니다.')
     } finally {
       setBusy('')
     }
@@ -887,7 +998,25 @@ export function DelegatePrepPage() {
             `대리 참석 중` 이고 그 전이면 `예정` 인데, 화면이 필드를 조합하면
             홈과 여기가 같은 회의를 다르게 부른다. 대리인 호칭도 사람마다 다르다.
           */}
-          {delegated ? <span className="prep-badge">{header?.badge}</span> : null}
+          {/*
+            맡겼는지 아닌지를 **헤더에서** 가른다.
+
+            아래 「적용하기」가 몰래 등록해 주던 때에는 이 자리에 아무것도
+            없어서, 맡긴 사람과 안 맡긴 사람이 같은 화면을 봤다. 맡기는 것은
+            회의에 안 나간다는 결정이라 눈에 보이는 자리에서 눌러야 한다.
+          */}
+          {delegated ? (
+            <span className="prep-badge">{header?.badge}</span>
+          ) : (
+            <button
+              className="prep-delegate"
+              type="button"
+              disabled={Boolean(busy)}
+              onClick={delegateToBordo}
+            >
+              {busy === 'delegate' ? '맡기는 중…' : 'Bordo에게 맡기기'}
+            </button>
+          )}
         </div>
       </header>
 
@@ -904,6 +1033,29 @@ export function DelegatePrepPage() {
               실패했다는 뜻이지 아직 예상할 자료가 없다는 뜻이 아니다.
             */}
             <p>{debate?.notice ?? ''}</p>
+            {/*
+              예상은 **누르는 동작**이다.
+
+              전에는 불참 등록의 부산물로만 생겼다. 그래서 준비 화면을 열어
+              두고도 논쟁점을 다시 뽑을 방법이 없었고, 예측이 한 번 실패하면
+              그 회의는 끝까지 빈 목록이었다.
+
+              맡기지 않은 사람에게는 안 보인다. 이 예측은 「내가 없는 사이」를
+              위한 것이라, 참석하는 사람 몫까지 돌리면 회의마다 모델이 참석자
+              수만큼 돌면서 정작 그 결과를 쓸 사람이 없다.
+            */}
+            {delegated ? (
+              <button
+                className="prep-predict"
+                type="button"
+                disabled={Boolean(busy) || generating}
+                onClick={predictPoints}
+              >
+                {generating || busy === 'predict'
+                  ? '예상하는 중…'
+                  : (rows.length > 0 ? '다시 예상하기' : '논쟁점 예상하기')}
+              </button>
+            ) : null}
           </div>
 
           {prep.loading ? <Loading label="논쟁점을 읽는 중입니다…" /> : null}
@@ -1037,14 +1189,12 @@ export function DelegatePrepPage() {
                                   <strong>{evidence.who}</strong>
                                   <span>{evidence.body}</span>
                                 </div>
-                                {/*
-                                  `/flow-board` 가 `?edge=` 딥링크를 받게 되면서
-                                  갈 곳이 생겼다 — 예전에는 여기서 눌리지 않는
-                                  표시만 그렸다.
-                                */}
-                                {evidence.link ? (
-                                  <AppLink className="prep-evidence-link" href={evidence.link}>
-                                    바로가기
+                                {evidenceHref(evidence.link) ? (
+                                  <AppLink
+                                    className="prep-evidence-link"
+                                    href={evidenceHref(evidence.link)}
+                                  >
+                                    {evidence.link.label || '바로가기'}
                                   </AppLink>
                                 ) : null}
                               </div>
@@ -1389,7 +1539,12 @@ export function DelegatePrepPage() {
       </section>
 
       {showComplete ? (
-        <CompleteModal remaining={remainingPoints} onClose={() => setShowComplete(false)} />
+        <CompleteModal
+          remaining={remainingPoints}
+          delegated={delegated}
+          generating={generating}
+          onClose={() => setShowComplete(false)}
+        />
       ) : null}
     </PrepShell>
   )

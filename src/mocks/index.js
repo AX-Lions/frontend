@@ -509,6 +509,17 @@ function resolve(path, method, body) {
       patch(`absence:${b}`, { delegated: method === 'POST' })
       return method === 'DELETE' ? null : { delegated: true }
     }
+    /*
+      논쟁점 예상. 가상 모드에는 이미 뽑혀 있는 목록이 있으므로 **아무것도
+      바꾸지 않고** 곧바로 준비된 상태로 답한다.
+
+      실서버는 `202` 와 `GENERATING` 을 주고 뒤에서 모델을 돌린다. 여기서
+      그것까지 흉내 내면 가상 모드가 돌지도 않는 예측을 4초마다 다시 물으며
+      영원히 스피너를 돌린다 — 없는 일을 기다리는 화면이 된다.
+    */
+    if (a === 'meetings' && c === 'debate-points' && s[3] === 'predict') {
+      return { meeting_id: b, status: 'READY', already_running: false }
+    }
     if (a === 'meetings' && c === 'agent-setup') {
       const base = preps[b]?.agent_setup
       if (!base) {

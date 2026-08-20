@@ -165,6 +165,54 @@
   white-space: nowrap;
 }
 
+/*
+ * 뱃지가 앉을 자리에 **아직 안 맡겼을 때** 대신 서는 버튼.
+ *
+ * 뱃지와 같은 크기·같은 자리다. 둘이 자리를 주고받으므로 맡기고 나면 헤더가
+ * 흔들리지 않는다. 색은 채워 둔다 — 이 화면에서 사람이 내리는 결정 중
+ * 되돌리는 데 손이 가장 많이 가는 것이라, 있는 줄 모르고 지나치면 안 된다.
+ */
+.prep-delegate {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--prep-orange);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.prep-delegate:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 부제 아래에 붙는다. 제목 옆에 두면 `예상 논쟁점` 과 무게가 같아져
+   어느 쪽이 제목인지 흐려진다. */
+.prep-predict {
+  margin: 10px 0 0;
+  padding: 7px 12px;
+  border: 1px solid var(--prep-line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--prep-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.prep-predict:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.prep-predict:disabled {
+  color: #b8bbc0;
+  cursor: default;
+}
+
 .prep-notice,
 .prep-error {
   margin: 16px 0 0;
