@@ -131,6 +131,29 @@ export function ConfirmedScheduleDialog({ meetingId, relatedEdgeId, schedule, on
           <button className="cs-cancel" type="button" onClick={onClose}>취소</button>
           {/* 갈 회의가 없으면 단추도 없다. 눌러도 아무 데도 안 가는 단추를
               남기면 `회의 보기` 가 고장 난 것처럼 보인다. */}
+          {/*
+            불참 등록을 **여기서도** 할 수 있어야 한다.
+
+            예전에는 이 버튼이 홈 「오늘 일정」에만 있었다. 그 목록은 보는
+            사람의 시간대로 **오늘 하루만** 자르므로, 회의가 그 사람에게 내일
+            이거나 이미 지난 날이면 **누를 자리가 아예 없었다** — 시차가 다른
+            팀원일수록 그렇다. 이 서비스가 파는 것이 "자리를 비울 것을 미리
+            등록한다" 인데, 회의를 언제로 잡았느냐에 따라 그 행위가 막히면 안
+            된다. 달력에서 일정을 눌러 열리는 이 팝업이 날짜와 무관한 유일한
+            진입점이다.
+          */}
+          {meetingId ? (
+            <button
+              className="cs-absence"
+              type="button"
+              onClick={() => {
+                navigate(`/delegate-prep?meeting=${meetingId}`)
+                onClose()
+              }}
+            >
+              {shown?.delegated ? '대리 참석 중' : '회의에 참여하지 않아요'}
+            </button>
+          ) : null}
           {meetingId ? (
             <button
               className="cs-view"

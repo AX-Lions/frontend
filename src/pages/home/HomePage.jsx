@@ -19,14 +19,36 @@ const starIcons = {
 }
 
 /*
-  「나중에 보기」로 닫았다는 사실은 모듈 스코프에 남긴다 — `useState` 만으로는
-  안 된다. 다른 화면에 갔다가 홈으로 돌아오면 `HomePage` 가 통째로 다시
-  마운트되어 `briefingSeen` 이 `false` 로 되돌아가고, 서버가 여전히
-  `briefing_pending.exists` 를 주는 한(사람이 실제로 브리핑을 열기 전까진
-  안 꺼진다) 팝업이 매번 다시 떴다. 새로고침하면 다시 뜨는 것은 맞다 —
-  그때는 정말 처음 들어온 것이므로.
+  「나중에 보기」로 닫은 브리핑은 `localStorage` 에 남긴다.
+
+  전에는 모듈 스코프 변수 하나였다 — 같은 탭 안에서 다른 화면에 갔다가
+  돌아오는 것까지는 버텼지만(그 사이엔 `HomePage` 가 다시 마운트돼도 이
+  변수는 그대로다), **새로고침하거나 다시 들어오면 초기화됐다.** 서버는
+  사람이 브리핑을 실제로 열기 전까진 `briefing_pending.exists` 를 계속
+  주므로(그쪽이 맞다 — 진짜 안 읽었으니까), 그 값만 보면 새로고침마다
+  같은 팝업이 다시 떴다.
+
+  `meeting_id` 로 저장해 둔다 — 통째로 "브리핑은 다시 안 띄운다" 를 저장하면
+  나중에 진짜 새로 생긴 브리핑까지 영영 안 뜬다. 지금 뜬 이 브리핑만
+  다시 안 뜨면 된다.
 */
-let briefingDismissedThisSession = false
+const DISMISSED_BRIEFING_KEY = 'bordo.dismissedBriefingMeetingId'
+
+function getDismissedBriefingMeetingId() {
+  try {
+    return window.localStorage.getItem(DISMISSED_BRIEFING_KEY)
+  } catch {
+    return null
+  }
+}
+
+function setDismissedBriefingMeetingId(meetingId) {
+  try {
+    window.localStorage.setItem(DISMISSED_BRIEFING_KEY, meetingId)
+  } catch {
+    // 저장이 안 돼도(시크릿 모드 등) 팝업 자체는 떠야 한다 — 여기서 막지 않는다.
+  }
+}
 
 function isModifiedClick(event) {
   return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
@@ -75,10 +97,17 @@ export function HomePage() {
   // `localStorage` 값이라 리액트 상태로 옮겨 받아야 바뀌었을 때 다시 그린다.
   const [currentTeamId, setCurrentTeamIdState] = useState(getCurrentTeamId)
   useEffect(() => onCurrentTeamChange(setCurrentTeamIdState), [])
-  // 브리핑 팝업은 한 번만 뜬다. `homeData` 를 다시 읽을 때마다 뜨면, 별 하나
-  // 눌렀다고 팝업이 다시 올라온다. 초깃값을 모듈 스코프 값에서 가져와야
-  // 다른 화면에 갔다가 돌아와 다시 마운트돼도 이미 닫았던 사실이 남는다.
-  const [briefingSeen, setBriefingSeen] = useState(briefingDismissedThisSession)
+  /*
+    브리핑 팝업은 한 번만 뜬다. `homeData` 를 다시 읽을 때마다 뜨면, 별 하나
+    눌렀다고 팝업이 다시 올라온다.
+
+    이 상태 자체은 "이번 렌더 트리에서 방금 닫았다" 만 즉시 반영하는 자리다
+    — `localStorage` 에 쓴 값은 리액트가 모르므로, 쓰자마자 곧장 렌더에
+    반영하려면 이 상태가 따로 있어야 한다. 그보다 오래가는 기억(다른
+    화면에 갔다 왔을 때·새로고침했을 때)은 아래 렌더 조건에서
+    `getDismissedBriefingMeetingId()` 로 직접 확인한다.
+  */
+  const [briefingSeen, setBriefingSeen] = useState(false)
   // 자동 열기는 상태가 아니라 ref 다. 상태로 두면 effect 안에서 setState 를
   // 부르게 되고 렌더가 한 번 더 돈다 — 어차피 화면에 아무것도 안 그리는 값이다.
   const autoOpenedRef = useRef(false)
@@ -119,17 +148,25 @@ export function HomePage() {
     팝업이 닫힌 뒤 홈이 할 일.
 
     `result` 는 **서버에 저장이 끝났을 때만** 온다(`POST /me/briefing-dismiss`).
-    X·Esc·바깥 클릭으로 그냥 닫은 것은 아무 결정도 아니라서, 그때는 담아 둔
-    홈도 그대로 둔다.
+    X·Esc·바깥 클릭으로 그냥 닫은 것은 서버에 아무것도 안 보내므로 아래
+    `dropHomeCache`·`always_open` 처리는 안 탄다 — 담아 둔 홈은 그대로 둔다.
+
+    다시 뜨는 것을 막는 것은 다르다. **닫는 방법과 상관없이** 사람이 이
+    팝업을 치웠다는 사실 자체는 남긴다 — X 로 닫든 「나중에 보기」를
+    누르든, 사용자에게는 똑같이 "이건 봤고 지금은 됐다" 는 뜻이다. 여기서
+    갈리면 X 로 닫은 사람만 계속 같은 팝업을 본다.
 
     `briefing_pending.exists` 는 건드리지 않는다. 그 요청이 서버에서 바꾸는
     것은 `always_open` 하나뿐이고, 대기 표시는 브리핑을 실제로 열었을 때만
     꺼진다. 화면에서 미리 꺼 버리면 상단 버튼이 `새 브리핑 없음` 으로 바뀌어
-    **아직 안 읽은 브리핑으로 가는 길이 사라진다.**
+    **아직 안 읽은 브리핑으로 가는 길이 사라진다.** 대신 이 팝업 자체를
+    다시 안 띄우는 것으로 "귀찮게 굴지 않는다" 를 지킨다.
   */
   const closeBriefing = (result) => {
-    briefingDismissedThisSession = true
     setBriefingSeen(true)
+    if (briefing.meeting_id) {
+      setDismissedBriefingMeetingId(briefing.meeting_id)
+    }
     if (!result) {
       return
     }
@@ -635,11 +672,22 @@ export function HomePage() {
           // `project_progress` 에도 넣는다. 온보딩 화면이 뜰지 말지를 이걸로
           // 판정하므로, 여기 안 넣으면 프로젝트를 만들고도 화면이 `아직 참여
           // 중인 프로젝트가 없습니다` 로 남아 사용자가 또 만들게 된다.
-          onCreated={(project) => setData((current) => (current ? {
-            ...current,
-            recent_projects: [project, ...(current.recent_projects ?? [])],
-            project_progress: [project, ...(current.project_progress ?? [])],
-          } : current))}
+          onCreated={(project) => {
+            /*
+              담아 둔 홈 응답을 버린다.
+
+              화면 안의 값만 얹으면 **이 화면을 떠나는 순간 방금 만든
+              프로젝트가 사라진다** — 다른 데 갔다 돌아오면 캐시에 있던
+              옛 응답이 그대로 다시 그려지기 때문이다. 사용자는 프로젝트가
+              안 만들어진 줄 알고 또 만든다.
+            */
+            evict(cacheKeyFor('home', []))
+            setData((current) => (current ? {
+              ...current,
+              recent_projects: [project, ...(current.recent_projects ?? [])],
+              project_progress: [project, ...(current.project_progress ?? [])],
+            } : current))
+          }}
         />
       ) : null}
 
@@ -650,7 +698,8 @@ export function HomePage() {
         />
       ) : null}
 
-      {briefing.exists && !briefing.always_open && !briefingSeen ? (
+      {briefing.exists && !briefing.always_open && !briefingSeen
+        && getDismissedBriefingMeetingId() !== briefing.meeting_id ? (
         <BriefingPrompt briefing={briefing} onClose={closeBriefing} />
       ) : null}
     </div>

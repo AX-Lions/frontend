@@ -29,15 +29,6 @@ export function IconButton({ children, label, active = false, disabled = false, 
   )
 }
 
-export function RequestIcon({ muted = false, small = false }) {
-  return (
-    <Icon
-      className={small ? 'request-icon small' : 'request-icon'}
-      src={muted ? icons.requestSmall : icons.request}
-    />
-  )
-}
-
 export function BordoAvatar({ small = false }) {
   return (
     <span className={small ? 'bordo-avatar small' : 'bordo-avatar'} aria-hidden="true">

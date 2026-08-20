@@ -23,8 +23,6 @@ export const icons = {
   menu: '/chat-icons/menu.svg',
   profile: '/chat-icons/profile.svg',
   refresh: '/icons/Refresh.svg',
-  request: '/chat-icons/request.svg',
-  requestSmall: '/chat-icons/request-small.svg',
   search: '/chat-icons/search.svg',
   send: '/chat-icons/send-hor.svg',
   setting: '/chat-icons/setting-line.svg',

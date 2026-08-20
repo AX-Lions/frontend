@@ -426,6 +426,24 @@
   color: var(--muted);
 }
 
+/*
+ * 자동으로 일어나는 일 목록. 불릿을 지우고 화살표 문장 자체를 읽게 둔다 —
+ * 점을 붙이면 「설정할 항목」처럼 보여서 뭘 더 눌러야 하는 줄 압니다.
+ */
+.account-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.9;
+}
+
+.account-steps strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
 /* ── 다른 화면으로 */
 
 /*

@@ -286,28 +286,10 @@ function applyReadPatches(sidebar) {
   }
 }
 
-/** 이번에 중요 표시·확인을 바꾼 메시지면 그 값을 덮어 얹는다. */
+/** 이번에 수정·삭제로 바뀐 메시지면 그 값을 덮어 얹는다. */
 function applyMessagePatch(message) {
   const saved = patchedOf(`message:${message.id}`)
   return saved ? { ...message, ...saved } : message
-}
-
-/**
- * `GET /chat/important` 를 매번 다시 센다.
- *
- * 미리 구운 `chatImportant` 는 처음 상태 그대로다. `확인` 을 부르면 그
- * 메시지가 여기서 빠져야 하는데, 고정된 목록으로는 그럴 수가 없다 —
- * 확인을 눌러도(또는 방을 열어 자동으로 확인돼도) 목록이 그대로면
- * 사용자는 확인이 안 된 줄 알고 계속 누른다.
- */
-function liveImportant() {
-  const results = Object.values(roomMessages)
-    .flatMap((response) => response.results)
-    .map(applyMessagePatch)
-    .filter((m) => m.is_important && !m.important_confirmed_at)
-    .sort((a, b) => b.sent_at.localeCompare(a.sent_at))
-    .map((message) => ({ message, room: roomDetails[message.room_id] }))
-  return { count: results.length, results }
 }
 
 /**
@@ -432,15 +414,14 @@ function resolve(path, method, body) {
     if (path === '/chat/away-handled') return awayHandled
 
     if (path === '/chat/sidebar') return applyReadPatches(viewerSidebar())
-    if (path.startsWith('/chat/important')) return liveImportant()
     if (path.startsWith('/chat/candidates')) return chatCandidates
     if (a === 'chat' && b === 'rooms' && !c) return chatRooms
     if (a === 'chat' && b === 'rooms' && c && !s[3]) return roomDetails[c] ?? null
     if (a === 'chat' && b === 'rooms' && s[3] === 'messages') {
       const base = roomMessages[c] ?? { results: [], next_before: null, has_older: false, has_newer: false }
       // 이번 방문에 보낸 말을 뒤에 잇는다. 안 이으면 화면이 다시 읽는 순간
-      // 방금 보낸 말이 사라진다. 중요 표시·확인을 바꾼 것도 같이 얹는다 —
-      // 안 그러면 말풍선의 `확인` 버튼이 눌러도 그대로 남는다.
+      // 방금 보낸 말이 사라진다. 수정·삭제로 바뀐 것도 같이 얹는다 —
+      // 안 그러면 말풍선의 `수정` 버튼이 눌러도 그대로 남는다.
       const results = withAppended(`room:${c}`, base.results ?? []).map(applyMessagePatch)
       return { ...base, results }
     }
@@ -528,6 +509,17 @@ function resolve(path, method, body) {
       patch(`absence:${b}`, { delegated: method === 'POST' })
       return method === 'DELETE' ? null : { delegated: true }
     }
+    /*
+      논쟁점 예상. 가상 모드에는 이미 뽑혀 있는 목록이 있으므로 **아무것도
+      바꾸지 않고** 곧바로 준비된 상태로 답한다.
+
+      실서버는 `202` 와 `GENERATING` 을 주고 뒤에서 모델을 돌린다. 여기서
+      그것까지 흉내 내면 가상 모드가 돌지도 않는 예측을 4초마다 다시 물으며
+      영원히 스피너를 돌린다 — 없는 일을 기다리는 화면이 된다.
+    */
+    if (a === 'meetings' && c === 'debate-points' && s[3] === 'predict') {
+      return { meeting_id: b, status: 'READY', already_running: false }
+    }
     if (a === 'meetings' && c === 'agent-setup') {
       const base = preps[b]?.agent_setup
       if (!base) {
@@ -609,23 +601,6 @@ function resolve(path, method, body) {
     if (a === 'chat' && s[3] === 'read') {
       patch(`room-read:${c}`, { read: true })
       return null
-    }
-
-    /*
-      중요 표시 · 확인.
-
-      **표시를 내리면 확인 기록도 같이 지운다.** 서버 규칙이 그렇다 — 다시
-      중요로 찍히면 또 확인해야 한다. 여기서 안 지우면 껐다 켠 메시지가
-      확인도 안 했는데 `중요 채팅` 에서 빠진 채로 남는다.
-    */
-    if (a === 'chat' && b === 'messages' && s[3] === 'important' && !s[4]) {
-      return patch(`message:${c}`, {
-        is_important: body?.is_important,
-        ...(body?.is_important ? {} : { important_confirmed_at: null }),
-      })
-    }
-    if (a === 'chat' && b === 'messages' && s[3] === 'important' && s[4] === 'confirm') {
-      return patch(`message:${c}`, { important_confirmed_at: new Date().toISOString() })
     }
 
     /*
@@ -724,8 +699,6 @@ function resolve(path, method, body) {
         is_mine: true,
         body: body?.body ?? '',
         sent_at: new Date().toISOString(),
-        is_important: false,
-        confirmed_at: null,
         edited_at: null,
         attachments: [],
       })

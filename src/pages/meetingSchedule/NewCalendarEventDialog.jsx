@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import { me as fetchMe } from '../../lib/api.js'
 import { fetchTeamMembers, fetchTeamProjects, fetchTeams } from '../home/home.api.js'
 import { NumberBox, TextBox, TimeBox } from '../home/newProjectBits.jsx'
 import '../home/newProject.css'
@@ -30,6 +31,12 @@ export function NewCalendarEventDialog({ onClose, onCreated }) {
   const [title, setTitle] = useState('')
 
   const [candidates, setCandidates] = useState([])
+  /*
+    만든 사람은 서버가 참여자로 넣어 준다(`apps/calendars/views.py`). 후보 목록에
+    나까지 두면 이미 들어가 있는 사람을 다시 고르는 칸이 되고, 고르지 않으면
+    빠지는 줄 알고 매번 나를 먼저 누르게 된다.
+  */
+  const [myId, setMyId] = useState('')
   const [memberQuery, setMemberQuery] = useState('')
   const [members, setMembers] = useState([])
 
@@ -46,6 +53,14 @@ export function NewCalendarEventDialog({ onClose, onCreated }) {
   const memberRef = useRef(null)
 
   useEscapeToClose(onClose)
+
+  useEffect(() => {
+    let alive = true
+    fetchMe()
+      .then((body) => { if (alive) setMyId(body?.id || '') })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -145,13 +160,28 @@ export function NewCalendarEventDialog({ onClose, onCreated }) {
   }
 
   const pickTeam = (id) => {
-    setTeamId(id)
     setTeamOpen(false)
     setTeamWarn(false)
     setError('')
+    setProjectOpen(true)
+
+    /*
+      같은 팀을 다시 고른 것이면 **아무것도 비우지 않는다.**
+
+      아래에서 목록을 비우고 다시 채우는 것은 `useEffect([teamId])` 인데, 값이
+      그대로면 그 effect 가 안 돈다. 팀이 하나뿐인 사용자는 팝업이 열릴 때
+      자동으로 그 팀이 골라져 있어서, 팀 칸을 눌러 같은 팀을 고르는 순간
+      프로젝트 목록만 비워진 채 다시 채워지지 않았다 —
+      화면에는 `이 팀에는 프로젝트가 없습니다` 가 뜨고, 팝업을 닫았다 열기
+      전까지 회의를 만들 수가 없다.
+    */
+    if (id === teamId) {
+      return
+    }
+
+    setTeamId(id)
     setProjectId('')
     setProjects([])
-    setProjectOpen(true)
     setCandidates([])
     setMembers([])
   }
@@ -163,23 +193,44 @@ export function NewCalendarEventDialog({ onClose, onCreated }) {
     setError('')
   }
 
+  /*
+    아직 안 고른 팀원. **검색어가 없어도 전부 보여 준다.**
+
+    입력 칸만 있고 목록이 없으면 "누가 있는지 모르는 채 이름을 적으라" 는 화면이
+    된다 — 팀에 누가 있는지는 서버가 이미 내려주고 있는데(`fetchTeamMembers`)
+    화면이 감춰 두고 있었을 뿐이다. 이름을 정확히 기억하지 못하면 회의를 만들 수
+    없고, 오타 하나에 `그 이름의 팀원을 찾지 못했습니다` 만 돌아온다.
+  */
+  const memberMatches = useMemo(() => {
+    const needle = memberQuery.trim().toLowerCase()
+    return candidates
+      .filter((person) => person.user_id !== myId)
+      .filter((person) => !members.some((picked) => picked.user_id === person.user_id))
+      .filter((person) => !needle || (person.name || '').toLowerCase().includes(needle))
+  }, [candidates, members, memberQuery, myId])
+
+  const pickMember = (person) => {
+    setMembers((current) => (current.some((picked) => picked.user_id === person.user_id)
+      ? current
+      : [...current, person]))
+    setMemberQuery('')
+    setError('')
+  }
+
   const addMember = () => {
     if (needsProject()) {
       return
     }
-    const needle = memberQuery.trim().toLowerCase()
-    if (!needle) {
-      return
-    }
-    const found = candidates.find((person) => (person.name || '').toLowerCase().includes(needle)
-      && !members.some((picked) => picked.user_id === person.user_id))
+    // Enter 는 **목록의 첫 줄**을 고른다. 검색어가 비어 있으면 남은 첫 사람이라
+    // 세 명짜리 팀에서는 Enter 세 번으로 끝난다.
+    const found = memberMatches[0]
     if (!found) {
-      setError('그 이름의 팀원을 찾지 못했습니다.')
+      setError(memberQuery.trim()
+        ? '그 이름의 팀원을 찾지 못했습니다.'
+        : '더 넣을 팀원이 없습니다.')
       return
     }
-    setMembers((current) => [...current, found])
-    setMemberQuery('')
-    setError('')
+    pickMember(found)
   }
 
   const at = (time) => {
@@ -368,9 +419,26 @@ export function NewCalendarEventDialog({ onClose, onCreated }) {
                 inputRef={memberRef}
                 onChange={setMemberQuery}
                 onSubmit={addMember}
-                placeholder="원하는 참여자를 검색한 후 Enter를 누르면 등록돼요."
+                placeholder="이름을 누르거나, 검색 후 Enter 를 누르면 등록돼요."
                 ariaLabel="참여자 검색"
               />
+              {teamId && memberMatches.length > 0 ? (
+                <div className="np-list np-member-list">
+                  {memberMatches.map((person) => (
+                    <button
+                      className="np-list-item"
+                      type="button"
+                      key={person.user_id}
+                      onClick={() => { if (!needsProject()) pickMember(person) }}
+                    >
+                      <span>{person.name}</span>
+                      {person.role && person.role !== 'MEMBER'
+                        ? <span className="np-member-role">{person.role}</span>
+                        : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {members.length > 0 ? (
                 <div className="np-chips">
                   {members.map((person) => (

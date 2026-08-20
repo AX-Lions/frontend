@@ -527,3 +527,22 @@
     width: 120px;
   }
 }
+
+/* 참여자 후보 목록. 팀원이 셋뿐이어도 목록이 화면을 차지하면 날짜 칸이 접히므로
+   높이를 눌러 둔다 — 팝업 전체가 스크롤되면 `일정 추가하기` 버튼이 밀려난다. */
+.np-member-list {
+  max-height: 132px;
+  margin-top: 8px;
+  padding: 4px 12px;
+}
+
+.np-member-list .np-list-item {
+  padding: 8px 4px;
+  font-weight: 500;
+}
+
+.np-member-role {
+  color: #60646c;
+  font-size: 12px;
+  font-weight: 500;
+}
