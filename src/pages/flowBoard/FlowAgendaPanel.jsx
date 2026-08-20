@@ -78,8 +78,14 @@ export function FlowAgendaPanel({ column, icons, item, onBack, onClose }) {
           </section>
         ) : null}
 
+        {/*
+          이 패널에서 가장 값진 한 줄이다 — "그래서 어떻게 됐는데" 가 못 온
+          사람이 진짜 궁금한 것이다. 맥락·갈린 지점과 같은 흰 문단으로
+          두면 다섯 문단 중 하나로 묻혀, 다 읽어야 결론을 찾는다. 결론임을
+          말하는 색(`agenda-resolution`)을 따로 준다.
+        */}
         {item.resolution ? (
-          <section className="agenda-section">
+          <section className="agenda-section agenda-resolution">
             <h3>어떻게 됐나</h3>
             <p>{item.resolution}</p>
           </section>

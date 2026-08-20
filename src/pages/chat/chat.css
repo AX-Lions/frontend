@@ -262,8 +262,13 @@
   둔 이유다. 절반만 한 회로 세면 마지막에 어두운 채로 끝나 사라지는 순간이
   깜빡이다 만 것처럼 보인다.
 */
+/*
+  700ms 였다 — 한 번 깜빡이는 데 걸리는 시간이 너무 짧아서, 세 번을 다
+  깜빡이기 전에 이미 사라진 것처럼 보였다. 1300ms 로 늘려 한 번 한 번이
+  눈에 확실히 들어오게 한다(전체 3.9초).
+*/
 .chat-tip.is-blinking {
-  animation: chat-tip-blink 700ms ease-in-out 3;
+  animation: chat-tip-blink 1300ms ease-in-out 3;
 }
 
 @keyframes chat-tip-blink {

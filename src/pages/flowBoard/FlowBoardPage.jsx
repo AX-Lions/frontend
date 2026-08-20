@@ -277,6 +277,44 @@ export function FlowBoardPage() {
   )
 
   /*
+    같은 제목("회의 일정 조율" 처럼)이 여러 번 오간 것을 한 줄로 묶는다.
+
+    한 주제를 두고 여러 차례 주고받으면 시간순 인덱스에 같은 제목이 그
+    횟수만큼 반복됐다 — 목록을 훑는 사람은 "몇 번째 회의 일정 조율" 이
+    아니라 "이 주제가 언제 오갔나" 를 본다. 처음 나온 자리를 그 주제의
+    자리로 삼고, 같은 제목의 나머지는 그 자리에 묶어 넣는다.
+
+    `related_edge_ids` 를 여기서 만든다 — 판 강조(`highlightedEdgeIds`)가
+    이미 `item.related_edge_ids ?? [item.edge_id]` 를 읽으므로, 묶은 결과에
+    이 필드를 채워 두면 그쪽 코드를 안 건드리고도 "이 줄을 고르면 소속된
+    화살표 전부가 함께 강조된다" 가 그대로 성립한다. 개별 항목이 이미
+    `related_edge_ids` 를 갖고 있을 수도 있어(그 항목 자체가 여러 화살표를
+    가리키는 결론일 때) 그것까지 모두 펼쳐 합친다.
+
+    `seq`·`order` 는 묶은 뒤의 자리로 다시 매긴다 — 그래야 목록에 찍히는
+    번호가 화면에 보이는 줄 수와 맞고, 같은 번호가 반복되지 않는다.
+  */
+  const groupedTimeline = useMemo(() => {
+    const groups = []
+    const byTitle = new Map()
+    pickedTimeline.forEach((item) => {
+      let group = byTitle.get(item.title)
+      if (!group) {
+        group = { ...item, memberItems: [], related_edge_ids: [] }
+        byTitle.set(item.title, group)
+        groups.push(group)
+      }
+      group.memberItems.push(item)
+      ;(item.related_edge_ids ?? [item.edge_id]).forEach((id) => {
+        if (!group.related_edge_ids.includes(id)) {
+          group.related_edge_ids.push(id)
+        }
+      })
+    })
+    return groups.map((group, index) => ({ ...group, seq: index + 1, order: index + 1 }))
+  }, [pickedTimeline])
+
+  /*
     맥락 재생.
 
     좌측 목록의 `총 몇 건` 만 알면 되므로 대본 자체는 넘기지 않는다 — 훅이
@@ -284,7 +322,7 @@ export function FlowBoardPage() {
     다시 걸린다. 거른 목록을 기준으로 센다 — 화면에 안 보이는 줄을 기다리며
     판이 0.5초씩 멈춰 있으면 재생이 멎은 것으로 보인다.
   */
-  const playback = useFlowPlayback(pickedTimeline.length)
+  const playback = useFlowPlayback(groupedTimeline.length)
   const { stop: stopPlayback } = playback
 
   /*
@@ -311,8 +349,14 @@ export function FlowBoardPage() {
     "지워졌다가 하나씩 쌓인다" 가 눈에 보인다.
   */
   const visibleEdgeIds = useMemo(() => {
+    /*
+      재생 중에는 **묶은 단위**로 짚는다 — 한 걸음이 곧 한 주제라, 그 주제에
+      묶인 화살표 전부가 같은 걸음에서 한꺼번에 돋아난다. 재생이 아닐 때는
+      (필터만 걸렸을 때) 묶지 않은 목록 그대로 쓴다 — 필터는 주제 단위가
+      아니라 종류 단위라 묶을 이유가 없다.
+    */
     const script = playback.isPlaying
-      ? pickedTimeline.slice(0, playback.step)
+      ? groupedTimeline.slice(0, playback.step)
       : pickedTimeline
     if (!playback.isPlaying && excludedContents.length === 0) {
       return null
@@ -322,7 +366,7 @@ export function FlowBoardPage() {
       (item.related_edge_ids ?? [item.edge_id]).forEach((id) => shown.add(id))
     })
     return shown
-  }, [playback.isPlaying, playback.step, pickedTimeline, excludedContents])
+  }, [playback.isPlaying, playback.step, groupedTimeline, pickedTimeline, excludedContents])
 
   /*
     엣지 하나가 회의 전반에서 몇 번째인지.
@@ -528,23 +572,45 @@ export function FlowBoardPage() {
     같은 모양을 만들어야 한다. 따로 두면 둘 중 하나만 고쳐질 때 "손으로
     누르면 이렇게 뜨는데 재생 중엔 다르게 뜬다" 는 어긋남이 생긴다.
   */
-  const edgePanelFor = (item) => ({
-    kind: 'edge',
-    badgeId: null,
-    count: null,
-    arrow: {
-      id: `timeline::${item.edge_id}`,
-      direction_label: item.direction_label,
-      counts: [{
-        content_type: item.content_type,
-        label: item.label,
-        count: 1,
-        edge_ids: [item.edge_id],
-      }],
-    },
-    direction: item.direction_label,
-    edgeIds: [item.edge_id],
-  })
+  /*
+    한 줄이 이제 주제 하나(같은 제목으로 묶인 화살표 여럿)일 수 있다.
+    `memberItems` 가 있으면 그 전부에서 종류별 개수를 센다 — 없으면(예:
+    브리핑 카드에서 엣지 하나로 곧장 열 때) 그 항목 하나만 있는 것으로 본다.
+    `FlowEdgePanel` 은 `arrow.counts` 종류마다 알약을 그리고 `edgeIds` 전체의
+    상세를 읽어 오므로, 여기서 여러 화살표를 한 데 모아 넘기면 패널은 그
+    주제에 걸린 모든 이야기를 한 번에 보여준다 — 따로 고칠 곳이 없다.
+  */
+  const edgePanelFor = (item) => {
+    const members = item.memberItems ?? [item]
+    const countsByType = new Map()
+    members.forEach((member) => {
+      const existing = countsByType.get(member.content_type)
+      if (existing) {
+        existing.count += 1
+        existing.edge_ids.push(member.edge_id)
+      } else {
+        countsByType.set(member.content_type, {
+          content_type: member.content_type,
+          label: member.label,
+          count: 1,
+          edge_ids: [member.edge_id],
+        })
+      }
+    })
+
+    return {
+      kind: 'edge',
+      badgeId: null,
+      count: null,
+      arrow: {
+        id: `timeline::${item.edge_id}`,
+        direction_label: item.direction_label,
+        counts: [...countsByType.values()],
+      },
+      direction: item.direction_label,
+      edgeIds: members.map((member) => member.edge_id),
+    }
+  }
 
   const selectTimelineItem = (item) => {
     const same = ui.activeTimelineItem?.edge_id === item.edge_id
@@ -741,7 +807,7 @@ export function FlowBoardPage() {
         */
         playback={{ ...playback, start: startPlayback }}
         teamName={meeting.data?.detail?.project_name}
-        timeline={pickedTimeline}
+        timeline={groupedTimeline}
         /* 껐기 때문에 빈 것과 원래 없는 것은 다르다. 앞엣것을 `오간 내용이
            없습니다` 로 말하면 사용자는 자기가 끈 것을 잊고 고장으로 읽는다. */
         timelineEmptyText={nothingPicked
@@ -974,7 +1040,7 @@ export function FlowBoardPage() {
           <FlowPlaybackLog
             onClose={stopPlayback}
             step={playback.step}
-            timeline={pickedTimeline}
+            timeline={groupedTimeline}
           />
         ) : null}
 

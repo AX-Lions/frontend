@@ -38,6 +38,9 @@ const LINK_TONES = {
 
 const toneOfLink = (link) => (link.isAi ? 'ai' : 'human')
 
+/** 뱃지가 접혀도 이만큼은 실제 알약으로 보인다. 나머지만 `···` 뒤에 숨는다. */
+const COLLAPSED_PEEK_COUNT = 2
+
 /** 마커 id 꼬리표. `기본 사람` 만 꼬리표가 없다 — 가장 흔한 선이라 짧게 둔다. */
 function markerSuffix(tone, state) {
   return `${tone === 'ai' ? '-ai' : ''}${state === 'on' ? '-on' : ''}`
@@ -319,6 +322,10 @@ export function FlowCanvas({
         const lit = isHighlighted(badge.arrow)
         const counts = badge.arrow.counts ?? []
         const collapsed = badge.crampedNode && !expandedBadgeIds.has(badge.id)
+        // 접혀도 알약 하나 둘은 그대로 보인다 — "..." 뒤에 전부 숨기면 무엇을
+        // 나르는 화살표인지조차 안 보인다. 나머지만 "..." 로 묶는다.
+        const peekCounts = collapsed ? counts.slice(0, COLLAPSED_PEEK_COUNT) : counts
+        const hiddenCount = collapsed ? counts.length - peekCounts.length : 0
 
         return (
           <div
@@ -342,22 +349,7 @@ export function FlowCanvas({
             }}
             onPointerDown={(event) => event.stopPropagation()}
           >
-            {collapsed ? (
-              /*
-                노드와 겹칠 때만 오는 마지막 수단이다 — 알약을 펼친 채로 두면
-                얼굴을 가리므로, 종류 수만 우선 보여 주고 눌러야 펼친다.
-                펼친 뒤에는 이 판이 다시 그려질 때까지 그대로 남는다(같은
-                자리로 도로 접히면 방금 누른 것이 사라진 것처럼 보인다).
-              */
-              <button
-                type="button"
-                className="flow-badge flow-badge-collapsed"
-                aria-label={`${badge.arrow.direction_label} ${counts.length}종 ${badge.arrow.total_count ?? counts.reduce((sum, c) => sum + c.count, 0)}건 — 눌러서 펼치기`}
-                onClick={() => expandBadge(badge.id)}
-              >
-                <span aria-hidden="true">···</span>
-              </button>
-            ) : counts.map((count) => {
+            {peekCounts.map((count) => {
               const badgeId = `${badge.id}::${count.content_type}`
               /*
                 안 걸린 알약은 **지우지 않고 흐리게 둔다.**
@@ -398,6 +390,25 @@ export function FlowCanvas({
                 </button>
               )
             })}
+            {hiddenCount > 0 ? (
+              /*
+                노드와 겹칠 때만 오는 마지막 수단이다 — 알약을 전부 펼친 채로
+                두면 얼굴을 가린다. 그래도 앞의 한둘(`COLLAPSED_PEEK_COUNT`)은
+                진짜 알약으로 남겨 둔다 — 이 화살표가 무엇을 나르는지 자체가
+                안 보이면 `···` 하나만으로는 뭘 누르는 건지 짐작할 수 없다.
+                나머지 개수만 이 단추 뒤에 숨는다. 펼친 뒤에는 이 판이 다시
+                그려질 때까지 그대로 남는다(같은 자리로 도로 접히면 방금
+                누른 것이 사라진 것처럼 보인다).
+              */
+              <button
+                type="button"
+                className="flow-badge flow-badge-collapsed"
+                aria-label={`${badge.arrow.direction_label} 그 외 ${hiddenCount}종 — 눌러서 펼치기`}
+                onClick={() => expandBadge(badge.id)}
+              >
+                <span aria-hidden="true">···</span>
+              </button>
+            ) : null}
           </div>
         )
       })}

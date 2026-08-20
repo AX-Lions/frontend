@@ -345,18 +345,28 @@ export function FlowNavigationSidebar({
             <nav className="timeline-list">
               {timeline.length === 0 ? (
                 <p className="index-empty">{timelineEmptyText}</p>
-              ) : timeline.map((item) => (
-                <button
-                  className={timelineRowClass(item, activeEdgeId, playback)}
-                  type="button"
-                  key={item.edge_id}
-                  data-tip={`${item.label} · ${item.direction_label} · ${item.at_label}`}
-                  onClick={() => onTimelineSelect(item)}
-                >
-                  <b className="timeline-seq">{item.seq}</b>
-                  <span className="timeline-title">{item.title}</span>
-                </button>
-              ))}
+              ) : timeline.map((item) => {
+                // 같은 제목으로 묶인 화살표가 여럿이면(`FlowBoardPage.jsx` 의
+                // `groupedTimeline`) 몇 건이 묶였는지도 말풍선에 적는다 —
+                // 안 그러면 이 줄 하나가 사실은 여러 번 오간 이야기라는 것이
+                // 눌러 보기 전까지 안 보인다.
+                const memberCount = item.memberItems?.length ?? 1
+                const tip = `${item.label} · ${item.direction_label} · ${item.at_label}`
+                  + (memberCount > 1 ? ` · ${memberCount}건 묶음` : '')
+                return (
+                  <button
+                    className={timelineRowClass(item, activeEdgeId, playback)}
+                    type="button"
+                    key={item.edge_id}
+                    data-tip={tip}
+                    onClick={() => onTimelineSelect(item)}
+                  >
+                    <b className="timeline-seq">{item.seq}</b>
+                    <span className="timeline-title">{item.title}</span>
+                    {memberCount > 1 ? <em className="timeline-count">{memberCount}</em> : null}
+                  </button>
+                )
+              })}
             </nav>
           ) : null}
         </section>

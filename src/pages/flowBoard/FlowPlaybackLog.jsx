@@ -18,7 +18,9 @@ import { useEdgeDetails } from './useFlowBoardData'
  */
 export function FlowPlaybackLog({ onClose, step, timeline }) {
   const revealed = timeline.slice(0, step)
-  const edgeIds = revealed.map((item) => item.edge_id)
+  // 한 줄이 이제 같은 제목으로 묶인 화살표 여럿일 수 있다(`FlowBoardPage.jsx`
+  // 의 `groupedTimeline`). 그 전부의 상세를 한 번에 읽어 온다.
+  const edgeIds = revealed.flatMap((item) => item.related_edge_ids ?? [item.edge_id])
   const edges = useEdgeDetails(edgeIds)
 
   const detailByEdgeId = new Map((edges.data ?? []).map((row) => [row.edge.id, row]))
@@ -51,14 +53,12 @@ export function FlowPlaybackLog({ onClose, step, timeline }) {
 
       <div className="briefing-scroll playback-log-scroll" ref={scrollRef}>
         {revealed.map((item) => {
-          const detail = detailByEdgeId.get(item.edge_id)
+          const memberIds = item.related_edge_ids ?? [item.edge_id]
+          const detail = detailByEdgeId.get(memberIds[0])
           // 「무엇에 대한 이야기였나」는 안건이 그 자리다. 안건이 없는
           // 엣지는 붙은 문서가, 그마저 없으면 종류 라벨이 대신한다
           // (`FlowInspectorPanel` 의 카드 제목과 같은 우선순위).
           const topic = detail?.agenda?.title ?? detail?.document?.title ?? item.label
-          // 대화 없이 대리인이 혼자 남긴 메모처럼 인용문이 비는 엣지도
-          // 있다 — 그때는 시간순 인덱스의 제목으로 대신한다.
-          const quote = detail?.delivery_context?.[0]?.utterance || item.title
 
           return (
             <article className="playback-log-item" key={item.edge_id}>
@@ -66,7 +66,16 @@ export function FlowPlaybackLog({ onClose, step, timeline }) {
                 <strong>{item.direction_label}</strong>
                 <span>{topic}</span>
               </div>
-              <p>{quote}</p>
+              {/*
+                같은 주제로 묶인 화살표가 여럿이면 인용문도 그만큼 쌓인다 —
+                한 주제가 오간 순서를 그대로 보여준다. 대화 없이 대리인이
+                혼자 남긴 메모처럼 인용문이 비는 엣지는 시간순 인덱스의
+                제목으로 대신한다.
+              */}
+              {memberIds.map((edgeId) => {
+                const quote = detailByEdgeId.get(edgeId)?.delivery_context?.[0]?.utterance || item.title
+                return <p key={edgeId}>{quote}</p>
+              })}
             </article>
           )
         })}

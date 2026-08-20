@@ -550,6 +550,24 @@
   overflow-wrap: anywhere;
 }
 
+/* 같은 제목으로 묶인 화살표가 여럿일 때만 붙는 개수. 뱃지 알약과 같은
+   말투(동그란 배경 + 숫자)를 쓴다 — 이 판 다른 곳의 "묶음" 표시와 같은
+   모양이라야 "여기도 여러 건이 하나로 묶였다" 는 뜻이 곧장 읽힌다. */
+.timeline-count {
+  flex: 0 0 auto;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--brand, #002662);
+  color: #ffffff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
 /*
   재생 중 아직 안 드러난 줄.
 
@@ -1092,16 +1110,22 @@
   펼쳐진 알약 하나(`.metric-icon`, 28px 원)와 같은 발판을 써서, 접혔다
   펼쳐져도 자리가 크게 튀지 않는다. 톤이 없는 요약이라 색은 중립으로 둔다.
 */
+/*
+  점 세 개가 14px·회색이라 거의 안 보였다. 자리(32px)와 글자(20px)를 키우고
+  진한 남색으로 바꾼다 — 이 단추는 "누르면 더 있다" 는 뜻을 말로 없이
+  전달해야 하는 자리라, 존재 자체가 눈에 먼저 들어와야 한다.
+*/
 .flow-badge-collapsed {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   justify-content: center;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: #ffffff;
-  color: var(--muted);
-  font-size: 14px;
+  color: var(--brand, #002662);
+  font-size: 20px;
   font-weight: 700;
+  letter-spacing: 1px;
   line-height: 1;
   transition:
     background 120ms ease,
@@ -2388,6 +2412,20 @@ button.bordo-action-card:disabled {
   background: rgb(0 38 98 / 6%);
   color: var(--brand);
   font-size: 11px;
+  font-weight: 600;
+}
+
+/*
+  결론. 이 패널에서 가장 먼저 눈에 들어와야 하는 한 줄이라, 맥락·갈린
+  지점과 같은 흰 문단이 아니라 남색 왼쪽 테두리 + 옅은 남색 바탕을 준다 —
+  "아직 안 정해진 것" 이 노랑인 것과 짝 지어, 같은 화면에서 정해진 것과
+  안 정해진 것이 색으로 곧장 갈린다.
+*/
+.agenda-resolution p {
+  border-left: 3px solid var(--brand);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 12px;
+  background: rgb(0 38 98 / 5%);
   font-weight: 600;
 }
 

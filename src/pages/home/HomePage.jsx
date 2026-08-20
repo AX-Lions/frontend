@@ -18,6 +18,16 @@ const starIcons = {
   inactive: '/icons/Starunactive.svg',
 }
 
+/*
+  「나중에 보기」로 닫았다는 사실은 모듈 스코프에 남긴다 — `useState` 만으로는
+  안 된다. 다른 화면에 갔다가 홈으로 돌아오면 `HomePage` 가 통째로 다시
+  마운트되어 `briefingSeen` 이 `false` 로 되돌아가고, 서버가 여전히
+  `briefing_pending.exists` 를 주는 한(사람이 실제로 브리핑을 열기 전까진
+  안 꺼진다) 팝업이 매번 다시 떴다. 새로고침하면 다시 뜨는 것은 맞다 —
+  그때는 정말 처음 들어온 것이므로.
+*/
+let briefingDismissedThisSession = false
+
 function isModifiedClick(event) {
   return event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
     || (event.button !== undefined && event.button !== 0)
@@ -66,8 +76,9 @@ export function HomePage() {
   const [currentTeamId, setCurrentTeamIdState] = useState(getCurrentTeamId)
   useEffect(() => onCurrentTeamChange(setCurrentTeamIdState), [])
   // 브리핑 팝업은 한 번만 뜬다. `homeData` 를 다시 읽을 때마다 뜨면, 별 하나
-  // 눌렀다고 팝업이 다시 올라온다.
-  const [briefingSeen, setBriefingSeen] = useState(false)
+  // 눌렀다고 팝업이 다시 올라온다. 초깃값을 모듈 스코프 값에서 가져와야
+  // 다른 화면에 갔다가 돌아와 다시 마운트돼도 이미 닫았던 사실이 남는다.
+  const [briefingSeen, setBriefingSeen] = useState(briefingDismissedThisSession)
   // 자동 열기는 상태가 아니라 ref 다. 상태로 두면 effect 안에서 setState 를
   // 부르게 되고 렌더가 한 번 더 돈다 — 어차피 화면에 아무것도 안 그리는 값이다.
   const autoOpenedRef = useRef(false)
@@ -117,6 +128,7 @@ export function HomePage() {
     **아직 안 읽은 브리핑으로 가는 길이 사라진다.**
   */
   const closeBriefing = (result) => {
+    briefingDismissedThisSession = true
     setBriefingSeen(true)
     if (!result) {
       return
