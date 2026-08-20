@@ -132,8 +132,14 @@ export function MeetingSchedulePage() {
     [homeData, currentTeamId],
   )
 
-  const from = ymd(visibleMonth)
-  const to = ymd(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), daysInMonth(visibleMonth)))
+  /*
+    앞뒤로 하루씩 더 받는다. 서버는 `from`·`to` 를 **UTC 하루**로 자르는데
+    화면은 브라우저 시간대로 칸을 그린다. 8월 1일 00시(KST)에 잡은 일정은
+    UTC 로 7월 31일이라, 딱 맞춰 받으면 8월 달력에서 사라진다.
+  */
+  const from = ymd(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 0))
+  const to = ymd(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(),
+                          daysInMonth(visibleMonth) + 1))
 
   useEffect(() => {
     let alive = true
@@ -193,13 +199,27 @@ export function MeetingSchedulePage() {
         list.push({ ...row, project_name: project.name, team_name: project.team_name })
       })
     })
-    return list
-  }, [projects, eventsByProject])
+    /*
+      받아 온 앞뒤 하루를 여기서 걷어낸다. 칸은 **날짜 숫자**로만 묶으므로
+      (`eventsByDay`), 7월 31일짜리가 남아 있으면 8월 31일 칸에 붙는다.
+    */
+    return list.filter((row) => {
+      const at = new Date(row.start_at)
+      return at.getFullYear() === visibleMonth.getFullYear()
+        && at.getMonth() === visibleMonth.getMonth()
+    })
+  }, [projects, eventsByProject, visibleMonth])
 
   const eventsByDay = useMemo(() => {
     const map = {}
     monthEvents.forEach((row) => {
-      const day = Number(row.start_at.slice(8, 10))
+      /*
+        **문자열을 자르면 안 된다.** 서버는 UTC 로 내려주므로
+        `2026-08-20T15:00:00Z` 에서 `20` 을 떼면, 한국에서 8월 21일 00시에
+        잡은 회의가 20일 칸에 들어간다 — 같은 카드의 시각은 `hhmm()` 이
+        브라우저 시간대로 그려 `00:00` 이라, 20일 칸에 00:00 이 찍힌다.
+      */
+      const day = new Date(row.start_at).getDate()
       ;(map[day] ??= []).push(row)
     })
     Object.values(map).forEach((rows) => rows.sort((a, b) => a.start_at.localeCompare(b.start_at)))

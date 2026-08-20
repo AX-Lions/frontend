@@ -77,3 +77,20 @@ export function registerAbsence(meetingId) {
 export function cancelAbsence(meetingId) {
   return api.delete(`/meetings/${meetingId}/absence`)
 }
+
+/**
+ * 예상 논쟁점을 지금 만든다.
+ *
+ * 전에는 생성 트리거가 불참 등록 하나뿐이었다. 그래서 준비 화면의 `적용하기`
+ * 가 **몰래 불참을 등록해야만** 논쟁점이 생겼고, 설정만 저장하려던 사람이
+ * 회의 불참으로 바뀌는 일을 겪었다.
+ *
+ * 서버는 `202` 와 `status: GENERATING` 만 주고 곧바로 돌아온다 — 모델을 여러
+ * 번 부르므로 기다리면 수십 초다. 화면은 `prep` 을 몇 초마다 다시 읽는다.
+ *
+ * `force` 는 **다시 예상하기**다. 이미 답을 단 논쟁점과 그 입장은 지워지지
+ * 않는다(서버 `contention.build_for`).
+ */
+export function predictDebatePoints(meetingId, { force = false } = {}) {
+  return api.post(`/meetings/${meetingId}/debate-points/predict`, { force })
+}

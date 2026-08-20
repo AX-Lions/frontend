@@ -145,18 +145,6 @@
   object-fit: contain;
 }
 
-.request-icon {
-  width: 16px;
-  height: 16px;
-  display: block;
-  object-fit: contain;
-}
-
-.request-icon.small {
-  width: 16px;
-  height: 16px;
-}
-
 .ai-title-icon {
   width: 20px;
   height: 20px;
@@ -232,6 +220,7 @@
   color: var(--chat-ink);
   font-size: var(--chat-fs-meta);
   line-height: 1.35;
+  text-align: center;
 }
 
 /* 보이는 것은 그대로 두고 누를 자리만 넓힌다. 14px 은 겨냥하기 어렵다. */
@@ -1956,14 +1945,6 @@
   display: grid;
   min-width: 0;
   gap: 2px;
-}
-
-.message-mark {
-  display: inline-flex;
-}
-
-.message-mark.confirmed {
-  opacity: 0.5;
 }
 
 .message-edited,

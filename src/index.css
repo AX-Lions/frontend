@@ -19,6 +19,19 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /*
+    한글은 글자마다 줄바꿈이 허용된다는 기본값 때문에, 폭이 좁은 자리에서
+    "정리해 두었습" / "니다." 처럼 **단어 한가운데서** 줄이 갈렸다 — 여러
+    화면(브리핑 팝업 문구·채팅 안내 말풍선·회의 카드 제목…)에서 같은
+    증상이 났다. `keep-all` 은 띄어쓰기에서만 줄을 넘긴다.
+
+    화면마다 따로 걸면 새 문구가 생길 때마다 또 잊어버리므로 여기 한
+    곳에 건다. `overflow-wrap: break-word` 를 같이 두는 이유 — `keep-all`
+    은 예외로 **정말 못 끊는 낱말**(긴 URL 등)은 그대로 두면 상자를 넘쳐
+    흐른다. 그럴 때만 어쩔 수 없이 낱말 중간에서라도 끊는다.
+  */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 * {

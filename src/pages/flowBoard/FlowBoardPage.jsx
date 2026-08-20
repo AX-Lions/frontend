@@ -361,12 +361,35 @@ export function FlowBoardPage() {
     if (!playback.isPlaying && excludedContents.length === 0) {
       return null
     }
+    /*
+      **묶음이 걸러진 것을 다시 끌고 들어오지 못하게 막는다.**
+
+      한 줄이 여러 화살표를 대표할 수 있다(`related_edge_ids` — 같은 안건에
+      묶인 것들). 그 목록을 그대로 펼치면 **종류가 다른 형제 화살표까지 같이
+      켜진다.** 그래서 `요청사항` 하나만 켰는데 판에는 결론도 의견도 그대로
+      남고, 둘 다 켜야 비로소 화면과 체크가 맞는 것처럼 보였다.
+
+      줄이 아니라 **화살표 하나하나의 종류**로 다시 거른다. 인덱스에 없는
+      id 는 종류를 알 수 없으므로 남긴다 — 모른다고 지우면 필터를 하나만 켜도
+      판이 뭉텅이로 비어 버린다.
+    */
+    const typeOf = new Map(timelineItems.map((item) => [item.edge_id, item.content_type]))
+    const dropped = (id) => {
+      const type = typeOf.get(id)
+      return type !== undefined && excludedContents.includes(type)
+    }
+
     const shown = new Set()
     script.forEach((item) => {
-      (item.related_edge_ids ?? [item.edge_id]).forEach((id) => shown.add(id))
+      (item.related_edge_ids ?? [item.edge_id]).forEach((id) => {
+        if (!dropped(id)) {
+          shown.add(id)
+        }
+      })
     })
     return shown
-  }, [playback.isPlaying, playback.step, groupedTimeline, pickedTimeline, excludedContents])
+  }, [playback.isPlaying, playback.step, groupedTimeline, pickedTimeline,
+      excludedContents, timelineItems])
 
   /*
     엣지 하나가 회의 전반에서 몇 번째인지.
@@ -815,7 +838,7 @@ export function FlowBoardPage() {
           : (mode === WORK_MODE ? '이 기간에 오간 작업이 없습니다.' : '이 회의에서 오간 내용이 없습니다.')}
       />
 
-      <main className={(panel || playback.isPlaying) ? 'flow-workspace has-record-panel' : 'flow-workspace'}>
+      <main className={(panel || playback.isPlaying || playback.isFinished) ? 'flow-workspace has-record-panel' : 'flow-workspace'}>
         <section
           className={isPanning ? 'flow-board is-panning' : 'flow-board'}
           aria-label="회의 플로우보드"
@@ -1036,7 +1059,16 @@ export function FlowBoardPage() {
           ) : null}
         </section>
 
-        {playback.isPlaying ? (
+        {playback.isPlaying || playback.isFinished ? (
+          /*
+            재생이 끝나도 닫지 않는다.
+
+            전에는 `isPlaying` 이 꺼지는 순간(끝까지 다 본 순간) 이 패널도
+            같이 사라졌다 — 방금 다 본 회의록을 다시 훑어볼 새도 없이
+            치워지는 것이라, 사람이 직접 닫기 전까지는(`onClose` 가 부르는
+            `stopPlayback`) 열어 둔다. `isFinished` 는 `useFlowPlayback.js`
+            참고 — "끝까지 봤다" 를 `isPlaying` 과 별도로 들고 있는 값이다.
+          */
           <FlowPlaybackLog
             onClose={stopPlayback}
             step={playback.step}
@@ -1044,7 +1076,14 @@ export function FlowBoardPage() {
           />
         ) : null}
 
-        {!playback.isPlaying && panel?.kind === 'briefing' ? (
+        {/*
+          아래 네 패널은 재생 중이거나 방금 끝났을 때는 안 연다 — 그 자리는
+          위 「전체 회의록」이 쓰고 있다. 캔버스에서 노드·화살표를 눌러도
+          `setPanel` 자체는 그대로 불리므로(누르는 동작을 막지는 않는다),
+          여기서 안 걸러 두면 재생이 끝난 뒤 무언가를 누르는 순간 두 패널이
+          동시에 뜬다.
+        */}
+        {!playback.isPlaying && !playback.isFinished && panel?.kind === 'briefing' ? (
           briefing ? (
             <FlowBriefingSidebar
               activeChip={activeChip}
@@ -1071,7 +1110,7 @@ export function FlowBoardPage() {
           )
         ) : null}
 
-        {!playback.isPlaying && panel?.kind === 'agenda' ? (
+        {!playback.isPlaying && !playback.isFinished && panel?.kind === 'agenda' ? (
           <FlowAgendaPanel
             column={panel.column}
             icons={icons}
@@ -1091,7 +1130,7 @@ export function FlowBoardPage() {
           />
         ) : null}
 
-        {!playback.isPlaying && panel?.kind === 'node' && selectedNode ? (
+        {!playback.isPlaying && !playback.isFinished && panel?.kind === 'node' && selectedNode ? (
           <FlowNodePanel
             meetingId={meetingId}
             node={selectedNode}
@@ -1101,7 +1140,7 @@ export function FlowBoardPage() {
           />
         ) : null}
 
-        {!playback.isPlaying && panel?.kind === 'edge' ? (
+        {!playback.isPlaying && !playback.isFinished && panel?.kind === 'edge' ? (
           <FlowEdgePanel
             /*
               화살표가 바뀌면 **패널을 새로 만든다.**

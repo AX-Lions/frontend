@@ -399,13 +399,19 @@ export function AccountPage() {
               </div>
             ))}
           </div>
-          {/* 두 화면의 스위치 개수가 다른 것을 사용자가 먼저 발견하면 "어느 쪽이
-              진짜지" 가 된다. 다르다는 것과 그 이유를 화면이 먼저 말한다. */}
+          {/*
+            채팅 쪽 `Bordo 설정` 이 이 목록과 같은 모양으로 맞춰지면서
+            (`586:7032`) 두 화면의 스위치 개수가 같아졌다. 그래서 "저쪽은
+            셋으로 보인다" 던 안내를 걷어낸다 — 화면과 다른 설명이 남으면
+            사용자가 없는 화면을 찾아다닌다.
+
+            대신 **셋이 함께 움직인다**는 것만 남긴다. 스위치는 하나인데
+            이름이 셋이라, 하나만 끌 수 있다고 읽힐 자리가 여전히 있다.
+          */}
           <p className="account-note">
-            채팅의 <strong>Bordo 설정</strong>에서는 마지막 항목이
-            <em> 작업 · 계획 · 생각 </em>스위치 세 개로 나뉘어 보입니다.
-            서버에는 이 셋을 담는 칸이 하나뿐이라 <strong>셋은 언제나 함께 켜지고
-            함께 꺼집니다.</strong> 하나만 끄고 싶다면 따로 요청해 주세요.
+            <em>작업 · 계획 · 생각</em>은 서버에 한 칸으로 담깁니다 —
+            <strong>셋은 언제나 함께 켜지고 함께 꺼집니다.</strong>
+            하나만 끄고 싶다면 따로 요청해 주세요.
           </p>
         </section>
 
@@ -584,6 +590,24 @@ export function AccountPage() {
               </p>
             </>
           )}
+
+          {/*
+            발급 방법 아래에 **무엇이 자동으로 일어나는지**를 적는 이유 — 이걸 안
+            적으면 사용자가 매번 "기록해 줘"라고 시켜야 하는 줄 압니다. 실제로는
+            무엇을 언제 기록할지를 연결할 때 서버가 개인 AI 에게 알려 줍니다.
+          */}
+          <p className="account-label">연결하면 이렇게 동작합니다</p>
+          <ul className="account-steps">
+            <li>새 작업에 착수하면 → <strong>작업</strong>으로 기록됩니다</li>
+            <li>진척이 생기면 → 진행률이 갱신됩니다</li>
+            <li>막히면 → <strong>막힘</strong>으로 바뀌고 이유가 남습니다</li>
+            <li>일을 끝내면 → <strong>완료</strong>로 표시됩니다</li>
+            <li>설계 결정·조사 결과를 정리하면 → <strong>문서</strong>로 올라갑니다</li>
+          </ul>
+          <p className="account-hint account-hint-after">
+            매번 “기록해 줘”라고 말할 필요는 없습니다. 평소처럼 개인 AI 와 일하면
+            됩니다. 비밀키로 보이는 값은 저장 <strong>전에</strong> 지워집니다.
+          </p>
         </section>
 
         <section className="account-section account-danger">
