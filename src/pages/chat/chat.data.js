@@ -48,10 +48,6 @@ export function fetchAwayHandled(signal) {
   return api.get('/chat/away-handled', undefined, { signal })
 }
 
-export function fetchImportant(signal) {
-  return api.get('/chat/important', undefined, { signal })
-}
-
 /** `새 채팅 → 대화상대 선택`. `type` 을 주면 대리인이 없는 사람은 빠진다. */
 export function fetchCandidates({ query, type } = {}, signal) {
   return api.get('/chat/candidates', { query, type }, { signal })
@@ -109,12 +105,11 @@ export function fetchMessages(roomId, { before, date, limit } = {}, signal) {
  * 전송 버튼을 두 번 눌렀거나 네트워크가 끊겨 재시도한 경우, 이 값이 없으면
  * 같은 말이 두 번 남는다.
  */
-export function sendMessage(roomId, { body, clientMessageId, attachmentIds, isImportant }) {
+export function sendMessage(roomId, { body, clientMessageId, attachmentIds }) {
   return api.post(`/chat/rooms/${roomId}/messages`, {
     body,
     client_message_id: clientMessageId,
     attachment_ids: attachmentIds?.length ? attachmentIds : undefined,
-    is_important: isImportant || undefined,
   })
 }
 
@@ -129,22 +124,6 @@ export function deleteMessage(messageId) {
 
 export function markRead(roomId) {
   return api.post(`/chat/rooms/${roomId}/read`)
-}
-
-// ─────────────────────────────────────────── 중요 표시 · 확인
-export function setMessageImportant(messageId, isImportant) {
-  return api.patch(`/chat/messages/${messageId}/important`, { is_important: isImportant })
-}
-
-/**
- * 확인.
- *
- * **표시를 내리는 것과 다르다.** `is_important` 는 true 로 남고 내 확인 기록만
- * 생겨서, 상단 `중요 채팅` 에서만 빠진다. 같은 메시지가 다른 사람 화면에는
- * 그대로 남아 있는 것이 정상이다.
- */
-export function confirmMessageImportant(messageId) {
-  return api.post(`/chat/messages/${messageId}/important/confirm`)
 }
 
 // ─────────────────────────────────────────── 달력 · 검색 · 요약
@@ -238,14 +217,12 @@ export function toTeamRows(sidebar) {
       id: project.project_id,
       name: project.project_name,
       unread: project.unread_count,
-      marked: project.has_important,
       rooms: (project.rooms ?? []).map(toPreview),
     }))
     return {
       id: team.team_id,
       name: team.team_name,
       unread: team.unread_count,
-      marked: team.has_important,
       groupRoom: toTeamGroupRoom(team, projects),
       projects,
     }
@@ -267,8 +244,7 @@ export function toTeamRows(sidebar) {
  * ## 미읽음은 빼서 알아낸다
  *
  * 서버가 `팀 합계 = 팀 단체방 + 프로젝트 합계` 로 만들므로, 화면에 보이는
- * 프로젝트 합계를 빼면 남는 것이 곧 이 방 몫이다. 중요 표시도 같은 논리다 —
- * 팀에 표시가 섰는데 어느 프로젝트에도 없으면 이 방에 선 것이다.
+ * 프로젝트 합계를 빼면 남는 것이 곧 이 방 몫이다.
  *
  * 제목은 여기서 짓지 않고 빈 값으로 둔다. 방을 열면 `fetchRoom` 이 서버가
  * 만든 이름을 가져온다 — 화면이 이름을 조립하면 규칙이 두 군데로 갈린다.
@@ -286,7 +262,6 @@ function toTeamGroupRoom(team, projects) {
     message: '',
     sentAt: null,
     unread: Math.max(0, (team.unread_count || 0) - seen),
-    marked: Boolean(team.has_important) && !projects.some((project) => project.marked),
     avatars: [],
     avatar: null,
     bordo: false,
@@ -320,7 +295,6 @@ export function toPreview(room) {
       : '',
     sentAt: room.last_message?.sent_at ?? null,
     unread: room.unread_count,
-    marked: room.has_important,
     // 서버가 참여자 아바타를 최대 4장 준다. 예전에는 여기 자리에 목 이미지
     // 세 장(`/flowchart/profile-N.jpeg`)이 박혀 있어서, 어느 방이든 같은
     // 세 사람 얼굴이 떴다.

@@ -4,7 +4,7 @@ import { icons } from './chat.icons.js'
 import { NewChatDialog } from './NewChatDialog.jsx'
 import { toTeamRows } from './chat.data.js'
 import { formatTime } from './chat.format.js'
-import { AvatarStack, BordoAvatar, Icon, IconButton, PersonAvatar, RequestIcon, UnreadBadge } from './chat.ui.jsx'
+import { AvatarStack, BordoAvatar, Icon, IconButton, PersonAvatar, UnreadBadge } from './chat.ui.jsx'
 
 function ChatPreview({ chat, selected, onSelect }) {
   return (
@@ -21,7 +21,6 @@ function ChatPreview({ chat, selected, onSelect }) {
           <div className="chat-preview-title">
             <strong>{chat.name}</strong>
             {chat.context ? <span>{chat.context}</span> : null}
-            {chat.marked ? <RequestIcon small /> : null}
           </div>
           <p>{chat.message || '아직 나눈 이야기가 없습니다.'}</p>
         </div>
@@ -55,7 +54,6 @@ function TeamHeader({ team, open, onToggle }) {
     >
       <span className="team-name">
         <strong>{team.name}</strong>
-        {team.marked ? <RequestIcon small /> : null}
         <UnreadBadge count={team.unread} label={team.name} />
       </span>
       <Icon className={open ? 'ui-icon chevron open' : 'ui-icon chevron'} src={icons.expandDown} />
@@ -396,7 +394,6 @@ export function ChatListPanel({
                     >
                       <span className="project-name">
                         <strong>{project.name}</strong>
-                        {project.marked ? <RequestIcon small /> : null}
                         <UnreadBadge count={project.unread} label={project.name} />
                       </span>
                       <Icon

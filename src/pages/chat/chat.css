@@ -145,18 +145,6 @@
   object-fit: contain;
 }
 
-.request-icon {
-  width: 16px;
-  height: 16px;
-  display: block;
-  object-fit: contain;
-}
-
-.request-icon.small {
-  width: 16px;
-  height: 16px;
-}
-
 .ai-title-icon {
   width: 20px;
   height: 20px;
@@ -1957,14 +1945,6 @@
   display: grid;
   min-width: 0;
   gap: 2px;
-}
-
-.message-mark {
-  display: inline-flex;
-}
-
-.message-mark.confirmed {
-  opacity: 0.5;
 }
 
 .message-edited,
