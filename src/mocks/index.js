@@ -628,6 +628,30 @@ function resolve(path, method, body) {
       return patch(`message:${c}`, { important_confirmed_at: new Date().toISOString() })
     }
 
+    /*
+      방별 알림 끄기·켜기.
+
+      **여기가 비어 있으면 설정 화면의 단추가 가상 데이터 모드에서 오류로
+      끝난다** — 쓰기는 표에 없으면 던지도록 해 뒀다. 시연을 이 모드로 하는데
+      단추 하나가 무대에서 터지면 안 된다.
+
+      돌려주는 칸은 서버(`chat/views.py` 의 `room_mute`)와 같게 둔다 —
+      `room_id` · `muted` · `muted_at`. 화면이 응답의 `muted` 를 그대로
+      쓰므로 이름이 다르면 누른 뒤 값이 되돌아간 것처럼 보인다.
+    */
+    if (a === 'chat' && b === 'rooms' && s[3] === 'mute') {
+      const muted = Boolean(body?.muted)
+      const room = roomDetails[c]
+      if (room) {
+        room.muted = muted
+      }
+      const listed = chatRooms.results?.find((r) => r.id === c)
+      if (listed) {
+        listed.muted = muted
+      }
+      return { room_id: c, muted, muted_at: muted ? new Date().toISOString() : null }
+    }
+
     if (path === '/me/briefing-dismiss') return { dismissed: true }
 
     /*

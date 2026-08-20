@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 import { icons } from './chat.icons.js'
-import { fetchRoom, leaveRoom, renameRoom, toPreview } from './chat.data.js'
+import { fetchRoom, leaveRoom, muteRoom, renameRoom, toPreview } from './chat.data.js'
 import { Icon } from './chat.ui.jsx'
 import { useResource } from '../../lib/useResource.js'
 import { Empty, LoadError, Loading } from '../../shared/components/LoadState.jsx'
@@ -26,8 +26,8 @@ const LEAVE_RESULT = {
  * 열었다. 채팅 설정이라는 화면이 아예 없었다.
  *
  * 여기 있는 것은 전부 **백엔드에 실제로 있는 것**뿐이다 — 이름 변경
- * (`PATCH /chat/rooms/{id}`)과 나가기(`DELETE`). 알림처럼 화면에 있어야 할 것
- * 같은데 서버에 없는 것은 **자리를 비우지 않고 없다고 적는다.** 스위치를
+ * (`PATCH /chat/rooms/{id}`), 알림 끄기·켜기(`PATCH .../mute`), 나가기
+ * (`DELETE`). 서버에 없는 것은 **자리를 비우지 않고 없다고 적는다.** 스위치를
  * 그려 놓고 아무 데도 안 보내면, 사용자는 껐다고 믿고 알림을 계속 받는다.
  */
 export function ChatSettingsPanel({ room, roomId, onClose, onRenamed, onLeft }) {
@@ -44,11 +44,17 @@ export function ChatSettingsPanel({ room, roomId, onClose, onRenamed, onLeft }) 
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [leaveError, setLeaveError] = useState('')
+  const [mutedOverride, setMutedOverride] = useState(null)
+  const [muting, setMuting] = useState(false)
+  const [muteError, setMuteError] = useState('')
 
   // 서버 규칙이다. 상대 이름으로 표시되는 방은 이름을 바꿀 수 없다 —
   // 화면에서 고쳐 봐야 서버가 `CHAT_ROOM_TYPE_NOT_ALLOWED` 로 거절한다.
   const renamable = current ? !['DIRECT', 'AI', 'PEER_AGENT'].includes(current.type) : false
   const leavable = current ? current.type !== 'AI' : false
+  // 토글 직후에는 서버 값을 다시 불러올 때까지 내가 누른 값을 그대로 보여준다
+  // — 안 그러면 누르는 순간 잠깐 원래 상태로 되돌아갔다 다시 바뀌는 것처럼 깜빡인다.
+  const muted = mutedOverride ?? Boolean(current?.muted)
 
   if (!roomId) {
     return (
@@ -110,6 +116,23 @@ export function ChatSettingsPanel({ room, roomId, onClose, onRenamed, onLeft }) 
     }
   }
 
+  const submitMuteToggle = async () => {
+    if (muting) {
+      return
+    }
+    const next = !muted
+    setMuting(true)
+    setMuteError('')
+    try {
+      const result = await muteRoom(roomId, next)
+      setMutedOverride(Boolean(result?.muted ?? next))
+    } catch (err) {
+      setMuteError(err?.message || '알림 설정을 바꾸지 못했습니다.')
+    } finally {
+      setMuting(false)
+    }
+  }
+
   return (
     <main className="chat-settings" aria-label="채팅 설정">
       <header className="chat-settings-header">
@@ -157,14 +180,21 @@ export function ChatSettingsPanel({ room, roomId, onClose, onRenamed, onLeft }) 
 
         <section className="chat-settings-section">
           <h2>알림</h2>
-          {/*
-            서버에 방별 알림 설정이 없다. 스위치를 그려 놓고 아무 데도 안 보내면
-            사용자는 껐다고 믿고 계속 알림을 받는다 — 없는 것을 있는 것처럼
-            보이게 하는 쪽이 비어 있는 것보다 나쁘다.
-          */}
           <p className="chat-settings-note">
-            방별 알림 끄기는 아직 서버에 없습니다. 준비되면 여기에 생깁니다.
+            꺼도 대화는 계속 보입니다. 소리로만 알리지 않을 뿐이고, 미읽음
+            수는 그대로 셉니다.
           </p>
+          <div className="chat-settings-form">
+            <button
+              type="button"
+              aria-pressed={muted}
+              disabled={muting}
+              onClick={submitMuteToggle}
+            >
+              {muting ? '바꾸는 중…' : muted ? '알림 켜기' : '알림 끄기'}
+            </button>
+          </div>
+          {muteError ? <p className="chat-settings-error" role="alert">{muteError}</p> : null}
         </section>
 
         <section className="chat-settings-section danger">
