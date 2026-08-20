@@ -1659,6 +1659,9 @@
   flex-direction: column;
   gap: 10px;
   padding-top: 4px;
+  /* `FlowPlaybackLog.jsx` 가 `scrollTo({ behavior: 'smooth' })` 로 미는데,
+     혹시 그 호출 전에 브라우저가 먼저 자리를 잡는 경우까지 부드럽게 잇는다. */
+  scroll-behavior: smooth;
 }
 
 .playback-log-item {
@@ -1667,16 +1670,29 @@
   background: #ffffff;
   /*
     새 카드가 아래에 쌓일 때 튀지 않고 자연스럽게 나타나야 "시간 순으로
-    이어지고 있다" 는 느낌이 산다. 갑자기 나타나면 재생 속도(0.5초)와
-    안 맞아 뚝뚝 끊겨 보인다.
+    이어지고 있다" 는 느낌이 산다. 갑자기 나타나면 재생 속도와 안 맞아
+    뚝뚝 끊겨 보인다.
   */
-  animation: playback-log-enter 200ms ease;
+  animation: playback-log-enter 240ms ease;
+  transition: box-shadow 260ms ease;
+}
+
+/*
+  방금 막 드러난 칸(맨 아래)만 살짝 도드라진다 — 판의 대리인 화살표와 같은
+  주황(`AI/포인트컬러`)이라 "방금 Bordo 가 새로 가져온 줄" 이라고 읽힌다.
+  다음 칸이 밑에 붙는 순간 `:last-child` 가 그쪽으로 넘어가므로 자바스크립트
+  없이 강조가 저절로 옮겨 다닌다 — 눈이 지금 읽어야 할 자리를 놓치지 않는다.
+*/
+.playback-log-item:last-child {
+  box-shadow:
+    0 0 0 1px rgba(255, 157, 66, 0.55),
+    0 6px 16px rgba(31, 31, 31, 0.08);
 }
 
 @keyframes playback-log-enter {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -1713,6 +1729,40 @@
   color: var(--ink);
   font-size: 13px;
   line-height: 1.5;
+  /*
+    한 칸에 묶인 인용문이 여럿이면 `FlowPlaybackLog.jsx` 가 순번마다
+    `--playback-log-line-delay` 를 다르게 얹는다 — 전부 동시에 나타나면
+    "여덟 줄이 한꺼번에 쏟아졌다" 로만 읽히고 몇 번째 줄이 새로 왔는지
+    안 잡힌다. 하나씩 순서대로 짚어야 쌓이는 게 실제로 보인다.
+  */
+  animation: playback-log-line-enter 260ms ease both;
+  animation-delay: var(--playback-log-line-delay, 0ms);
+}
+
+.playback-log-item p + p {
+  margin-top: 7px;
+}
+
+@keyframes playback-log-line-enter {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playback-log-item,
+  .playback-log-item p {
+    animation: none;
+  }
+
+  .playback-log-scroll {
+    scroll-behavior: auto;
+  }
 }
 
 .bordo-section {

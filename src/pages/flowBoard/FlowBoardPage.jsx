@@ -322,7 +322,17 @@ export function FlowBoardPage() {
     다시 걸린다. 거른 목록을 기준으로 센다 — 화면에 안 보이는 줄을 기다리며
     판이 0.5초씩 멈춰 있으면 재생이 멎은 것으로 보인다.
   */
-  const playback = useFlowPlayback(groupedTimeline.length)
+  /*
+    각 칸이 묶어 오는 인용문 개수. 한 칸에 여덟 줄이 몰리면 그만큼 더
+    머물러야 하므로(`useFlowPlayback.js` 의 `stepDurationMs`) 넘긴다.
+    `groupedTimeline` 이 안 바뀌면 이 배열도 새로 안 만든다 — 위 주석과 같은
+    이유로, 신원이 매번 바뀌면 재생 중에 타이머가 괜히 다시 걸린다.
+  */
+  const playbackWeights = useMemo(
+    () => groupedTimeline.map((item) => item.related_edge_ids?.length || 1),
+    [groupedTimeline],
+  )
+  const playback = useFlowPlayback(groupedTimeline.length, playbackWeights)
   const { stop: stopPlayback } = playback
 
   /*
