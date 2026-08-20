@@ -88,6 +88,16 @@ export function leaveRoom(roomId) {
   return api.delete(`/chat/rooms/${roomId}`)
 }
 
+/**
+ * 이 방 알림 끄기·켜기.
+ *
+ * 방을 나가는 것과 다르다 — 대화는 계속 보이되 소리로 부르지만 않는다.
+ * 미읽음 수는 그대로 센다(껐다는 것과 다 읽었다는 것은 다른 상태).
+ */
+export function muteRoom(roomId, muted) {
+  return api.patch(`/chat/rooms/${roomId}/mute`, { muted })
+}
+
 // ─────────────────────────────────────────── 메시지
 /**
  * 메시지 한 페이지.
