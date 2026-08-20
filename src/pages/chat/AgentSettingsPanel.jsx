@@ -39,21 +39,23 @@ const settingItems = [
     description: '회의 중간에 Bordo가 질문할 수 있습니다.',
   },
   {
-    id: 'work-open',
-    title: '작업 공개',
-    description: '개인이 진행한 작업을 타 팀원에게 공개합니다.',
-  },
-  {
-    id: 'plan-open',
-    title: '계획 공개',
-    description: '개인이 세운 계획을 타 팀원에게 공개합니다.',
-  },
-  {
-    id: 'thought-open',
-    title: '생각 공개',
-    description: '개인의 생각을 타 팀원에게 공개합니다.',
+    id: 'disclosure',
+    title: '작업·계획·생각 공개',
+    description: '개인의 작업, 계획, 생각을 타 팀원에게 공개합니다.',
   },
 ]
+
+/*
+ * 작업·계획·생각 공개 스위치 하나가 움직이는 서버 키 셋 (시안 `586:7032`).
+ *
+ * 아래 `SETTING_KEY` 주석대로 이 셋은 backend #88 로 갈라진 독립 필드다 —
+ * 회의 준비 화면(`DelegatePrepPage`)은 여전히 이 셋을 따로 켜고 끈다. 여기
+ * 전역 설정 화면만 시안대로 한 줄·한 스위치로 되돌린다. 즉 **"작업만 켜고
+ * 계획은 끄기"를 전역 기본값에서는 더 이상 표현하지 못한다** — 셋을 늘 같은
+ * 값으로 묶어 보내기로 한 제품 판단이고, #88 이 막았던 동작을 이 화면에
+ * 한해 의도적으로 되돌리는 것이다.
+ */
+const DISCLOSURE_KEYS = ['disclose_work', 'disclose_plan', 'disclose_thought']
 
 function SettingSwitch({ enabled, disabled = false, onToggle }) {
   return (
@@ -65,31 +67,21 @@ function SettingSwitch({ enabled, disabled = false, onToggle }) {
 }
 
 /**
- * 화면의 스위치 ↔ 서버의 설정 키. **여섯씩 1:1 이다.**
+ * 화면의 스위치 ↔ 서버의 설정 키. 여기 남은 셋은 1:1 이다.
  *
- * 전에는 공개 셋이 `disclose_work_plan_thought` 하나에 걸려 있어, 하나를 끄면
- * 나머지 둘이 같이 꺼졌다. 화면은 셋을 따로 정할 수 있다고 말해 놓고 그러지
- * 못했다 — **사용자는 껐다고 생각한 것이 계속 나갔다.**
+ * 원래는 공개 셋(작업·계획·생각)도 여기 있었고, 각각 낱개 서버 키
+ * (`disclose_work`/`disclose_plan`/`disclose_thought`, backend #88 로
+ * `disclose_work_plan_thought` 한 칸에서 갈라져 나왔다)에 1:1로 물려 있었다.
  *
- * 서버가 셋으로 갈렸다(backend #88). 옛 한 칸은 지난 실행의 스냅샷을 읽기 위한
- * 호환용으로만 남아 있고, 지금 판정에 쓰이는 것은 낱개 셋이다.
- *
- * ## 왜 합치지 않고 나누는가
- *
- * 회의별로 「작업만 켜고 계획은 끄기」 가 실제로 저장된다(준비 화면의 자료 범위).
- * 화면을 한 칸으로 합치면 그 상태를 **표현할 수 없다.**
- *
- * 옛 한 칸은 「하나라도 켜져 있으면 참」 이라 섞인 상태에서 ON 으로 보이는데,
- * 그것을 껐다 켜면 셋을 전부 ON 으로 되돌린다. 꺼 뒀던 계획 공개가 조용히
- * 켜지는 셈이라, 고치려던 문제와 같은 종류가 방향만 바뀌어 남는다.
+ * 시안(`586:7032`)이 이 전역 설정 화면에서만 셋을 한 줄·한 스위치로
+ * 되돌리면서, 그 셋은 `DISCLOSURE_KEYS`(위)로 옮기고 `toggleDisclosure` 가
+ * 따로 다룬다 — 늘 세 키를 같은 값으로 묶어 보낸다는 뜻이다. 회의 준비 화면
+ * (`DelegatePrepPage`)은 이 화면과 무관하게 셋을 계속 따로 켜고 끈다.
  */
 const SETTING_KEY = {
   feasibility: 'mention_feasibility',
   schedule: 'allow_schedule_change',
   'meeting-question': 'allow_midmeeting_question',
-  'work-open': 'disclose_work',
-  'plan-open': 'disclose_plan',
-  'thought-open': 'disclose_thought',
 }
 
 function PromptCard({ prompt, selected, onSelect, onSave, onRemove }) {
@@ -227,6 +219,33 @@ export function AgentSettingsPanel({ onBack }) {
     }
   }
 
+  // `toggleSetting` 과 같은 낙관적 갱신 · 동시 클릭 방지를 셋에 한 번에 적용한다.
+  const toggleDisclosure = async () => {
+    if (DISCLOSURE_KEYS.some((key) => pendingKeys.includes(key))) {
+      return
+    }
+
+    const enabled = DISCLOSURE_KEYS.every((key) => Boolean(serverSettings?.[key]))
+    const next = !enabled
+    const patch = Object.fromEntries(DISCLOSURE_KEYS.map((key) => [key, next]))
+
+    setPendingKeys((c) => [...c, ...DISCLOSURE_KEYS])
+    setServerSettings((current) => ({ ...(current ?? {}), ...patch }))
+    try {
+      const saved = await patchAgentSettings(patch)
+      setServerSettings(saved?.settings ?? saved)
+      showNotice('success')
+    } catch (err) {
+      setServerSettings((current) => ({
+        ...(current ?? {}),
+        ...Object.fromEntries(DISCLOSURE_KEYS.map((key) => [key, enabled])),
+      }))
+      showNotice('error', err?.message)
+    } finally {
+      setPendingKeys((c) => c.filter((key) => !DISCLOSURE_KEYS.includes(key)))
+    }
+  }
+
   const addPrompt = async (event) => {
     event.preventDefault()
     const trimmedPrompt = promptText.trim()
@@ -319,19 +338,29 @@ export function AgentSettingsPanel({ onBack }) {
             <LoadError error={settingsResource.error} onRetry={settingsResource.reload} />
           ) : (
             <div className="settings-list">
-              {settingItems.map((item) => (
-                <div className="settings-row" key={item.id}>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.description}</p>
+              {settingItems.map((item) => {
+                const isDisclosure = item.id === 'disclosure'
+                const enabled = isDisclosure
+                  ? DISCLOSURE_KEYS.every((key) => Boolean(serverSettings?.[key]))
+                  : Boolean(serverSettings?.[SETTING_KEY[item.id]])
+                const disabled = isDisclosure
+                  ? DISCLOSURE_KEYS.some((key) => pendingKeys.includes(key))
+                  : pendingKeys.includes(SETTING_KEY[item.id])
+
+                return (
+                  <div className="settings-row" key={item.id}>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <p>{item.description}</p>
+                    </div>
+                    <SettingSwitch
+                      disabled={disabled}
+                      enabled={enabled}
+                      onToggle={() => (isDisclosure ? toggleDisclosure() : toggleSetting(item.id))}
+                    />
                   </div>
-                  <SettingSwitch
-                    disabled={pendingKeys.includes(SETTING_KEY[item.id])}
-                    enabled={Boolean(serverSettings?.[SETTING_KEY[item.id]])}
-                    onToggle={() => toggleSetting(item.id)}
-                  />
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </section>
