@@ -338,6 +338,16 @@ export function toPreview(room) {
     avatar: room.avatar_urls?.[0] ?? null,
     bordo: room.type === 'AI' || room.type === 'PEER_AGENT',
     stacked: room.type === 'PROJECT' || room.type === 'TEAM',
+    /*
+      알림을 꺼 둔 방인지. **서버가 목록·상세 양쪽에 준다**
+      (`RoomSummarySerializer.muted`).
+
+      여기서 안 옮기면 설정 화면이 이 값을 못 읽어 **항상 「켜져 있음」으로
+      시작한다.** 이미 꺼 둔 방을 열어도 단추에 `알림 끄기` 가 뜬다 —
+      화면이 서버 상태와 다른 말을 하는 것이고, 누른 사람은 방금 껐다고
+      믿는데 실은 원래 꺼져 있었다.
+    */
+    muted: Boolean(room.muted),
     // 방 머리의 `그곳 시각` 줄이 쓴다. 없는 방(목록에만 있는 옛 응답)은
     // 빈 배열이라 그 줄이 통째로 안 그려진다.
     members: room.members ?? [],
