@@ -78,11 +78,13 @@ const STATUS_LABEL = {
 }
 
 /*
-  세부 설정 여섯 줄.
+  세부 설정 일곱 키 (화면에는 네 줄로 보인다 — 작업·계획·생각이 한 줄로
+  묶이고 문서는 아예 숨는다, `DETAIL_DISPLAY_ROWS` 참고).
 
-  **저장되는 곳이 둘로 갈린다.** 뒤 셋(작업·계획·생각)은 이 회의의 `sources` 로
-  진짜 저장되고, 앞 셋은 아직 회의별로 저장할 곳이 없어 전역 설정이 적용된다.
-  한 목록에 섞여 있어 사용자는 구별할 수 없으므로 화면이 적어 준다.
+  **저장되는 곳이 둘로 갈린다.** 뒤 넷(작업·계획·생각·문서)은 이 회의의
+  `sources` 로 진짜 저장되고, 앞 셋은 아직 회의별로 저장할 곳이 없어 전역
+  설정이 적용된다. 한 목록에 섞여 있어 사용자는 구별할 수 없으므로 화면이
+  적어 준다.
 */
 const BEHAVIOR_ROWS = [
   {
@@ -106,17 +108,33 @@ const SOURCE_ROWS = [
   { key: 'work', label: '작업 공개', hint: '개인이 진행한 작업을 타 팀원에게 공개합니다.' },
   { key: 'plan', label: '계획 공개', hint: '개인이 세운 계획을 타 팀원에게 공개합니다.' },
   { key: 'thought', label: '생각 공개', hint: '개인의 생각을 타 팀원에게 공개합니다.' },
-  /*
-    시안에는 없지만 남긴다.
-
-    `sources` 에는 `document`(프로젝트 문서)도 있다. 시안대로 세 줄만 두면 저장할
-    때 이 값이 목록에서 빠져 **문서를 근거로 쓰던 사람이 아무 안내 없이 그것을
-    잃는다.** 줄을 지우는 것과 기능을 끄는 것은 다르다.
-  */
   { key: 'document', label: '프로젝트 문서', hint: '팀에 공개된 문서를 근거로 씁니다.' },
 ]
 
 const ALL_SOURCES = SOURCE_ROWS.map((row) => row.key)
+
+/*
+  화면에는 작업·계획·생각을 한 줄로 묶고, `document` 줄은 아예 뺀다
+  (Bordo 설정 페이지와 같은 목록으로 맞춤).
+
+  `document` 를 `ALL_SOURCES` 에서까지 빼지는 않는다 — 뺐다면 저장할 때
+  `sources: ALL_SOURCES.filter(...)` 가 이 값을 항상 떨어뜨려, **문서를
+  근거로 쓰던 사람이 아무 안내 없이 그것을 잃는다.** 줄을 지우는 것과
+  기능을 끄는 것은 다르다: 목록에는 안 보이지만 이미 켜져 있던 값은 그대로
+  저장된다. 다만 이 화면에서 그 값을 다시 켜거나 끌 방법은 없다.
+*/
+const DISCLOSURE_KEYS = ['work', 'plan', 'thought']
+const HIDDEN_DETAIL_KEYS = ['document']
+const DISCLOSURE_ROW = {
+  key: 'disclosure',
+  label: '작업·계획·생각 공개',
+  hint: '개인의 작업, 계획, 생각을 타 팀원에게 공개합니다.',
+}
+const DETAIL_DISPLAY_ROWS = [
+  ...BEHAVIOR_ROWS,
+  DISCLOSURE_ROW,
+  ...SOURCE_ROWS.filter((row) => !DISCLOSURE_KEYS.includes(row.key) && !HIDDEN_DETAIL_KEYS.includes(row.key)),
+]
 
 const pad = (n) => String(n).padStart(2, '0')
 
@@ -598,6 +616,14 @@ export function DelegatePrepPage() {
   }
 
   const set = (key, value) => setDraft({ ...applied, [key]: value })
+
+  // 작업·계획·생각 세 키를 한 스위치로 같이 켜고 끈다. `set` 을 세 번 잇달아
+  // 부르면 매번 같은(아직 안 바뀐) `applied` 를 베이스로 스프레드해 앞선
+  // 두 키가 도로 지워진다 — 한 번의 `setDraft` 로 셋을 같이 얹어야 한다.
+  const setMany = (keys, value) => setDraft({
+    ...applied,
+    ...Object.fromEntries(keys.map((key) => [key, value])),
+  })
 
   const apply = async (mode) => {
     if (busy || !meetingId || !applied) {
@@ -1248,26 +1274,33 @@ export function DelegatePrepPage() {
           <div className="prep-detail">
             <h3>세부 설정</h3>
             <div className="prep-detail-rows">
-              {[...BEHAVIOR_ROWS, ...SOURCE_ROWS].map((row) => (
-                <div className="prep-detail-row" key={row.key}>
-                  <div>
-                    <strong>{row.label}</strong>
-                    <span>{row.hint}</span>
+              {DETAIL_DISPLAY_ROWS.map((row) => {
+                const isDisclosure = row.key === 'disclosure'
+                const on = isDisclosure
+                  ? DISCLOSURE_KEYS.every((key) => Boolean(applied?.[key]))
+                  : Boolean(applied?.[row.key])
+
+                return (
+                  <div className="prep-detail-row" key={row.key}>
+                    <div>
+                      <strong>{row.label}</strong>
+                      <span>{row.hint}</span>
+                    </div>
+                    <Switch
+                      label={row.label}
+                      on={on}
+                      disabled={!applied}
+                      onChange={(next) => (isDisclosure ? setMany(DISCLOSURE_KEYS, next) : set(row.key, next))}
+                    />
                   </div>
-                  <Switch
-                    label={row.label}
-                    on={Boolean(applied?.[row.key])}
-                    disabled={!applied}
-                    onChange={(next) => set(row.key, next)}
-                  />
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             <p className="prep-scope-note">
               위 세 줄은 아직 회의별로 저장되지 않습니다 — 이 회의에도{' '}
               <AppLink href="/account">개인 설정</AppLink>의 값이 적용됩니다.
-              아래 네 줄은 이 회의에만 적용됩니다.
+              아래 한 줄은 이 회의에만 적용됩니다.
             </p>
           </div>
 

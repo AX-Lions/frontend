@@ -1,24 +1,15 @@
 import { useState } from 'react'
 
-import {
-  confirmMessageImportant,
-  deleteMessage,
-  editMessage,
-  setMessageImportant,
-} from './chat.data.js'
+import { deleteMessage, editMessage } from './chat.data.js'
 import { formatTime } from './chat.format.js'
-import { BordoAvatar, PersonAvatar, RequestIcon } from './chat.ui.jsx'
+import { BordoAvatar, PersonAvatar } from './chat.ui.jsx'
 
 /**
  * 메시지 한 줄과 거기서 할 수 있는 일.
  *
- * 백엔드에 수정 · 삭제 · 중요 표시 · 중요 확인 네 라우트가 있는데 화면에서
- * 부를 방법이 하나도 없었다. 특히 **중요 확인이 없으면 상단 `중요 채팅` 섹션을
- * 비울 방법이 아예 없다** — 한 번 중요로 찍힌 대화가 영원히 거기 남는다.
- *
  * 동작을 말풍선 옆 `⋮` 하나에 모은다. 버튼을 늘어놓으면 말풍선보다 도구가 커진다.
  */
-export function ChatMessageRow({ message, focused, myAgentRoom, onChanged, onImportantChanged }) {
+export function ChatMessageRow({ message, focused, myAgentRoom, onChanged }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.body)
@@ -48,19 +39,10 @@ export function ChatMessageRow({ message, focused, myAgentRoom, onChanged, onImp
   /**
    * 서버가 돌려준 메시지로 갈아 끼운다.
    *
-   * 화면이 스스로 값을 바꾸지 않는 이유 — `is_important` 를 내리면 서버는
-   * 확인 기록까지 지운다. 화면에서 필드 하나만 뒤집으면 그 규칙을 흉내 내야 하고,
-   * 서버 규칙이 바뀔 때마다 두 곳이 갈린다.
-   *
-   * `important` 를 따로 받는 이유 — 중요 표시·해제·확인은 **이 줄 밖에도 보인다.**
-   * 좌측 `중요 채팅` 목록과 사이드바 `!` 뱃지가 같은 서버 상태를 그려서, 여기서만
-   * 갈아 끼우면 말풍선의 `확인` 을 눌러도 목록에서는 안 사라진다. 같은 버튼이 두
-   * 군데인데 한쪽만 동작하니 사용자는 계속 누른다.
-   *
    * 성공한 뒤에만 알린다. 실패한 변경까지 알리면 아무것도 안 바뀐 목록을
    * 다시 읽게 된다.
    */
-  const run = async (task, { important = false } = {}) => {
+  const run = async (task) => {
     if (busy) {
       return
     }
@@ -70,9 +52,6 @@ export function ChatMessageRow({ message, focused, myAgentRoom, onChanged, onImp
       const updated = await task()
       if (updated) {
         onChanged(updated)
-      }
-      if (important) {
-        onImportantChanged?.()
       }
       setMenuOpen(false)
       setEditing(false)
@@ -98,27 +77,6 @@ export function ChatMessageRow({ message, focused, myAgentRoom, onChanged, onImp
       </button>
       {menuOpen ? (
         <div className="message-menu">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => run(
-              () => setMessageImportant(message.id, !message.is_important),
-              { important: true },
-            )}
-          >
-            {message.is_important ? '중요 해제' : '중요 표시'}
-          </button>
-          {message.is_important && !message.important_confirmed_at ? (
-            // 표시를 내리는 것과 다르다. `is_important` 는 남고 내 확인 기록만
-            // 생겨서, 상단 `중요 채팅` 에서만 빠진다.
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => run(() => confirmMessageImportant(message.id), { important: true })}
-            >
-              확인
-            </button>
-          ) : null}
           {message.is_mine ? (
             <button
               type="button"
@@ -200,19 +158,7 @@ export function ChatMessageRow({ message, focused, myAgentRoom, onChanged, onImp
     )
   }
 
-  const marks = (
-    <>
-      {message.is_important ? (
-        <span
-          className={message.important_confirmed_at ? 'message-mark confirmed' : 'message-mark'}
-          data-tip={message.important_confirmed_at ? '확인한 중요 메시지' : '중요 메시지'}
-        >
-          <RequestIcon muted={Boolean(message.important_confirmed_at)} small />
-        </span>
-      ) : null}
-      {message.edited_at ? <span className="message-edited">수정됨</span> : null}
-    </>
-  )
+  const marks = message.edited_at ? <span className="message-edited">수정됨</span> : null
 
   if (onMySide) {
     const className = [

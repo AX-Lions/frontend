@@ -4,12 +4,12 @@
  * ## 왜 방과 메시지를 따로 적지 않고, 메시지에서 방을 만드는가
  *
  * 실서버 응답을 그대로 베껴 두면 `last_message.preview` 와 실제 마지막 메시지,
- * `has_important` 와 실제 중요 표시, `active-dates` 의 날짜와 메시지의 날짜가
- * **전부 손으로 맞춰야 하는 값**이 된다. 하나만 어긋나도 화면은 조용히
- * 이상해진다 — 사이드바에는 없는 말이 미리보기로 뜨고, 달력에서 파란 날을
- * 눌렀는데 빈 날이 나온다. 그래서 여기서는 **메시지 배열이 원본이고, 방의
- * 미리보기 · 중요 여부 · 대화한 날짜는 전부 거기서 계산한다.** 손으로 남겨 둔
- * 것은 계산할 수 없는 것(미읽음 수, 방 참여자)뿐이다.
+ * `active-dates` 의 날짜와 메시지의 날짜가 **전부 손으로 맞춰야 하는 값**이
+ * 된다. 하나만 어긋나도 화면은 조용히 이상해진다 — 사이드바에는 없는 말이
+ * 미리보기로 뜨고, 달력에서 파란 날을 눌렀는데 빈 날이 나온다. 그래서
+ * 여기서는 **메시지 배열이 원본이고, 방의 미리보기 · 대화한 날짜는 전부
+ * 거기서 계산한다.** 손으로 남겨 둔 것은 계산할 수 없는 것(미읽음 수, 방
+ * 참여자)뿐이다.
  *
  * ## 대리인 방을 굳이 채운 이유
  *
@@ -151,8 +151,6 @@ function message(roomId, sender, body, sentAt, extra = {}) {
       남의 대리인이 한 말은 여기서 거짓이다. 그건 상대 쪽 말풍선이다.
     */
     is_from_my_agent: sender.is_agent && sender.id === AGENT_IDS[ME.name],
-    is_important: false,
-    important_confirmed_at: null,
     read_count: 0,
     edited_at: null,
     deleted_at: null,
@@ -337,7 +335,6 @@ const loungeMessages = [
     '최비성',
     '응답 구조를 바꿨습니다. 방 목록과 메시지 목록에서 이름이 겹치던 필드를 정리했습니다. `name` 은 사람 이름에만 쓰고 방 제목은 `title` 로, 경로 문자열은 `path_label` 로 갑니다. 메시지의 `author` 는 `sender` 로 바뀌고 그 안에 `is_agent` 가 들어갑니다. 대리인이 한 말인지 사람이 한 말인지 화면이 구분해야 하는데 지금 응답으로는 알 수가 없어서입니다. 기존 필드는 한 주만 같이 내려갑니다.',
     daysAgo(3, 10, 41),
-    { is_important: true },
   ),
   say(loungeRoom, '임수연', '넵', daysAgo(3, 10, 47)),
   say(
@@ -351,7 +348,6 @@ const loungeMessages = [
     '최비성',
     '`snake_case` 유지합니다. 기존 필드는 한 주만 같이 내려갑니다.',
     daysAgo(3, 10, 52),
-    { is_important: true },
   ),
   say(loungeRoom, '서재민', '어제 회의 결과 정리해서 올립니다.', daysAgo(1, 9, 30)),
   say(
@@ -359,21 +355,19 @@ const loungeMessages = [
     '서재민',
     '[회의 결과]\n1. 프로필 이미지는 원형으로 통일 — 확정 (유수인 대리인이 유보 → 오늘 본인 확인)\n2. 회의 상세 모바일 기준폭 1280 → 1120 — 확정\n3. Discord 공지 템플릿에서 회의 시각 중복 제거 — 확정, 서버에서 뺀다\n4. 로그인 오류 문구 세분화 — 다음 회의로 넘김\n못 들어온 분들은 4번만 따로 봐 주시면 됩니다.',
     daysAgo(1, 9, 31),
-    { is_important: true },
   ),
   say(
     loungeRoom,
     '유수인',
     '프로필 이미지는 원형으로 통일해 주십시오.',
     daysAgo(1, 9, 52),
-    { is_important: true, important_confirmed_at: daysAgo(1, 10, 0), read_count: 4 },
+    { read_count: 4 },
   ),
   say(
     loungeRoom,
     '임수연',
     '우측 패널이 1280 이하에서 잘립니다. 너비를 다시 봐야 합니다.',
     daysAgo(1, 10, 3),
-    { is_important: true },
   ),
   say(loungeRoom, '유수인', '제가 시안 다시 올릴게요.', daysAgo(1, 10, 5), { read_count: 3 }),
   say(
@@ -381,7 +375,6 @@ const loungeMessages = [
     '강다은',
     'Discord 공지 문구에 회의 시각이 두 번 들어갑니다.',
     daysAgo(1, 11, 20),
-    { is_important: true },
   ),
   say(
     loungeRoom,
@@ -414,7 +407,6 @@ const loungeMessages = [
     '서재민',
     '로그인 실패 원인에 따라 오류 메시지를 구분하는 게 좋겠습니다. 지금은 비밀번호가 틀려도, 계정이 잠겨도 전부 "로그인에 실패했습니다" 로 나옵니다.',
     minutesAgo(40),
-    { is_important: true },
   ),
   say(
     loungeRoom,
@@ -446,7 +438,7 @@ const designMessages = [
     edited_at: daysAgo(4, 13, 46),
     read_count: 2,
   }),
-  say(designRoom, '최비성', '다크 모드도 이번에 같이 정하나요?', daysAgo(2, 10, 5), { is_important: true }),
+  say(designRoom, '최비성', '다크 모드도 이번에 같이 정하나요?', daysAgo(2, 10, 5)),
   say(
     designRoom,
     '유수인',
@@ -460,7 +452,7 @@ const designMessages = [
     '유수인',
     '토큰 2차 정리본 커밋했습니다. `--color-surface-2` 는 `--surface-raised` 로 합쳤습니다.',
     minutesAgo(200),
-    { is_important: true, read_count: 2 },
+    { read_count: 2 },
   ),
   say(designRoom, '임수연', '확인했습니다.', minutesAgo(160)),
 ]
@@ -483,7 +475,6 @@ const rehearsalMessages = [
     '서재민',
     '시연 중에 무엇이 실패했을 때 어디서 멈출지 미리 정해 둡시다. 지난 중간 점검 때 로그인이 한 번 안 돼서 3분을 거기서 썼습니다. 각 화면마다 "여기서 막히면 다음으로 넘어간다" 를 하나씩 적어 주세요.',
     daysAgo(2, 11, 5),
-    { is_important: true },
   ),
   say(rehearsalRoom, '임수연', '홈은 브리핑 팝업까지만 보여주고 넘어가겠습니다.', daysAgo(2, 11, 12)),
   say(rehearsalRoom, '최비성', '플로우는 필터 하나만 걸고 끝냅니다. 세 개 다 누르면 시간이 안 맞습니다.', daysAgo(2, 11, 18)),
@@ -492,7 +483,7 @@ const rehearsalMessages = [
     '유수인',
     '대리인 화면은 유보 카드가 보이는 데까지 가야 합니다. 심사에서 지적받은 부분이 거기라서요.',
     daysAgo(1, 14, 40),
-    { is_important: true, read_count: 3 },
+    { read_count: 3 },
   ),
   say(rehearsalRoom, '서재민', '그럼 대리인 화면에 시간을 더 주고 홈을 줄입시다.', daysAgo(1, 14, 52)),
   say(rehearsalRoom, '임수연', '수인님, 리허설용 계정 비밀번호 어디에 적어 두셨나요?', minutesAgo(35)),
@@ -529,7 +520,6 @@ const slidesMessages = [
     '임수연',
     '9장 화면 캡처가 옛날 시안입니다. 원형 프로필 적용 전 것이라 데모랑 안 맞습니다.',
     daysAgo(1, 15, 10),
-    { is_important: true },
   ),
   say(slidesRoom, '유수인', '오늘 시안 다시 올리면서 같이 갈아 끼우겠습니다.', daysAgo(1, 15, 22), { read_count: 1 }),
   say(slidesRoom, '서재민', '심사 시간이 7분이라 12장은 많습니다. 9장까지 줄여 봅시다.', minutesAgo(210)),
@@ -551,7 +541,6 @@ const academySubmitMessages = [
     '강다은',
     '저장소를 공개로 두기 전에 서버 정보가 든 파일이 없는지 확인하는 항목을 넣었습니다. 지난번에 설정 파일이 그대로 올라간 적이 있어서요.',
     daysAgo(2, 20, 15),
-    { is_important: true },
   ),
   say(academySubmitRoom, '유수인', '포스터는 제가 목요일까지 올리겠습니다.', daysAgo(2, 20, 30), { read_count: 2 }),
   say(academySubmitRoom, '강다은', '체크리스트 공유합니다. 각자 맡은 줄에 이름 적어 주세요.', daysAgo(1, 22, 5), {
@@ -564,7 +553,6 @@ const academySubmitMessages = [
     '서재민',
     '체크리스트에 담당자 칸이 비어 있는 줄이 셋 있습니다. 비워 두면 아무도 안 합니다.',
     minutesAgo(70),
-    { is_important: true },
   ),
   say(academySubmitRoom, '강다은', '오늘 안에 채우겠습니다.', minutesAgo(58)),
 ]
@@ -581,7 +569,6 @@ const teamMessages = [
     '서재민',
     '중간 점검 결과 정리합니다. 심사에서 나온 지적은 두 가지였습니다. 하나는 "대리인이 사람 대신 결정하는 것처럼 보인다" 는 것이고, 다른 하나는 백엔드에서 신경 쓴 부분이 화면에 안 드러나서 채팅창 하나로 보인다는 것이었습니다. 앞의 것은 유보 화면을 더 앞에 내세우는 것으로, 뒤의 것은 플로우 화면에서 근거 링크를 노출하는 것으로 대응하기로 했습니다. 둘 다 이번 주 안에 화면에 반영돼야 합니다.',
     daysAgo(3, 18, 40),
-    { is_important: true },
   ),
   say(teamRoom, '임수연', '유보 화면 시안 필요하면 말씀해 주세요.', daysAgo(3, 18, 55)),
   say(teamRoom, '강다은', '봇은 회의 시작·종료 알림까지 붙었습니다.', daysAgo(1, 11, 5)),
@@ -642,7 +629,6 @@ const suyeonMessages = [
     '임수연',
     '어제 회의에서 디자인 쪽으로 나온 것만 모았습니다.\n1. 프로필 이미지 원형 통일 — 확정\n2. 회의 상세 기준폭 1120 으로 — 확정\n3. 우측 패널 최소 너비 — 미정. 수인님이 시안으로 정해 주셔야 합니다.\n4. 유보 상태를 보여주는 카드 — 새로 필요합니다. 대리인이 "본인 확인 필요" 로 남긴 것을 그대로 보여줄 자리가 지금 화면에 없습니다.\n4번이 제일 급합니다. 심사에서 지적받은 부분이라서요.',
     daysAgo(1, 16, 20),
-    { is_important: true },
   ),
   say(suyeonRoom, '유수인', '정리 고맙습니다. 3번이랑 4번은 오늘 안에 볼게요.', daysAgo(1, 16, 45), { read_count: 1 }),
   say(suyeonRoom, '임수연', '혹시 원형 프로필 시안 언제쯤 올라올까요? 리허설 전에 붙여 두고 싶어서요.', minutesAgo(240)),
@@ -714,7 +700,7 @@ export const roomMessages = {
 // ─────────────────────────────────────────── 방
 
 /**
- * 방 하나. 미리보기 · 중요 여부는 메시지에서 계산한다.
+ * 방 하나. 미리보기는 메시지에서 계산한다.
  *
  * 팀은 **참·거짓이 아니라 팀 객체**로 받는다. 팀이 하나뿐일 때는 `team: true`
  * 로 두고 `TEAM` 을 갖다 써도 됐지만, 팀이 둘이 되면 그 방식은 조용히 틀린다 —
@@ -775,7 +761,6 @@ function buildRoom({ id, type, title, team = TEAM, project = null, members, unre
     avatar_urls: avatars,
     last_message: toLastMessage(list),
     unread_count: unread,
-    has_important: list.some((m) => m.is_important),
     /*
       알림을 꺼 둔 방인지. 서버가 `RoomSummarySerializer` 에서 주는 칸이다.
 
@@ -980,10 +965,6 @@ function unreadOf(rooms) {
   return rooms.reduce((total, room) => total + room.unread_count, 0)
 }
 
-function markedIn(rooms) {
-  return rooms.some((room) => room.has_important)
-}
-
 const bordoUnread = unreadOf(bordoRooms)
 const demoUnread = unreadOf(demoRooms)
 const academyUnread = unreadOf(academyRooms)
@@ -1004,22 +985,18 @@ const teamGroupUnread = byId[ROOM_IDS.team].unread_count
  */
 export const chatSidebar = {
   my_agent_room: byId[ROOM_IDS.agent],
-  // 상단 `중요 채팅`. 중요 메시지가 남아 있는 방만 올라온다.
-  important_rooms: ALL.filter((room) => room.has_important),
   teams: [
     {
       team_id: TEAM.id,
       team_name: TEAM.name,
       group_chat_room_id: ROOM_IDS.team,
       unread_count: bordoUnread + demoUnread + teamGroupUnread,
-      has_important: markedIn([...bordoRooms, ...demoRooms, byId[ROOM_IDS.team]]),
       projects: [
         {
           project_id: PROJECTS.bordo.id,
           project_name: PROJECTS.bordo.name,
           group_chat_room_id: ROOM_IDS.lounge,
           unread_count: bordoUnread,
-          has_important: markedIn(bordoRooms),
           rooms: bordoRooms,
         },
         {
@@ -1027,7 +1004,6 @@ export const chatSidebar = {
           project_name: PROJECTS.demo.name,
           group_chat_room_id: ROOM_IDS.rehearsal,
           unread_count: demoUnread,
-          has_important: markedIn(demoRooms),
           rooms: demoRooms,
         },
       ],
@@ -1039,14 +1015,12 @@ export const chatSidebar = {
       // 안 만들어진 상태도 화면이 견뎌야 한다.
       group_chat_room_id: null,
       unread_count: academyUnread,
-      has_important: markedIn(academyRooms),
       projects: [
         {
           project_id: PROJECTS.academy.id,
           project_name: PROJECTS.academy.name,
           group_chat_room_id: ROOM_IDS.academySubmit,
           unread_count: academyUnread,
-          has_important: markedIn(academyRooms),
           rooms: academyRooms,
         },
       ],
@@ -1060,23 +1034,6 @@ export const chatSidebar = {
     + teamGroupUnread
     + unreadOf(directRooms)
     + byId[ROOM_IDS.agent].unread_count,
-}
-
-// ─────────────────────────────────────────── 중요 채팅
-/*
-  확인(`important/confirm`)한 메시지는 **여기서만 빠진다.** 방 안에서는 중요
-  표시가 그대로 남아 있는 것이 정상이다 — 둘을 같이 지우면 "확인" 과 "중요
-  해제" 가 구별되지 않는다. 그래서 확인된 메시지를 한 건 남겨 두었다.
-*/
-const importantMessages = Object.values(roomMessages)
-  .flatMap((response) => response.results)
-  .filter((m) => m.is_important && !m.important_confirmed_at)
-  .sort((a, b) => b.sent_at.localeCompare(a.sent_at))
-
-/** `GET /chat/important`. */
-export const chatImportant = {
-  count: importantMessages.length,
-  results: importantMessages.map((message) => ({ message, room: byId[message.room_id] })),
 }
 
 // ─────────────────────────────────────────── 새 채팅 후보

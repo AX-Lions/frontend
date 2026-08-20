@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { GlobalSidebar } from '../../shared/components/GlobalSidebar.jsx'
 import { useSearchParam } from '../../app/navigation.js'
 import { fetchMe } from '../account/account.data.js'
@@ -10,9 +10,7 @@ import { ChatRoom } from './ChatRoom.jsx'
 import { ChatSettingsPanel } from './ChatSettingsPanel.jsx'
 import {
   clearRoomUnread,
-  confirmMessageImportant,
   fetchAwayHandled,
-  fetchImportant,
   fetchPresence,
   setPresence,
   fetchSidebar,
@@ -72,7 +70,6 @@ export function ChatPage() {
   const [fullscreen, setFullscreen] = useState(false)
 
   const sidebar = useResource((signal) => fetchSidebar(signal), [], { cacheKey: 'chat-sidebar' })
-  const important = useResource((signal) => fetchImportant(signal), [], { cacheKey: 'chat-important' })
   // `개인 설정` 화면과 같은 캐시 키를 써서 이미 그쪽이 받아 둔 값이 있으면
   // 다시 요청하지 않는다. 레일 하단 프로필(`GlobalSidebar`)이 홈 사이드바와
   // 같은 사람을 그리려면 이름·아바타가 필요하다.
@@ -153,59 +150,16 @@ export function ChatPage() {
     [awayHandled.data],
   )
 
-  const importantRooms = useMemo(
-    // 중요 채팅은 **메시지 목록**으로 온다. 같은 방의 메시지가 여럿이면 방이
-    // 여러 번 나오므로 방 기준으로 합친다. 미리보기는 그 방의 가장 최근 것이다.
-    () => {
-      const seen = new Map()
-      ;(important.data?.results ?? []).forEach((row) => {
-        if (!seen.has(row.room.id)) {
-          seen.set(row.room.id, {
-            ...toPreview(row.room),
-            // 확인 버튼이 이 id 를 쓴다. 방이 아니라 **메시지**를 확인하는
-            // 것이라, 방만 들고 있으면 여기서 섹션을 비울 수 없다.
-            messageId: row.message.id,
-            message: `${row.message.sender.name}: ${row.message.body}`,
-            sentAt: row.message.sent_at,
-            marked: true,
-          })
-        }
-      })
-      return [...seen.values()]
-    },
-    [important.data],
-  )
-
   const openRoom = useMemo(() => {
     const all = [
       toPreview(sidebar.data?.my_agent_room),
-      ...importantRooms,
       ...toDirectRows(sidebar.data),
       ...toTeamRows(sidebar.data).flatMap((t) => t.projects.flatMap((p) => p.rooms)),
     ].filter(Boolean)
     return all.find((room) => room.id === selectedChatId) ?? null
-  }, [sidebar.data, importantRooms, selectedChatId])
+  }, [sidebar.data, selectedChatId])
 
-  /**
-   * 중요 상태가 바뀌었다 — 같은 값을 그리는 곳을 전부 다시 읽는다.
-   *
-   * 중요 표시·해제·확인은 **말풍선 한 줄만의 일이 아니다.** 좌측 `중요 채팅`
-   * 목록과 사이드바 `!` 뱃지가 같은 서버 상태를 보고 그린다. 대화창에서
-   * 바꿨을 때 그 줄만 갈아 끼우면 두 목록은 옛 값으로 남아, **말풍선의
-   * `확인` 을 눌러도 목록에서는 안 사라진다.** 같은 버튼이 두 군데인데
-   * 한쪽만 동작하니 사용자는 계속 누른다.
-   *
-   * 낙관적으로 미리 지우지 않는 이유 — 무엇이 목록에서 빠지는지는 서버 규칙이다.
-   * `is_important` 를 내리면 확인 기록까지 지워지고, 같은 방에 중요 메시지가
-   * 더 있으면 그 방은 목록에 남는다. 화면이 그 규칙을 흉내 내면 두 곳이 갈린다.
-   * 요청 두 번은 감수한다 — 좌측 `확인` 도 원래 이 둘을 다시 읽는다.
-   */
-  const { reload: reloadImportant } = important
   const { setData: setSidebarData, reload: reloadSidebar } = sidebar
-  const refreshImportant = useCallback(() => {
-    reloadImportant()
-    reloadSidebar()
-  }, [reloadImportant, reloadSidebar])
 
   /*
     방을 열면 읽음 워터마크를 올린다.
@@ -242,40 +196,6 @@ export function ChatPage() {
       alive = false
     }
   }, [selectedChatId, setSidebarData, reloadSidebar])
-
-  /**
-   * 방을 열면 그 방의 중요 메시지도 같이 확인된다.
-   *
-   * `확인` 버튼을 따로 두지 않는다 — 방을 열어 읽은 것 자체가 확인이다.
-   * 표시를 내리는 것과는 다르다. `is_important` 는 남고 **내 확인 기록만**
-   * 생겨서 상단 `중요 채팅` 에서만 빠진다(같은 메시지가 다른 사람 화면에는
-   * 그대로 남는다).
-   *
-   * `importantRooms` 는 방 하나당 **가장 최근의 미확인 중요 메시지 하나**만
-   * 대표로 들고 있다(위 주석 참고). 그 메시지를 확인하면 방이 목록에서
-   * 빠지고 `importantRooms` 가 다시 계산되므로, 새로 들어온 중요 메시지가
-   * 있으면 이 effect 가 다시 돈다 — 방을 계속 보고 있는 동안 온 것도 놓치지
-   * 않는다.
-   */
-  useEffect(() => {
-    const room = importantRooms.find((r) => r.id === selectedChatId)
-    if (!room) {
-      return undefined
-    }
-
-    let alive = true
-    confirmMessageImportant(room.messageId)
-      .then(() => {
-        if (alive) {
-          refreshImportant()
-        }
-      })
-      .catch(() => {})
-
-    return () => {
-      alive = false
-    }
-  }, [selectedChatId, importantRooms, refreshImportant])
 
   if (sidebar.loading && !sidebar.data) {
     return (
@@ -366,7 +286,6 @@ export function ChatPage() {
           presence={presenceStatus}
           onClose={() => setSelectedChatId(null)}
           onPresenceChange={changePresence}
-          onImportantChanged={refreshImportant}
           onOpenAgentSettings={() => setView('agent')}
           onOpenSettings={() => setView('room-settings')}
           onToggleFullscreen={() => setFullscreen((on) => !on)}
