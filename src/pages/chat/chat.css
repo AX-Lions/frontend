@@ -232,6 +232,7 @@
   color: var(--chat-ink);
   font-size: var(--chat-fs-meta);
   line-height: 1.35;
+  text-align: center;
 }
 
 /* 보이는 것은 그대로 두고 누를 자리만 넓힌다. 14px 은 겨냥하기 어렵다. */
