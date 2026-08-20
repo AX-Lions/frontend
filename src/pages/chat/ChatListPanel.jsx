@@ -153,6 +153,7 @@ function PresenceToggle({ busy, status, onChange }) {
 export function ChatListPanel({
   sidebar,
   awayRooms,
+  directRooms,
   presence,
   presenceBusy,
   selectedChatId,
@@ -170,6 +171,15 @@ export function ChatListPanel({
 
   const needle = tool === 'search' ? query.trim().toLowerCase() : ''
   const primaryChat = sidebar?.my_agent_room
+  /*
+    어느 팀·프로젝트에도 안 매달린 방(1:1 · 동료의 대리인).
+
+    서버는 `direct_rooms` 로 주고 있었는데 화면이 그 목록을 **아무 데도 그리지
+    않았다.** 회의에서 유보된 질문은 「{상대}의 Bordo」 방으로 가는데, 물어본
+    사람은 그 방을 열 길이 없어 **답이 와도 못 봤다** — 시차를 건너 답이
+    돌아오는 자리가 화면에서 끊겨 있었다.
+  */
+  const directs = (directRooms ?? []).filter((room) => matchesRoom(room, needle))
   const teams = toTeamRows(sidebar)
     .map((team) => ({
       ...team,
@@ -347,6 +357,22 @@ export function ChatListPanel({
               ))
             : null}
         </section>
+
+        {directs.length > 0 ? (
+          <section className="chat-list-section">
+            <div className="section-heading">
+              <h2>개인 대화</h2>
+            </div>
+            {directs.map((chat) => (
+              <ChatPreview
+                chat={chat}
+                key={chat.id}
+                selected={selectedChatId === chat.id}
+                onSelect={() => onSelectChat(chat.id)}
+              />
+            ))}
+          </section>
+        ) : null}
 
         {/*
           서버가 `팀 → 프로젝트 → 방` 3층으로 준다. 목에서는 이 층이 고정된

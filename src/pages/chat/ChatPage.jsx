@@ -312,6 +312,7 @@ export function ChatPage() {
       ) : fullscreen ? null : (
         <ChatListPanel
           awayRooms={awayRooms}
+          directRooms={toDirectRows(sidebar.data)}
           presence={presenceStatus}
           presenceBusy={Boolean(pendingPresence)}
           selectedChatId={selectedChatId}
