@@ -219,3 +219,42 @@
     flex: 1;
   }
 }
+
+/*
+  `회의에 참여하지 않아요`.
+
+  홈 「오늘 일정」의 같은 이름 버튼과 색을 맞춘다 — 두 자리에서 같은 일을
+  하는 단추라 생김새가 다르면 다른 기능으로 읽힌다. 이미 등록된 회의는
+  `대리 참석 중` 으로 글자만 바뀌고 색이 옅어져, 누를 것이 남았는지가
+  색으로 먼저 보인다.
+*/
+.cs-absence {
+  width: 174px;
+  flex: none;
+  background: #ff5a1f;
+  color: #ffffff;
+  transition:
+    background 140ms ease,
+    transform 80ms ease;
+}
+
+.cs-absence:hover {
+  background: #e94e14;
+}
+
+.cs-absence:active {
+  background: #d4460f;
+  transform: scale(0.99);
+}
+
+.cs-absence:focus-visible {
+  outline: 2px solid #002662;
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .cs-absence {
+    width: auto;
+    flex: 1;
+  }
+}
