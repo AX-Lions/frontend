@@ -377,6 +377,35 @@ export function DelegatePrepPage() {
   const delegated = Boolean(header?.delegated)
   const rows = debate?.points ?? []
   /*
+    불참을 등록하면 서버가 **뒤에서** 논쟁점을 뽑는다(모델 호출이라 10초 안팎).
+    그동안 화면이 빈 목록을 그리면 사용자는 예측이 실패한 줄 알고 나가 버린다.
+    서버가 `status: GENERATING` 을 주는 동안 스피너를 두고 몇 초마다 다시 읽는다.
+  */
+  const generating = debate?.status === 'GENERATING'
+
+  const reloadPrep = prep.reload
+  useEffect(() => {
+    if (!generating) {
+      return undefined
+    }
+    /*
+      4초마다 다시 읽는다. 더 잦게 물으면 예측이 도는 동안 같은 응답만 쌓이고,
+      더 뜸하면 촬영에서 「생성 중」 화면이 필요 이상으로 오래 남는다.
+
+      2분에서 멈춘다. 모델이 죽어 열쇠가 남아 있으면 폴링이 영원히 돈다 —
+      화면을 열어 둔 채 자리를 비우면 그동안 계속 요청이 나간다.
+    */
+    const started = Date.now()
+    const timer = setInterval(() => {
+      if (Date.now() - started > 120000) {
+        clearInterval(timer)
+        return
+      }
+      reloadPrep()
+    }, 4000)
+    return () => clearInterval(timer)
+  }, [generating, reloadPrep])
+  /*
     서버가 든 입장에서 시작한다.
 
     **논쟁점 하나에 내 입장은 하나다.** 서버가 그렇게 든다 — 같은 쟁점에 둘이면
@@ -852,6 +881,14 @@ export function DelegatePrepPage() {
           </div>
 
           {prep.loading ? <Loading label="논쟁점을 읽는 중입니다…" /> : null}
+          {/*
+            예측이 도는 동안 자리를 지킨다. 이게 없으면 등록 직후 몇 초간
+            「예상 논쟁점」 아래가 통째로 비어, 사용자는 예측이 없는 화면과
+            구별할 수 없다.
+          */}
+          {!prep.loading && generating && rows.length === 0
+            ? <Loading label="Bordo가 논쟁점을 예상하고 있어요…" />
+            : null}
 
           {rows.map((row) => {
             const open = openRow?.id === row.id
