@@ -498,6 +498,12 @@
   background: #ffffff;
   color: var(--prep-muted);
   font-size: 12px;
+  text-decoration: none;
+}
+
+.prep-evidence-link:hover {
+  color: var(--prep-ink, #1f1f1f);
+  text-decoration: underline;
 }
 
 .prep-stance-open {

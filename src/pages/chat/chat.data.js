@@ -88,6 +88,16 @@ export function leaveRoom(roomId) {
   return api.delete(`/chat/rooms/${roomId}`)
 }
 
+/**
+ * 이 방 알림 끄기·켜기.
+ *
+ * 방을 나가는 것과 다르다 — 대화는 계속 보이되 소리로 부르지만 않는다.
+ * 미읽음 수는 그대로 센다(껐다는 것과 다 읽었다는 것은 다른 상태).
+ */
+export function muteRoom(roomId, muted) {
+  return api.patch(`/chat/rooms/${roomId}/mute`, { muted })
+}
+
 // ─────────────────────────────────────────── 메시지
 /**
  * 메시지 한 페이지.
@@ -314,6 +324,18 @@ export function toPreview(room) {
     id: room.id,
     type: room.type,
     name: room.title,
+    /*
+      이 방이 매달린 프로젝트. **실시간 이벤트가 흐르는 채널 이름이다**
+      (`RoomSummarySerializer.project_id` → `/ws/projects/{project_id}`).
+
+      서버는 목록·상세 양쪽에 담아 주는데 여기서 안 옮겨서, 대화창은 어느
+      채널에 붙어야 하는지 알 방법이 없었다. `muted` 가 같은 자리에서 같은
+      이유로 빠져 있었다.
+
+      **1:1 과 대리인 방은 비어 있는 것이 정상이다.** 그런 방은 프로젝트에
+      안 매달려 있어 서버 `_deliver()` 가 흘려보낼 채널 자체를 만들지 않는다.
+    */
+    projectId: room.project_id ?? null,
     context: room.path_label || undefined,
     message: room.last_message
       ? `${room.last_message.sender_name}: ${room.last_message.preview}`
@@ -328,6 +350,16 @@ export function toPreview(room) {
     avatar: room.avatar_urls?.[0] ?? null,
     bordo: room.type === 'AI' || room.type === 'PEER_AGENT',
     stacked: room.type === 'PROJECT' || room.type === 'TEAM',
+    /*
+      알림을 꺼 둔 방인지. **서버가 목록·상세 양쪽에 준다**
+      (`RoomSummarySerializer.muted`).
+
+      여기서 안 옮기면 설정 화면이 이 값을 못 읽어 **항상 「켜져 있음」으로
+      시작한다.** 이미 꺼 둔 방을 열어도 단추에 `알림 끄기` 가 뜬다 —
+      화면이 서버 상태와 다른 말을 하는 것이고, 누른 사람은 방금 껐다고
+      믿는데 실은 원래 꺼져 있었다.
+    */
+    muted: Boolean(room.muted),
     // 방 머리의 `그곳 시각` 줄이 쓴다. 없는 방(목록에만 있는 옛 응답)은
     // 빈 배열이라 그 줄이 통째로 안 그려진다.
     members: room.members ?? [],

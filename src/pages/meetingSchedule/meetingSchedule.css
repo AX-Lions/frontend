@@ -3,10 +3,27 @@
  * `.sidebar`)를 그대로 쓰고, 여기서는 오른쪽 본문만 정의한다.
  */
 
+/*
+  달력이 스크롤 없이 한 화면에 들어와야 한다.
+
+  `.msched-cell` 이 `min-height: 108px` 짜리 여섯 줄로 고정돼 있어서, 머리·
+  달 이동 줄까지 합친 실제 높이가 창보다 커지면 `.msched-main` 이 통째로
+  스크롤됐다 — 달력 아래쪽 한두 줄이 매번 가려졌다. 세로를 flex 로 나눠
+  `.msched-calendar`(그 안의 `.msched-grid`)가 **남는 높이를 전부 갖게**
+  하고, 칸의 높이도 고정값 대신 `1fr` 로 그 안에서 나눠 갖게 한다 —
+  칸 여섯 줄이 항상 지금 창 높이에 맞춰 줄어들거나 늘어난다.
+
+  `overflow-y: auto` 는 지운다. 세로가 극단적으로 짧은 창(브라우저를 아주
+  작게 접은 경우)까지 완벽히 대응하려면 필요하지만, 정작 그런 창에서는
+  `.msched-cell` 자체(아래 `overflow-y: auto`)가 한 칸 안에서 먼저
+  스크롤되므로 바깥까지 막힐 일이 없다.
+*/
 .msched-main {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
+  min-height: 0;
   padding: 38px 32px 48px;
 }
 
@@ -26,6 +43,9 @@
 }
 
 .msched-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   height: 41px;
   padding: 12px 20px;
   border: 0;
@@ -35,6 +55,11 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+}
+
+.msched-add img {
+  width: 16px;
+  height: 16px;
 }
 
 .msched-add:hover {
@@ -105,6 +130,8 @@
 
 .msched-calendar {
   display: flex;
+  flex: 1;
+  min-height: 0;
   flex-direction: column;
   gap: 16px;
 }
@@ -114,6 +141,14 @@
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 10px;
+}
+
+/* 칸 42개는 늘 정확히 7×6 이다(위 `cells` 참고) — 여섯 줄이 `.msched-calendar`
+   가 준 높이를 똑같이 나눠 갖는다. */
+.msched-grid {
+  flex: 1;
+  min-height: 0;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
 }
 
 .msched-weekday {
@@ -131,10 +166,14 @@
 
 .msched-cell {
   display: flex;
-  min-height: 108px;
+  /* 고정 108px 이면 여섯 줄의 합이 창보다 커져 바깥이 스크롤됐다. `1fr` 행이
+     실제로 줄 수 있어야 하므로 최소 높이를 없앤다 — 대신 아래로 넘치면 이
+     칸만 스스로 스크롤된다(다음 규칙). */
+  min-height: 0;
   flex-direction: column;
   gap: 8px;
   padding: 12px;
+  overflow-y: auto;
   border-radius: 4px;
   border-bottom: 1px solid #e5e7eb;
 }

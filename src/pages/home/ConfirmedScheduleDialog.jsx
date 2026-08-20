@@ -25,10 +25,12 @@ import './confirmedSchedule.css'
  * 없으므로 `회의 보기` 도 내리지 않는다.
  *
  * @param meetingId 회의 id. 없으면 요청을 보내지 않는다.
+ * @param relatedEdgeId 이 일정을 만든 그 발언(플로우 엣지) id. 있으면 「회의
+ *                  보기」가 회의를 여는 데서 그치지 않고 그 발언까지 바로 연다.
  * @param schedule  회의가 없을 때 쓸 값
  *                  `{ title, teamName, projectName, when, participantNames }`
  */
-export function ConfirmedScheduleDialog({ meetingId, schedule, onClose }) {
+export function ConfirmedScheduleDialog({ meetingId, relatedEdgeId, schedule, onClose }) {
   const [header, setHeader] = useState(null)
   const [participants, setParticipants] = useState(null)
   const [error, setError] = useState('')
@@ -133,7 +135,11 @@ export function ConfirmedScheduleDialog({ meetingId, schedule, onClose }) {
             <button
               className="cs-view"
               type="button"
-              onClick={() => { navigate(`/flow-board?meeting=${meetingId}`); onClose() }}
+              onClick={() => {
+                const query = relatedEdgeId ? `${meetingId}&edge=${relatedEdgeId}` : meetingId
+                navigate(`/flow-board?meeting=${query}`)
+                onClose()
+              }}
             >
               회의 보기
             </button>

@@ -402,7 +402,14 @@ const loungeMessages = [
   ),
   say(loungeRoom, '임수연', '확인했습니다. `--color-surface-2` 가 없어진 것 같은데 맞나요?', minutesAgo(150)),
   say(loungeRoom, '유수인', '네, `--surface-raised` 로 합쳤습니다.', minutesAgo(145), { read_count: 2 }),
-  say(
+  /*
+    `say` 로 있었다 — 서재민이 직접 쓴 말로 표시돼 말풍선이 회색이었다.
+    자리를 비운 서재민 대신 그의 Bordo 가 남긴 말이라 `bot` 이어야 한다
+    (아바타도 겹쳐 보였다 — 깨진 사진 자리에 쓰는 기본 프로필이 대리인
+    아바타와 같은 그림이라, `is_agent` 가 틀리면 사람 메시지도 대리인
+    메시지처럼 보인다).
+  */
+  bot(
     loungeRoom,
     '서재민',
     '로그인 실패 원인에 따라 오류 메시지를 구분하는 게 좋겠습니다. 지금은 비밀번호가 틀려도, 계정이 잠겨도 전부 "로그인에 실패했습니다" 로 나옵니다.',
@@ -714,7 +721,8 @@ export const roomMessages = {
  * 학술제 방에 해커톤 팀 이름이 붙는다. 프로젝트가 있으면 팀은 물어볼 것도 없이
  * 그 프로젝트의 팀이다.
  */
-function buildRoom({ id, type, title, team = TEAM, project = null, members, unread = 0 }) {
+function buildRoom({ id, type, title, team = TEAM, project = null, members, unread = 0,
+                    muted = false }) {
   const owner = project ? teamOf(project) : team
   const list = roomMessages[id].results
   const avatars = members
@@ -768,6 +776,14 @@ function buildRoom({ id, type, title, team = TEAM, project = null, members, unre
     last_message: toLastMessage(list),
     unread_count: unread,
     has_important: list.some((m) => m.is_important),
+    /*
+      알림을 꺼 둔 방인지. 서버가 `RoomSummarySerializer` 에서 주는 칸이다.
+
+      **하나는 처음부터 꺼진 채로 둔다**(`muted: true`). 전부 켜져 있으면
+      「이미 꺼진 방을 열었을 때 단추가 `알림 켜기` 로 뜨는가」 를 눌러 볼
+      상황이 없다 — 화면의 한쪽 갈래가 한 번도 안 그려진다.
+    */
+    muted: Boolean(muted),
   }
 }
 
@@ -796,6 +812,10 @@ const ALL = [
     project: PROJECTS.bordo,
     members: ['유수인', '임수연', '최비성'],
     unread: 2,
+    // 알림을 꺼 둔 채로 미읽음이 남아 있는 방. **끈 것과 다 읽은 것은 다른
+    // 상태**인데, 둘이 같이 있는 경우가 하나도 없으면 그 구별이 화면에서
+    // 한 번도 안 밟힌다.
+    muted: true,
   }),
   buildRoom({
     id: ROOM_IDS.rehearsal,

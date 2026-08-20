@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { icons } from './chat.icons.js'
 
 /**
@@ -46,6 +47,24 @@ export function BordoAvatar({ small = false }) {
 }
 
 /**
+ * 사람 아바타 한 장.
+ *
+ * 목 데이터의 `avatar_url` 이 실제로는 없는 파일을 가리키는 사람이 있다 —
+ * 그대로 두면 깨진 이미지 아이콘이 뜬다. 불러오기에 실패하면 `BordoAvatar`
+ * 와 같은 그림(`icons.profile`)으로 바꾼다 — 이니셜을 따로 만들지 않는다.
+ * 이 앱의 기본 프로필은 이미 정해져 있고 대리인·사람을 가리지 않는다.
+ */
+export function PersonAvatar({ src, className = 'chat-avatar' }) {
+  const [broken, setBroken] = useState(false)
+
+  if (!src || broken) {
+    return <img className={className} src={icons.profile} alt="" />
+  }
+
+  return <img className={className} src={src} alt="" onError={() => setBroken(true)} />
+}
+
+/**
  * 단체방 썸네일.
  *
  * 서버가 참여자 아바타를 최대 4장 준다(`avatar_urls`). 예전에는 이 자리에
@@ -57,6 +76,9 @@ export function BordoAvatar({ small = false }) {
  */
 export function AvatarStack({ avatars = [] }) {
   const shown = avatars.filter(Boolean).slice(0, 4)
+  // 깨진 장은 이 앱의 기본 프로필(`icons.profile`)로 바꾼다 — 아예 안
+  // 그리면 그 사람만 빠진 것처럼 보인다.
+  const [broken, setBroken] = useState(() => new Set())
 
   if (shown.length === 0) {
     return (
@@ -69,7 +91,12 @@ export function AvatarStack({ avatars = [] }) {
   return (
     <span className="avatar-stack" aria-hidden="true">
       {shown.map((url, index) => (
-        <img alt="" key={`${url}-${index}`} src={url} />
+        <img
+          alt=""
+          key={`${url}-${index}`}
+          src={broken.has(index) ? icons.profile : url}
+          onError={() => setBroken((current) => new Set(current).add(index))}
+        />
       ))}
     </span>
   )

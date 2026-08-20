@@ -17,6 +17,7 @@ const MEETING_IDS = {
   designReview: 'baf061c5-2efc-4ca8-80e5-cecc15582780',
   weekly: '4eb1040f-18d7-4841-bc72-360846888c3d',
   devSync: 'cdcd5cda-d887-47dc-91aa-4bb7393d461b',
+  academyKickoff: '2f5c1d47-9b0a-4e3c-8f61-7a4d2c9e0b13',
   academyBooth: '0a3f6cd2-71b5-4d8e-9c4a-2f7b8e15d093',
   partnerSync: 'c47e9b30-5a68-4f21-8d0c-6b39f2ae7154',
 }
@@ -58,7 +59,10 @@ export const inbox = {
         }),
         item({
           id: 'req-2',
-          meetingId: MEETING_IDS.designReview,
+          // 이 두 태스크는 실제로 글로벌 회의(`direction`)에서 유보한 두
+          // 안건의 후속이다. `designReview` 는 아직 안 열린 회의라 근거가
+          // 될 발언이 없다 — 잘못 걸려 있던 것을 바로잡는다.
+          meetingId: MEETING_IDS.direction,
           title: '디자인 시안 마감 조정',
           project: PROJECTS.bordo,
           needsAnswer: 1,
@@ -81,6 +85,15 @@ export const inbox = {
           needsAnswer: 2,
           needsConfirm: 0,
           pendingApprovalTaskIds: ['task-req4-a'],
+        }),
+        item({
+          id: 'req-8',
+          meetingId: MEETING_IDS.academyKickoff,
+          title: '연합학술제 초록 마감일 확인',
+          project: PROJECTS.academy,
+          needsAnswer: 1,
+          needsConfirm: 1,
+          pendingApprovalTaskIds: ['task-req-a2'],
         }),
       ],
     },

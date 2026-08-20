@@ -75,6 +75,174 @@ const BADGE_ROW_HALF = 14
  */
 const BADGE_COLUMN_HALF = 19
 
+/*
+  뱃지 묶음의 대략적인 긴 변 길이(정렬 방향으로) — 알약이 하나 늘 때마다
+  얼마나 길어지는지. `BADGE_SLIDE` 주석의 실측("3종이면 130px 쯤")에서
+  역산한 값이다: 한 종류면 `BADGE_PILL_BASE`, 하나 늘 때마다
+  `BADGE_PILL_STEP` 씩 는다.
+*/
+const BADGE_PILL_BASE = BADGE_COLUMN_HALF * 2 // 38 — 알약 하나
+const BADGE_PILL_STEP = 46
+
+/**
+ * 뱃지 묶음이 서로, 그리고 노드와 겹치지 않게 자리를 찾는다.
+ *
+ * 묶음은 **자기 선의 한가운데**에서만 계산된다(`badgeShift`) — 다른 선의
+ * 뱃지가 어디 있는지도, 근처에 다른 노드가 있는지도 모른다. 여러 선이 한
+ * 노드로 모이면 그 둘레에 뱃지가 한꺼번에 몰려 서로 겹치고, 짧은 선의
+ * 뱃지는 아예 상대 노드 위에 올라탄다 — 실제로 회의가 복잡해지면 노드
+ * 하나 둘레에 알약이 겹겹이 쌓였다.
+ *
+ * **선 옆으로 밀지 않고 선을 따라 미끄러뜨린다.** 옆으로 밀면 "화살표에
+ * 바짝 붙어 있다" 는 규칙이 깨져 뱃지가 허공에 떠 보인다. 대신 같은
+ * 수직 간격(`badgeShift`)을 유지한 채 선 위의 다른 지점(`t`, 0=출발
+ * 노드 쪽 · 1=도착 노드 쪽)을 찾으면, 뱃지는 항상 **자기 선에 붙어
+ * 있으면서** 겹침만 피한다.
+ *
+ * 묶음을 회전한 사각형이 아니라 **반지름으로 감싸는 원**으로 본다. 사각형끼리
+ * 정확히 검사하려면 회전각마다 분리축을 다시 잡아야 하는데, 원은 각도와
+ * 무관하게 안 겹치면 사각형도 반드시 안 겹친다 — 계산은 단순해지고 결과는
+ * 더 안전한 쪽(살짝 더 벌어지는 쪽)으로만 어긋난다.
+ *
+ * 자기 뱃지(`isSelf`)는 옮기지 않는다. 그쪽은 `SELF_BADGE_STEP` 으로 이미
+ * 의도적으로 쌓아 둔 자리라, 같은 잣대를 들이대면 원래 디자인을 밀어낸다.
+ * 다만 **장애물로는** 넣는다 — 링크 뱃지가 자기 뱃지 위에 앉는 것도 겹침이다.
+ */
+const BADGE_CLEARANCE = 6
+
+/** 뱃지가 노드 테두리에서 최소한 떨어져야 하는 거리. */
+const BADGE_NODE_CLEARANCE = 6
+
+/** 선을 따라 미끄러뜨릴 때, 끝점 마커에 물리지 않도록 남겨 두는 여유. */
+const BADGE_SLIDE_MARGIN = 0.06
+
+/** `t` 를 이 간격으로 늘려 가며 후보를 찾는다. 촘촘할수록 정확하지만 느리다. */
+const BADGE_SLIDE_STEP = 0.05
+
+function badgeFootprint(badge) {
+  const pillCount = Math.max(1, (badge.arrow?.counts ?? []).length)
+  const long = BADGE_PILL_BASE + (pillCount - 1) * BADGE_PILL_STEP
+  const short = badge.axis === 'column' ? BADGE_PILL_BASE : BADGE_ROW_HALF * 2
+  return Math.hypot(long, short) / 2 + BADGE_CLEARANCE
+}
+
+/*
+  선 위의 매개변수 `t` 에서, 그 선의 고정된 수직 간격을 유지한 자리.
+
+  `side` 는 어느 쪽에 붙일지다(기본 1, 반대쪽 -1). 두 노드 사이를 **양쪽
+  방향으로** 잇는 선 한 쌍(A→B 와 B→A)은 서로 나란히 놓여 있어, `t` 를 아무리
+  옮겨도 두 선 사이의 수직 거리 자체가 좁으면 뱃지가 몇 종류만 실려도
+  맞은편 선의 뱃지와 계속 스친다 — 실제로 여섯 종류를 실은 뱃지에서 이
+  경우가 났다. 반대쪽으로 뒤집으면 두 선의 뱃지가 각자 바깥쪽으로 갈라져
+  훨씬 넓게 벌어진다.
+*/
+function badgePointAt(badge, t, side = 1) {
+  return {
+    x: badge.lineStart.x + (badge.lineEnd.x - badge.lineStart.x) * t + badge.badgeShift.x * side,
+    y: badge.lineStart.y + (badge.lineEnd.y - badge.lineStart.y) * t + badge.badgeShift.y * side,
+  }
+}
+
+/** 후보 자리가 노드·다른 뱃지와 얼마나 겹치는지(0 = 안 겹침). */
+function overlapPenalty(point, footprint, obstacles, nodes) {
+  let penalty = 0
+  nodes.forEach((node) => {
+    const minDist = node.r + BADGE_NODE_CLEARANCE + footprint
+    const dist = Math.hypot(point.x - node.x, point.y - node.y)
+    if (dist < minDist) {
+      penalty += minDist - dist
+    }
+  })
+  obstacles.forEach((other) => {
+    const minDist = footprint + badgeFootprint(other)
+    const dist = Math.hypot(point.x - other.point.x, point.y - other.point.y)
+    if (dist < minDist) {
+      penalty += minDist - dist
+    }
+  })
+  return penalty
+}
+
+/*
+  `t=0.5`(선의 한가운데) · 원래 쪽(`side=1`)에서 시작해 양옆으로 번갈아
+  넓혀 가며 겹치지 않는 첫 자리를 찾는다. 같은 `t` 에서는 반대쪽(`side=-1`)
+  보다 원래 쪽을 먼저 본다 — 뒤집는 것은 옆으로 조금 더 미는 것보다 큰
+  변화라, 작은 변화로 풀리면 굳이 뒤집지 않는다.
+
+  가운데에 가장 가까운 자리를 남겨야 "그 화살표의 한가운데쯤"이라는 원래
+  자리 감각이 최대한 남는다.
+
+  ## 완전히 안 겹치는 자리가 없을 때
+
+  전에는 여기서 포기하고 노드·다른 뱃지를 한꺼번에 밀어내는 자유 이동으로
+  넘어갔다(`escapeCollision`). 그 이동은 선을 아예 참고하지 않아서, 장애물이
+  촘촘한 자리에서는 뱃지가 자기 화살표에서 멀리 떨어진 허공에 남았다 —
+  "화살표에 붙어 있어야 한다" 는 이 판의 첫 번째 규칙을 깬 것이다.
+
+  대신 **선 위 후보 중 겹침이 가장 적은 자리**를 쓴다. `badgePointAt` 이
+  만드는 점은 전부 자기 선 위(고정 수직 간격)에 있으므로, 이렇게 고르면
+  뱃지는 어떤 경우에도 선을 벗어나지 않는다 — 아주 드물게 옆 뱃지와 살짝
+  겹치더라도, 화살표에서 통째로 떨어져 나가는 것보다는 낫다.
+*/
+function findClearSlide(badge, footprint, obstacles, nodes) {
+  const min = BADGE_SLIDE_MARGIN
+  const max = 1 - BADGE_SLIDE_MARGIN
+  const ts = [0.5]
+  for (let step = BADGE_SLIDE_STEP; step <= 0.5; step += BADGE_SLIDE_STEP) {
+    if (0.5 - step >= min) {
+      ts.push(0.5 - step)
+    }
+    if (0.5 + step <= max) {
+      ts.push(0.5 + step)
+    }
+  }
+
+  let best = null
+  let bestPenalty = Infinity
+  for (const t of ts) {
+    for (const side of [1, -1]) {
+      const point = badgePointAt(badge, t, side)
+      const penalty = overlapPenalty(point, footprint, obstacles, nodes)
+      if (penalty === 0) {
+        return point
+      }
+      if (penalty < bestPenalty) {
+        bestPenalty = penalty
+        best = point
+      }
+    }
+  }
+  return best
+}
+
+/** 자리를 다 정한 뒤에도 노드 원과 겹치는가 — 다른 뱃지와는 상관없다. */
+function overlapsAnyNode(point, footprint, nodes) {
+  return nodes.some((node) => {
+    const minDist = node.r + BADGE_NODE_CLEARANCE + footprint
+    return Math.hypot(point.x - node.x, point.y - node.y) < minDist
+  })
+}
+
+function resolveBadgeOverlaps(badges, nodes) {
+  const placedSoFar = badges.filter((badge) => badge.isSelf)
+
+  badges
+    .filter((badge) => !badge.isSelf)
+    .forEach((badge) => {
+      const footprint = badgeFootprint(badge)
+      badge.point = findClearSlide(badge, footprint, placedSoFar, nodes)
+      /*
+        선 위에서 겹침이 가장 적은 자리를 골라도, 아주 촘촘한 판에서는 그
+        자리가 여전히 노드 원 안일 수 있다(위 `findClearSlide` 주석 — 화살표에
+        붙어 있는 것이 겹치지 않는 것보다 우선이라 감수한 대가다). 그런
+        뱃지만 `crampedNode` 로 표시해 둔다 — `FlowCanvas` 가 이 값을 보고
+        알약을 펼쳐 두는 대신 눌러야 펼쳐지는 요약 단추로 접어 그린다.
+      */
+      badge.crampedNode = overlapsAnyNode(badge.point, footprint, nodes)
+      placedSoFar.push(badge)
+    })
+}
+
 /** 요약표 폭. */
 export const SUMMARY_WIDTH = 592
 
@@ -142,8 +310,15 @@ const MAX_PARALLEL_OFFSET = NODE_RADIUS * 0.72
 const BADGE_SLIDE = 130
 const BADGE_SLIDE_RATIO = 0.3
 
-/** 선 끝을 원 테두리에서 얼마나 띄울지. 끝쪽은 화살촉이 앉을 자리가 더 필요하다. */
-const EDGE_START_GAP = 6
+/*
+  선 끝을 원 테두리에서 얼마나 띄울지.
+
+  출발 쪽(작은 점)과 도착 쪽(화살촉)을 따로 뒀던 적이 있다 — 화살촉이 더 크니
+  자리가 더 필요하다는 논리였다. 그런데 마커 자체가 이미 끝점에서 바깥으로
+  그려지므로, 게이트를 다르게 두면 오히려 **점 쪽만 노드에 바짝 붙어 보였다.**
+  둘을 같은 값으로 맞춘다.
+*/
+const EDGE_START_GAP = 16
 const EDGE_END_GAP = 16
 
 /**
@@ -805,6 +980,12 @@ export function buildFlowLayout(
       arrow: link.arrow,
       isAi: link.isAi,
       isSelf: false,
+      // `resolveBadgeOverlaps` 가 겹침을 피해 이 선 위 다른 자리를 찾을 때
+      // 쓴다. 최종 `point` 는 거기서 다시 정해진다 — 여기 값은 "아직 아무와도
+      // 안 겹쳤을 때" 의 기본 자리(한가운데)일 뿐이다.
+      lineStart: link.start,
+      lineEnd: link.end,
+      badgeShift: link.badgeShift,
       point: {
         x: link.midpoint.x + link.badgeShift.x,
         y: link.midpoint.y + link.badgeShift.y,
@@ -854,6 +1035,8 @@ export function buildFlowLayout(
       })
     })
   })
+
+  resolveBadgeOverlaps(badges, placed)
 
   /*
     무대 크기를 그린 것에 맞춰 잡는다.

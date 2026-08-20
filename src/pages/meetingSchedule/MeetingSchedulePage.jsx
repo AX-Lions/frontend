@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { getCurrentTeamId, onCurrentTeamChange } from '../../lib/currentTeam.js'
 import { navigate, useSearchParam } from '../../app/navigation.js'
@@ -11,7 +11,7 @@ import { fetchHome, fetchTeamMembers } from '../home/home.api.js'
 // `Sidebar` 는 자기 스타일을 안 갖고 다닌다(`.sidebar` · `.home-layout` 이
 // 전부 `home.css` 에 있다) — 홈 화면이 부르는 대로 여기서도 함께 가져온다.
 import '../home/home.css'
-import { NEW_EVENT_PARAM, fetchCalendarEvents } from './meetingSchedule.data.js'
+import { EVENT_PARAM, NEW_EVENT_PARAM, fetchCalendarEvents } from './meetingSchedule.data.js'
 import { NewCalendarEventDialog } from './NewCalendarEventDialog.jsx'
 import './meetingSchedule.css'
 
@@ -81,6 +81,16 @@ export function MeetingSchedulePage() {
       navigate('/meeting-schedule', { replace: true })
     }
   }, [newEventFlag])
+
+  /*
+    브리핑의 「실제 일정에서 보기」가 `?event=` 를 달고 들어왔다.
+
+    달력 칸을 눌렀을 때와 같은 팝업을 연다 — 이동은 이미 끝났으니 이 화면
+    안에서는 그냥 그 칸을 누른 것과 똑같이 다룬다. 이벤트 목록은 프로젝트별로
+    비동기로 도착하므로, 목록에서 실제로 찾을 때까지 기다렸다가 한 번만 연다.
+  */
+  const eventParam = useSearchParam(EVENT_PARAM)
+  const openedFromUrlRef = useRef(false)
   /*
     달력의 일정 한 칸을 눌렀을 때 뜨는 「확정된 일정 확인」 팝업(시안
     `697:9393`)이 보여 줄 일정.
@@ -217,6 +227,7 @@ export function MeetingSchedulePage() {
   const openEvent = (row) => {
     setConfirming({
       meetingId: row.related_meeting ?? null,
+      relatedEdgeId: row.related_edge_id ?? null,
       schedule: {
         title: row.title,
         teamName: row.team_name,
@@ -228,6 +239,25 @@ export function MeetingSchedulePage() {
       },
     })
   }
+
+  useEffect(() => {
+    if (!eventParam || openedFromUrlRef.current) {
+      return undefined
+    }
+    const row = monthEvents.find((event) => event.id === eventParam)
+    if (!row) {
+      return undefined
+    }
+    // 한 틱 미룬다 — effect 본문에서 곧장 `setState` 를 부르면 같은 커밋
+    // 안에서 렌더가 한 번 더 걸린다(`react-hooks/set-state-in-effect`).
+    const timer = setTimeout(() => {
+      openedFromUrlRef.current = true
+      openEvent(row)
+      navigate('/meeting-schedule', { replace: true })
+    }, 0)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventParam, monthEvents])
 
   if (home.loading && !homeData) {
     return (
@@ -250,12 +280,17 @@ export function MeetingSchedulePage() {
   return (
     <div className="home-layout">
       <Sidebar
-        active="meeting"
+        /*
+          아이콘 줄의 `홈` 자리가 이제 `일정` 이다(시안 `576:4855`) — 이
+          화면이 그 자리를 켠다. 예전에는 `meeting` 을 켰는데, 그 자리는
+          팀장 드롭다운이라 `active` 자체를 안 봤다(늘 자기 열림 상태로만
+          진하기가 갈렸다) — 즉 여기 적힌 값이 실제로는 아무것도 켠 적이 없었다.
+        */
+        active="home"
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((c) => !c)}
         favoriteProjects={(homeData.favorite_projects ?? []).filter(inCurrentTeam)}
         recentProjects={(homeData.recent_projects ?? []).filter(inCurrentTeam)}
-        shortcuts={homeData.shortcuts}
         userName={homeData.user_name}
         avatarUrl={homeData.user_avatar_url}
         onAddProject={() => setAddingProject(true)}
@@ -265,6 +300,7 @@ export function MeetingSchedulePage() {
         <div className="msched-head">
           <h1>회의 일정</h1>
           <button type="button" className="msched-add" onClick={() => setAddingEvent(true)}>
+            <img src="/icons/AddIcon.svg" alt="" aria-hidden="true" />
             일정 추가하기
           </button>
         </div>
@@ -358,6 +394,7 @@ export function MeetingSchedulePage() {
       {confirming ? (
         <ConfirmedScheduleDialog
           meetingId={confirming.meetingId}
+          relatedEdgeId={confirming.relatedEdgeId}
           schedule={confirming.schedule}
           onClose={() => setConfirming(null)}
         />

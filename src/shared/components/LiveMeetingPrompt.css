@@ -75,20 +75,29 @@
   opacity: 0.6;
 }
 
-.live-meeting-decline {
+/*
+  글자색을 `.live-meeting-actions` 까지 묶어 명시도를 올린다.
+  이 모달이 뜨는 화면(`InboxPage` 등)이 `.inbox-page button { color: inherit }`
+  처럼 **자기 버튼 전부에 글자색을 미리 걸어 두는 경우**가 있는데, 그 규칙이
+  클래스 하나 + 태그 하나(0,1,1)라 `.live-meeting-join` 하나짜리(0,1,0)보다
+  명시도가 높아 이겼다 — 홈에서는 흰 글씨였는데 받은 항목함에서는 어두운
+  글자가 짙은 남색 배경에 그대로 깔려 안 읽혔다.
+*/
+.live-meeting-actions .live-meeting-decline {
   background: #f0f1f3;
   color: #60646c;
 }
 
-.live-meeting-decline:hover:not(:disabled) {
+.live-meeting-actions .live-meeting-decline:hover:not(:disabled) {
   background: #e5e7eb;
 }
 
-.live-meeting-join {
+.live-meeting-actions .live-meeting-join {
   background: #002662;
   color: #ffffff;
 }
 
-.live-meeting-join:hover {
+.live-meeting-actions .live-meeting-join:hover {
   background: #013080;
+  color: #ffffff;
 }

@@ -90,6 +90,30 @@
   background: #e5e7eb;
 }
 
+.ap-evidence {
+  padding: 12px;
+  border-radius: 12px;
+  background: #f6f4ff;
+}
+
+.ap-evidence p {
+  color: #3d2f7a;
+  font-style: italic;
+}
+
+.ap-evidence-link {
+  align-self: flex-start;
+  margin-top: 4px;
+  color: #4a3aad;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ap-evidence-link:hover {
+  text-decoration: underline;
+}
+
 .ap-error {
   margin: 0;
   color: #e5484d;

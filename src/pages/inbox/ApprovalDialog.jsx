@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
+import { AppLink } from '../../app/AppLink.jsx'
 import { useEscapeToClose } from '../../shared/hooks/useEscapeToClose.js'
 import { approveTask, fetchTask, rejectTask } from './inbox.data.js'
 import './approval.css'
@@ -118,6 +119,26 @@ export function ApprovalDialog({ taskId, onClose, onResolved }) {
                 <strong>승인 보류 근거</strong>
                 <p>Bordo가 회의 중 대신 만든 항목이에요. 사람이 확인하기 전까지는 실행되지 않아요.</p>
               </div>
+
+              {/*
+                "왜 사람이 눌러야 하는가" 와 "왜 이 내용이 나왔는가" 는 다른
+                질문이다. 위 카드는 전자(고정 문구)를, 이 카드는 후자(실제
+                회의 발언)를 답한다. `evidence` 가 없는 태스크도 있다 — 근거
+                없이 카드를 만들면 없는 인용을 지어내게 된다.
+              */}
+              {task.evidence ? (
+                <div className="ap-card ap-evidence">
+                  <strong>이 회의에서 나온 이야기예요</strong>
+                  <p>“{task.evidence.quote}” — {task.evidence.speaker}</p>
+                  <AppLink
+                    className="ap-evidence-link"
+                    href={`/flow-board?meeting=${task.source_meeting}&edge=${task.evidence.edgeId}`}
+                    onClick={onClose}
+                  >
+                    플로우에서 보기
+                  </AppLink>
+                </div>
+              ) : null}
             </div>
 
             {error ? <p className="ap-error" role="alert">{error}</p> : null}

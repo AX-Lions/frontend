@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { navigate } from '../../app/navigation.js'
-import { LiveMeetingPrompt } from '../../shared/components/LiveMeetingPrompt.jsx'
 import { globalNavItems } from '../../shared/constants/globalNav.js'
 import { useChatBadge } from '../../shared/hooks/useChatBadge.js'
 import { useInboxBadge } from '../../shared/hooks/useInboxBadge.js'
-import { useIsTeamLead } from '../../shared/hooks/useIsTeamLead.js'
-import { useLiveMeeting } from '../../shared/hooks/useLiveMeeting.js'
+import { NoLiveMeetingDialog } from './NoLiveMeetingDialog.jsx'
 
 /**
  * 홈의 사이드바.
@@ -56,17 +54,18 @@ export function Sidebar({
   /*
     아이콘 줄에서 켜진 것.
 
-    `홈` 으로 박혀 있었다. 이 사이드바는 홈 전용이었으니 맞는 말이었는데,
-    회의 일정·요청함이 같은 사이드바를 쓰게 되면서 **어느 화면에 있든 홈이
-    켜진 채로** 보였다. 시안(`666:5248`)은 요청함에서 요청함 아이콘이 켜져
-    있다 — 그것이 지금 어디인지 말해 주는 유일한 표시다.
+    한때 `홈` 으로 박혀 있었다. 이 사이드바가 홈 전용이던 시절에는 맞는
+    말이었지만, 회의 일정·요청함이 같은 사이드바를 쓰게 되면서 **어느
+    화면에 있든 홈이 켜진 채로** 보였다. 그마저도 `홈` 자리가 `일정` 으로
+    바뀐 지금은 뜻이 없다 — 홈 화면 자체를 가리키는 아이콘이 이 줄에
+    더는 없다. 그래서 기본값은 **아무것도 안 켜진 상태**다. 홈이 아닌
+    화면(`요청함`·`일정`)은 각자 자기 id 를 명시적으로 넘긴다.
   */
-  active = 'home',
+  active = '',
   isCollapsed = false,
   onToggleCollapse,
   recentProjects = [],
   favoriteProjects = [],
-  shortcuts,
   userName = '',
   avatarUrl = '',
   meetingIdByProject = {},
@@ -77,47 +76,24 @@ export function Sidebar({
     recent: true,
     favorite: true,
   })
-  const [meetingMenuOpen, setMeetingMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const searchInputRef = useRef(null)
-  const meetingMenuRef = useRef(null)
   const searchButtonRef = useRef(null)
   const searchBoxRef = useRef(null)
 
   const inboxBadge = useInboxBadge()
   const chatBadge = useChatBadge()
-  const isTeamLead = useIsTeamLead()
-  const {
-    liveMeeting, promptOpen, secondsLeft, responding,
-    openPrompt, respondDecline, respondJoin,
-  } = useLiveMeeting()
-
   /*
-    `회의 시작하기 · 회의 일정 보기` 드롭다운(시안 `692:7910`)은 바깥을
-    눌러도 닫혀야 한다 — 안 닫히면 다음에 누른 것을 가리고, 사용자는 왜
-    안 눌리는지 모른 채 같은 자리를 다시 누른다. `Escape` 도 같은 이유로 받는다.
+    마이크 자리(시안 `576:4400`·`576:4855`)는 지금은 진행 중인 회의를
+    실제로 잇지 않는다 — 눌러도 늘 "아직 진행 중인 회의가 없습니다" 를
+    띄운다. 예전에는 이 자리가 진행 중인 회의가 있을 때만 나타나는
+    실시간 아이콘이었는데(`useLiveMeeting`), 이제는 항상 떠 있는 자리라
+    그 훅과 팀장 전용 드롭다운(회의 시작하기 · 일정 보기)은 더 이상 여기서
+    쓰지 않는다. 실시간 참여 팝업(`LiveMeetingPrompt`)은 나중에 이 자리가
+    실제 회의를 잇게 되면 다시 연결한다 — 지금 지워도 되는 죽은 기능이
+    아니라 아직 이어지지 않은 기능이라 파일은 남겨 둔다.
   */
-  useEffect(() => {
-    if (!meetingMenuOpen) {
-      return undefined
-    }
-    const close = (event) => {
-      if (!meetingMenuRef.current?.contains(event.target)) {
-        setMeetingMenuOpen(false)
-      }
-    }
-    const onKey = (event) => {
-      if (event.key === 'Escape') {
-        setMeetingMenuOpen(false)
-      }
-    }
-    document.addEventListener('pointerdown', close)
-    window.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('pointerdown', close)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [meetingMenuOpen])
+  const [micModalOpen, setMicModalOpen] = useState(false)
 
   /*
     프로젝트 검색 칸도 같은 이유로 바깥을 누르면 닫는다.
@@ -220,10 +196,6 @@ export function Sidebar({
     ))
   }
 
-  // `GET /home` 의 `shortcuts` 가 Discord 주소를 이미 들고 온다. 여기서
-  // 채팅 사이드바를 한 번 더 부르면 홈 첫 화면에 요청이 하나 더 는다.
-  const discord = shortcuts?.discord ?? null
-
   return (
     <>
       <aside className={isCollapsed ? 'sidebar is-collapsed' : 'sidebar'} aria-label="사이드 메뉴">
@@ -246,10 +218,12 @@ export function Sidebar({
       {!isCollapsed ? (
         <>
           {/*
-            시안 `666:5059` 의 아이콘 줄. `홈` 은 언제나 이 화면 자체라 항상
-            켜진 것으로 그린다. 지금 진행 중인 회의가 있으면 `회의` 자리가
-            실시간 아이콘으로 바뀐다 — `GlobalSidebar` 와 같은 훅을 쓰므로
-            판정도 팝업도 똑같다.
+            시안 `666:5059` 의 아이콘 줄이었는데, 마이크 자리가 생기면서
+            시안이 `576:4855` 로 갈렸다 — `홈` 대신 `일정`, `회의`(플로우보드
+            바로가기) 대신 언제나 떠 있는 `마이크` 다. `홈` 을 빼는 이유는
+            로고(`.logo`, 바로 위)가 이미 그 자리를 하고 있어서다 — 아이콘
+            줄에 또 있으면 같은 목적지가 둘이 된다. `회의` 를 빼는 이유는
+            전역 레일(`GlobalSidebar`)이 그 길을 이미 맡고 있어서다.
 
             검색 칸은 눌러야 뜬다 — 늘 펼쳐 두면 최근 항목·즐겨찾기보다
             위에 항상 자리를 차지해, 프로젝트를 찾을 일이 없는 대부분의
@@ -258,81 +232,40 @@ export function Sidebar({
           <div className="sidebar-icon-row" aria-label="주요 화면">
             <div className="sidebar-icon-group">
               {globalNavItems.map((item) => {
-                if (item.id === 'meeting' && liveMeeting) {
+                if (item.id === 'home') {
+                  const isActive = active === 'home'
+                  return (
+                    <a
+                      key={item.id}
+                      className={isActive ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
+                      href="/meeting-schedule"
+                      aria-label="회의 일정"
+                      aria-current={isActive ? 'page' : undefined}
+                      data-tip="회의 일정"
+                      onClick={(event) => goInApp(event, '/meeting-schedule')}
+                    >
+                      <img src="/icons/CalendarCheck.svg" alt="" />
+                    </a>
+                  )
+                }
+
+                if (item.id === 'meeting') {
+                  /*
+                    빨간 뱃지(진행 중 표시)는 지금은 켜지 않는다 — 이 자리가
+                    아직 실제 회의를 안 잇고 있어서, 켜 두면 회의가 있다는
+                    거짓 신호가 된다.
+                  */
                   return (
                     <button
                       key={item.id}
                       type="button"
-                      className="sidebar-icon-btn sidebar-icon-live"
-                      aria-label="진행 중인 회의 참여하기"
-                      data-tip="진행 중인 회의 참여하기"
-                      onClick={openPrompt}
+                      className="sidebar-icon-btn"
+                      aria-label="회의 참여"
+                      data-tip="회의 참여"
+                      onClick={() => setMicModalOpen(true)}
                     >
-                      <img src="/icons/LiveMeetingIcon.svg" alt="" />
+                      <img src="/icons/Microphone.svg" alt="" />
                     </button>
-                  )
-                }
-
-                /*
-                  팀장에게는 `회의` 를 눌렀을 때 곧장 이동하지 않고 먼저
-                  묻는다(시안 `692:7910`) — 회의를 시작할지, 잡힌 일정을
-                  볼지. 팀장이 아니면 원래대로 `/flow-board` 로 바로 간다.
-                */
-                if (item.id === 'meeting' && isTeamLead) {
-                  return (
-                    <div className="sidebar-meeting-menu" key={item.id} ref={meetingMenuRef}>
-                      <button
-                        type="button"
-                        className={meetingMenuOpen ? 'sidebar-icon-btn active' : 'sidebar-icon-btn'}
-                        aria-label={item.label}
-                        aria-haspopup="menu"
-                        aria-expanded={meetingMenuOpen}
-                        data-tip={item.label}
-                        onClick={() => setMeetingMenuOpen((open) => !open)}
-                      >
-                        <img src={item.icon} alt="" />
-                      </button>
-
-                      {meetingMenuOpen ? (
-                        <div className="sidebar-meeting-panel" role="menu">
-                          {/*
-                            디스코드가 실제 회의 자리다 — "시작" 은 그리로
-                            보내는 것이지, 서버가 따로 만드는 행위가 아니다.
-                          */}
-                          <a
-                            className="sidebar-meeting-row"
-                            role="menuitem"
-                            href={discord?.connected && discord.url ? discord.url : undefined}
-                            aria-disabled={!(discord?.connected && discord.url)}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            onClick={(event) => {
-                              if (!(discord?.connected && discord.url)) {
-                                event.preventDefault()
-                                return
-                              }
-                              setMeetingMenuOpen(false)
-                            }}
-                          >
-                            <img src="/icons/SignalStart.svg" alt="" />
-                            회의 시작하기
-                          </a>
-                          <hr />
-                          <a
-                            className="sidebar-meeting-row"
-                            role="menuitem"
-                            href="/meeting-schedule"
-                            onClick={(event) => {
-                              setMeetingMenuOpen(false)
-                              goInApp(event, '/meeting-schedule')
-                            }}
-                          >
-                            <img src="/icons/CalendarCheck.svg" alt="" />
-                            회의 일정 보기
-                          </a>
-                        </div>
-                      ) : null}
-                    </div>
                   )
                 }
 
@@ -451,14 +384,7 @@ export function Sidebar({
       ) : null}
       </aside>
 
-      <LiveMeetingPrompt
-        open={promptOpen}
-        meeting={liveMeeting}
-        secondsLeft={secondsLeft}
-        responding={responding}
-        onDecline={respondDecline}
-        onJoin={respondJoin}
-      />
+      <NoLiveMeetingDialog open={micModalOpen} onClose={() => setMicModalOpen(false)} />
     </>
   )
 }

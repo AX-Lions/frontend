@@ -1,8 +1,6 @@
 import { AppLink } from '../../app/AppLink.jsx'
 import { globalNavItems } from '../constants/globalNav.js'
 import { useChatBadge } from '../hooks/useChatBadge.js'
-import { useLiveMeeting } from '../hooks/useLiveMeeting.js'
-import { LiveMeetingPrompt } from './LiveMeetingPrompt.jsx'
 import './GlobalSidebar.css'
 
 /**
@@ -31,18 +29,23 @@ import './GlobalSidebar.css'
  * `globalNavItems` 의 순서(홈·채팅·회의·요청함)는 홈 아이콘 줄(시안
  * `666:5059`)을 따른 것이다. 이 레일은 시안이 따로 있고(`576:4858` —
  * `채팅` 이 맨 아래) 회의 아이콘 그림도 다르다 — 홈 쪽은 책, 이 레일은
- * 클립보드다. 마이크는 둘 다 아니다 — 마이크(`LiveMeetingIcon`)는 지금
- * 진행 중인 회의가 있을 때만 이 자리에 잠깐 들어선다.
- * `globalNavItems` 를 고치면 홈까지 같이 바뀌므로
+ * 클립보드다(`576:4400`). `globalNavItems` 를 고치면 홈까지 같이 바뀌므로
  * 여기서만 순서를 다시 짜고 아이콘을 덮어쓴다.
+ *
+ * ## 이 자리는 마이크로 안 바뀐다
+ *
+ * 전에는 진행 중인 회의가 있으면 `회의` 자리가 마이크(`LiveMeetingIcon`)로
+ * 바뀌었다. 이 레일은 **어디서든 화면을 옮겨 다니는 자리**라 회의 판으로
+ * 가는 길이 잠깐씩 사라지면 안 된다는 판단으로, 여기서는 뺐다 — 클립보드
+ * 아이콘이 항상 있는다. 마이크는 이제 홈 아이콘 줄(`Sidebar.jsx`)에만
+ * 있고, 그쪽은 그 자리가 원래도 `/flow-board` 로 가는 길이 아니었다.
  *
  * ## 홈에는 이 레일이 없다
  *
  * 홈 화면(시안 `666:5059`)은 로고 밑에 아이콘 줄을 붙여 넣은 모양이라, 별도
  * 세로 레일과 나란히 두면 로고와 아이콘이 다른 칸에 떨어져 보인다. 그래서
- * 홈은 `Sidebar` 안에 같은 훅(`useLiveMeeting`)으로 만든 가로 줄을 직접
- * 그리고, 이 레일은 쓰지 않는다. 나머지 화면(채팅·회의·개인 설정·대리 참석
- * 준비)은 지금처럼 이 레일 하나로 다닌다.
+ * 홈은 `Sidebar` 가 가로 줄을 직접 그리고, 이 레일은 쓰지 않는다. 나머지
+ * 화면(채팅·회의·개인 설정·대리 참석 준비)은 지금처럼 이 레일 하나로 다닌다.
  */
 
 const RAIL_ORDER = ['home', 'meeting', 'chat']
@@ -66,10 +69,6 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
   const className = (id, base) => (active === id ? `${base} active` : base)
   const current = (id) => (active === id ? 'page' : undefined)
 
-  const {
-    liveMeeting, promptOpen, secondsLeft, responding,
-    openPrompt, respondDecline, respondJoin,
-  } = useLiveMeeting()
   const chatBadge = useChatBadge()
 
   // 레일에는 아이콘만 보인다. 여러 계정을 오가는 사람이 지금 누구로 로그인해
@@ -77,71 +76,53 @@ export function GlobalSidebar({ active = 'home', collapsed = false, onNavigate, 
   const accountLabel = user?.name ? `개인 설정 · ${user.name}` : '개인 설정'
 
   return (
-    <>
-      <aside
-        className={collapsed ? 'global-sidebar is-collapsed' : 'global-sidebar'}
-        aria-label="주요 메뉴"
-        inert={collapsed}
+    <aside
+      className={collapsed ? 'global-sidebar is-collapsed' : 'global-sidebar'}
+      aria-label="주요 메뉴"
+      inert={collapsed}
+    >
+      <nav className="global-sidebar-nav" aria-label="주요 화면">
+        {railNavItems.map((item) => (
+          <AppLink
+            className={className(item.id, 'global-sidebar-link')}
+            href={item.href}
+            key={item.id}
+            aria-label={item.tip ?? item.label}
+            aria-current={current(item.id)}
+            data-tip={item.tip ?? item.label}
+            onClick={(event) => onNavigate?.(event, item)}
+          >
+            <img src={RAIL_ICON_OVERRIDE[item.id] ?? item.icon} alt="" />
+            {item.id === 'chat' && chatBadge > 0 ? (
+              <span className="global-sidebar-badge">{chatBadge > 99 ? '99+' : chatBadge}</span>
+            ) : null}
+          </AppLink>
+        ))}
+      </nav>
+
+      <AppLink
+        className={className(accountItem.id, 'global-sidebar-user')}
+        href={accountItem.href}
+        aria-label={accountLabel}
+        aria-current={current(accountItem.id)}
+        data-tip={accountLabel}
+        onClick={(event) => onNavigate?.(event, accountItem)}
       >
-        <nav className="global-sidebar-nav" aria-label="주요 화면">
-          {railNavItems.map((item) => {
-            // 지금 진행 중인 회의가 있으면 `회의` 아이콘이 마이크로 바뀐다.
-            // 눌러도 이동하지 않는다 — 참여할지 대리인을 보낼지부터 팝업으로
-            // 묻는다. 그래서 이름도 `회의` 가 아니라 그 행동을 적는다.
-            if (item.id === 'meeting' && liveMeeting) {
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="global-sidebar-link global-sidebar-live"
-                  aria-label="진행 중인 회의 참여하기"
-                  data-tip="진행 중인 회의 참여하기"
-                  onClick={openPrompt}
-                >
-                  <img src="/icons/LiveMeetingIcon.svg" alt="" />
-                </button>
-              )
-            }
-
-            return (
-              <AppLink
-                className={className(item.id, 'global-sidebar-link')}
-                href={item.href}
-                key={item.id}
-                aria-label={item.tip ?? item.label}
-                aria-current={current(item.id)}
-                data-tip={item.tip ?? item.label}
-                onClick={(event) => onNavigate?.(event, item)}
-              >
-                <img src={RAIL_ICON_OVERRIDE[item.id] ?? item.icon} alt="" />
-                {item.id === 'chat' && chatBadge > 0 ? (
-                  <span className="global-sidebar-badge">{chatBadge > 99 ? '99+' : chatBadge}</span>
-                ) : null}
-              </AppLink>
-            )
-          })}
-        </nav>
-
-        <AppLink
-          className={className(accountItem.id, 'global-sidebar-user')}
-          href={accountItem.href}
-          aria-label={accountLabel}
-          aria-current={current(accountItem.id)}
-          data-tip={accountLabel}
-          onClick={(event) => onNavigate?.(event, accountItem)}
-        >
-          <img src={user?.avatarUrl || '/figma-icons/global-profile.png'} alt="" />
-        </AppLink>
-      </aside>
-
-      <LiveMeetingPrompt
-        open={promptOpen}
-        meeting={liveMeeting}
-        secondsLeft={secondsLeft}
-        responding={responding}
-        onDecline={respondDecline}
-        onJoin={respondJoin}
-      />
-    </>
+        {/*
+          홈 사이드바(`Sidebar.jsx`)의 하단 프로필과 **같은 자리를 같은 규칙으로
+          그린다.** 예전에는 여기만 고정 이미지(`/figma-icons/global-profile.png`)로
+          때웠는데, 그 파일 자체가 거의 흰 원이라 아바타가 없는 계정은 텅 빈
+          동그라미로 보였다 — 홈 쪽은 이름 첫 글자를 넣어 누구인지 알 수 있는데
+          레일만 다른 사람처럼 보였다.
+        */}
+        {user?.avatarUrl ? (
+          <img src={user.avatarUrl} alt="" />
+        ) : (
+          <span className="profile-avatar" aria-hidden="true">
+            {user?.name ? user.name.trim().charAt(0) : ''}
+          </span>
+        )}
+      </AppLink>
+    </aside>
   )
 }
